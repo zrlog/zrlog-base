@@ -48,6 +48,8 @@ public class CoreModelDatabaseTest {
     public void shouldQueryArticleModelViewsThroughRealTables() throws Exception {
         try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
             seedContent(db);
+            db.update("update log set extensions=? where logId=?",
+                    "{\"metadata\":{\"topicIds\":[\"tech\"],\"priority\":3}}", 1);
             Log log = new Log();
 
             PageData<ArticleBasicDTO> visitorPage = log.visitorFind(page(), "content");
@@ -69,6 +71,10 @@ public class CoreModelDatabaseTest {
             assertEquals("First", adminDefaultSortAsc.getRows().get(0).getTitle());
             assertEquals("First", adminDetail.getTitle());
             assertEquals("First", adminDetailByLongId.getTitle());
+            Map<String, Object> metadataExtensions =
+                    (Map<String, Object>) adminDetail.getExtensions().get("metadata");
+            assertEquals(Collections.singletonList("tech"), metadataExtensions.get("topicIds"));
+            assertEquals(3.0d, metadataExtensions.get("priority"));
             assertEquals("admin", adminDetail.getUserName());
             assertEquals(2L, log.findByTypeAlias(1, 10, "tech").getTotalElements());
             assertEquals(1L, log.findByTag(1, 10, "zrlog").getTotalElements());

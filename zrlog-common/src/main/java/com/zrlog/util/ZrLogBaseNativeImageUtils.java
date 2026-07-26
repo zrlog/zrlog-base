@@ -16,6 +16,7 @@ import com.zrlog.common.cache.vo.HotTypeLogInfo;
 import com.zrlog.common.updater.UpgradeProgressEvent;
 import com.zrlog.common.updater.aws.AwsLambdaUpdateCodeRequest;
 import com.zrlog.common.vo.*;
+import com.zrlog.common.json.JsonObjectMapAdapter;
 import org.apache.commons.dbutils.BasicRowProcessor;
 
 import java.io.BufferedReader;
@@ -90,6 +91,7 @@ public class ZrLogBaseNativeImageUtils {
                 TemplateVO.class,
                 TemplateVO.TemplateConfigMap.class,
                 TemplateVO.TemplateConfigVO.class,
+                JsonObjectMapAdapter.class,
                 MyBasicRowProcessor.class,
                 MyBasicRowProcessor.createMap().getClass()));
         //freemarker

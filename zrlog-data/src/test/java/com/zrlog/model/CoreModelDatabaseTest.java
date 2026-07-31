@@ -107,6 +107,41 @@ public class CoreModelDatabaseTest {
     }
 
     @Test
+    public void shouldOrderAndPaginatePublicHomeArticlesByStickyPriority() throws Exception {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+            seedContent(db);
+            insertArticle(db, 4, "newest", "Newest", "Newest content", "latest",
+                    "2026-02-03 10:00:00", 1, false, false);
+            insertArticle(db, 5, "private-sticky", "Private Sticky", "Private content", "secret",
+                    "2026-02-04 10:00:00", 1, false, true);
+            db.update("update log set sticky=? where logId=?", 5, 1);
+            db.update("update log set sticky=? where logId=?", 5, 2);
+            db.update("update log set sticky=? where logId=?", 100, 3);
+            db.update("update log set sticky=? where logId=?", 100, 5);
+            Log log = new Log();
+
+            PageData<ArticleBasicDTO> firstPage =
+                    log.visitorFindHome(new PageRequestImpl(1L, 2L));
+            PageData<ArticleBasicDTO> secondPage =
+                    log.visitorFindHome(new PageRequestImpl(2L, 2L));
+            PageData<ArticleBasicDTO> visitorPage =
+                    log.visitorFind(new PageRequestImpl(1L, 10L), null);
+
+            assertEquals(3L, firstPage.getTotalElements());
+            assertEquals(2, firstPage.getRows().size());
+            assertEquals("Second", firstPage.getRows().get(0).getTitle());
+            assertEquals(Integer.valueOf(5), firstPage.getRows().get(0).getSticky());
+            assertEquals("First", firstPage.getRows().get(1).getTitle());
+            assertEquals(3L, secondPage.getTotalElements());
+            assertEquals(1, secondPage.getRows().size());
+            assertEquals("Newest", secondPage.getRows().get(0).getTitle());
+            assertEquals(Integer.valueOf(0), secondPage.getRows().get(0).getSticky());
+            assertEquals("Newest", visitorPage.getRows().get(0).getTitle());
+            assertEquals("Second", visitorPage.getRows().get(1).getTitle());
+        }
+    }
+
+    @Test
     public void shouldQueryArticleDetailThroughRealTables() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {

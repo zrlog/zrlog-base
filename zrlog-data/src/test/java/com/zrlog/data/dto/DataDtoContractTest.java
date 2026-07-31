@@ -20,6 +20,7 @@ public class DataDtoContractTest {
         tag.setUrl("/tag/java");
         ArticleBasicDTO dto = new ArticleBasicDTO();
 
+        assertEquals(Integer.valueOf(0), dto.getSticky());
         dto.setId(1L);
         dto.setLogId(2L);
         dto.setAlias("alias");
@@ -32,6 +33,7 @@ public class DataDtoContractTest {
         dto.setDigest("digest");
         dto.setKeywords("java,zrlog");
         dto.setRecommended(true);
+        dto.setSticky(8);
         dto.setReleaseTime("2026-01-01");
         dto.setFullReleaseTime("2026-01-01T00:00:00+08:00");
         dto.setLast_update_date("2026-01-02");
@@ -69,6 +71,7 @@ public class DataDtoContractTest {
         assertEquals("digest", dto.getDigest());
         assertEquals("java,zrlog", dto.getKeywords());
         assertEquals(Boolean.TRUE, dto.getRecommended());
+        assertEquals(Integer.valueOf(8), dto.getSticky());
         assertEquals("2026-01-01", dto.getReleaseTime());
         assertEquals("2026-01-01T00:00:00+08:00", dto.getFullReleaseTime());
         assertEquals("2026-01-02", dto.getLast_update_date());

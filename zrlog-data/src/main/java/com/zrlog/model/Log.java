@@ -153,6 +153,12 @@ public class Log extends BasePageableDAO implements Serializable {
 
     }
 
+    public PageData<ArticleBasicDTO> visitorFindHome(PageRequest pageRequest) {
+        String sql =
+                "select l.*,t.typeName,t.alias as typeAlias,u.userName,u.header as header,(select count(commentId) from " + Comment.TABLE_NAME + " where logId=l.logId) commentSize from " + tableName + " l inner join user u inner join type t where l.rubbish=? and l.privacy=? and u.userId=l.userId and t.typeid=l.typeid order by l.sticky desc,l.logId desc";
+        return queryPageData(sql, pageRequest, new Object[]{false, false}, ArticleBasicDTO.class);
+    }
+
     public PageData<ArticleBasicDTO> visitorFind(PageRequest pageRequest, String keywords) {
         if (StringUtils.isEmpty(keywords)) {
             String sql =

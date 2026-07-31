@@ -7,7 +7,7 @@ import com.hibegin.common.dao.DAO;
  * 用于在版本升级过程中，无法单纯通过SQL更新的问题，使用代码扩展性更强
  */
 public interface UpgradeVersionHandler {
-    Integer SQL_VERSION = 24;
+    Integer SQL_VERSION = 25;
 
     void doUpgrade(DAO dao) throws Exception;
 }

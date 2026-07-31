@@ -143,8 +143,8 @@ public class DbUpgradeService {
                     LOGGER.log(Level.SEVERE, "", e);
                     return;
                 }
+                webSite.updateByKV(CacheService.ZRLOG_SQL_VERSION_KEY, entry.getKey() + "");
             }
-            webSite.updateByKV(CacheService.ZRLOG_SQL_VERSION_KEY, UpgradeVersionHandler.SQL_VERSION + "");
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "", e);
         }

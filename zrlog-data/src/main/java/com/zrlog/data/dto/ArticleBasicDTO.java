@@ -21,6 +21,7 @@ public class ArticleBasicDTO {
     private String digest;
     private String keywords;
     private Boolean recommended;
+    private Integer sticky = 0;
     private String releaseTime;
     private String fullReleaseTime;
     private String last_update_date;
@@ -135,6 +136,14 @@ public class ArticleBasicDTO {
 
     public void setRecommended(Boolean recommended) {
         this.recommended = recommended;
+    }
+
+    public Integer getSticky() {
+        return sticky;
+    }
+
+    public void setSticky(Integer sticky) {
+        this.sticky = sticky;
     }
 
     public String getReleaseTime() {

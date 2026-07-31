@@ -5,7 +5,6 @@ import com.hibegin.common.util.http.HttpUtil;
 import com.hibegin.common.util.http.handle.HttpFileHandle;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.exception.DownloadUpgradeFileException;
-import com.zrlog.business.rest.response.BackupProtectionStatus;
 import com.zrlog.business.rest.response.CheckVersionResponse;
 import com.zrlog.business.rest.response.PreCheckVersionResponse;
 import com.zrlog.business.rest.response.UpgradeProcessResponse;
@@ -236,11 +235,6 @@ public class UpgradeService {
         }
         if (isOnlineUpgradeDisabled()) {
             return buildManualUpgradeResponse(version, backend);
-        }
-        BackupProtectionStatus backupProtection = backupProtectionService.getStatus();
-        if (!Objects.equals(backupProtection.getReady(), true) && !backupRiskAccepted) {
-            return new UpgradeProcessResponse(false,
-                    backendString(backend, "upgrade.backupProtection.riskAcceptanceRequired"));
         }
         File upgradePackage = downloadUpgradePackage(version, progressListener, backend);
         UpdateVersionHandler updateVersionHandler = newOnlineUpdateVersionHandler(version, upgradePackage,

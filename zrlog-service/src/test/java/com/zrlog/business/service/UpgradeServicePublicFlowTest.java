@@ -142,19 +142,6 @@ public class UpgradeServicePublicFlowTest {
     }
 
     @Test
-    public void shouldRequireExplicitRiskAcceptanceBeforeOnlineUpgrade() {
-        FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(futureVersion("99.0.0"));
-        TestableUpgradeService service = new TestableUpgradeService(false, false, false, true,
-                false, false);
-
-        UpgradeProcessResponse blocked = service.doUpgrade(plugin, UpgradeProgressListener.NONE, backend());
-
-        assertFalse(blocked.getFinish());
-        assertEquals("Verify a recent backup or accept the backup risk", blocked.getMessage());
-        assertNull(service.onlinePackage);
-    }
-
-    @Test
     public void shouldFailUpgradeWhenDownloadedPackageChecksumMismatches() throws Exception {
         byte[] packageBytes = "zip-bytes".getBytes(StandardCharsets.UTF_8);
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -232,7 +219,7 @@ public class UpgradeServicePublicFlowTest {
     }
 
     @Test
-    public void shouldDownloadPackageAndRunOnlineUpdateHandler() throws Exception {
+    public void shouldDownloadPackageWhenBackupEvidenceIsMissing() throws Exception {
         byte[] packageBytes = "zip-bytes".getBytes(StandardCharsets.UTF_8);
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/zrlog.zip", exchange -> {
@@ -246,12 +233,13 @@ public class UpgradeServicePublicFlowTest {
             version.setZipDownloadUrl("http://127.0.0.1:" + server.getAddress().getPort() + "/zrlog.zip");
             FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(version);
             FakeUpdateVersionHandler handler = new FakeUpdateVersionHandler(true, "Updated");
-            TestableUpgradeService service = new TestableUpgradeService(false, false, false, true);
+            TestableUpgradeService service = new TestableUpgradeService(false, false, false, true,
+                    false, false);
             service.onlineHandler = handler;
             List<UpgradeProgressEvent.Data> progressEvents = new ArrayList<>();
 
             UpgradeProcessResponse response = service.doUpgrade(plugin,
-                    (event, data) -> progressEvents.add(data), backend());
+                    (event, data) -> progressEvents.add(data), backend(), false);
 
             assertTrue(response.getFinish());
             assertEquals("Updated", response.getMessage());

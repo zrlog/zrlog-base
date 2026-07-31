@@ -29,12 +29,12 @@ public class BackupProtectionServiceTest {
     }
 
     @Test
-    public void shouldRequireAcceptanceWhenBackupEvidenceIsMissing() {
+    public void shouldReportMissingEvidenceWithoutRequiringAcceptance() {
         BackupProtectionStatus status = service(new HashMap<>()).getStatus();
 
         assertEquals(BackupProtectionStatus.MISSING_BACKUP, status.getStatus());
         assertFalse(status.getReady());
-        assertTrue(status.getRequiresRiskAcceptance());
+        assertFalse(status.getRequiresRiskAcceptance());
     }
 
     @Test

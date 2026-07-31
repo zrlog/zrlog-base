@@ -94,7 +94,7 @@ public class BackupProtectionService {
         boolean ready = BackupProtectionStatus.READY.equals(result);
         status.setStatus(result);
         status.setReady(ready);
-        status.setRequiresRiskAcceptance(!ready);
+        status.setRequiresRiskAcceptance(false);
     }
 
     private static boolean validEvidence(BackupProtectionStatus status, long now) {

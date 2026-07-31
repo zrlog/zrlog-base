@@ -127,13 +127,14 @@ public class DbUpgradeServiceDatabaseTest {
         String previousConfPath = System.getProperty("sws.conf.path");
         File confFolder = writeUpgradeSql("partial-webapi-article-extension",
                 "ALTER TABLE log ADD COLUMN extensions longtext DEFAULT NULL;\n"
-                        + "CREATE TABLE IF NOT EXISTS log_extension_index(id integer primary key);\n", 24);
+                        + "CREATE TABLE IF NOT EXISTS log_extension_index(id integer primary key);\n"
+                        + "CREATE INDEX log_extension_article ON log_extension_index(id);\n"
+                        + "CREATE INDEX log_extension_filter ON log_extension_index(id);\n", 24);
         writeUpgradeSql(confFolder, bundledUpgradeSql(UpgradeVersionHandler.SQL_VERSION),
                 UpgradeVersionHandler.SQL_VERSION);
         try {
             System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
             try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
-                db.update("drop table log_extension_index");
                 db.update("alter table log drop column sticky");
 
                 new DbUpgradeService(asWebApi(db.dataSource()), 23).tryDoUpgrade();

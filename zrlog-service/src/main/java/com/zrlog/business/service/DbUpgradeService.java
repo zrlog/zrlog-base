@@ -129,10 +129,10 @@ public class DbUpgradeService {
                         try {
                             dao.execute(sql);
                         } catch (Exception e) {
-                            if (!isAlreadyAppliedWebApiColumn(sql, e)) {
+                            if (!isAlreadyAppliedWebApiSchemaChange(sql, e)) {
                                 throw e;
                             }
-                            LOGGER.info("Skip already applied WebApi column migration: " + sql);
+                            LOGGER.info("Skip already applied WebApi schema migration: " + sql);
                         }
                     }
                 } catch (Exception e) {
@@ -157,17 +157,26 @@ public class DbUpgradeService {
         }
     }
 
-    private boolean isAlreadyAppliedWebApiColumn(String sql, Exception exception) {
+    private boolean isAlreadyAppliedWebApiSchemaChange(String sql, Exception exception) {
         if (!dataSource.isWebApi()) {
             return false;
         }
         String normalizedSql = sql.trim().toLowerCase(Locale.ROOT);
-        if (!normalizedSql.startsWith("alter table ") || !normalizedSql.contains(" add column ")) {
+        boolean addColumn = normalizedSql.startsWith("alter table ") && normalizedSql.contains(" add column ");
+        boolean createIndex = normalizedSql.startsWith("create index ");
+        if (!addColumn && !createIndex) {
             return false;
         }
         for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
             String message = cause.getMessage();
-            if (message != null && message.toLowerCase(Locale.ROOT).contains("duplicate column name")) {
+            if (message == null) {
+                continue;
+            }
+            String normalizedMessage = message.toLowerCase(Locale.ROOT);
+            if (addColumn && normalizedMessage.contains("duplicate column name")) {
+                return true;
+            }
+            if (createIndex && normalizedMessage.contains("already exists")) {
                 return true;
             }
         }

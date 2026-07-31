@@ -1,5 +1,7 @@
 package com.zrlog.business.service;
 
+import com.hibegin.common.dao.DataSourceWrapper;
+import com.hibegin.common.dao.SqlConvertUtils;
 import com.zrlog.business.support.InMemoryZrLogDatabase;
 import com.zrlog.business.version.UpgradeVersionHandler;
 import com.zrlog.common.CacheService;
@@ -9,11 +11,16 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class DbUpgradeServiceDatabaseTest {
 
@@ -116,6 +123,46 @@ public class DbUpgradeServiceDatabaseTest {
     }
 
     @Test
+    public void shouldResumePartiallyAppliedArticleExtensionMigrationForWebApi() throws Exception {
+        String previousConfPath = System.getProperty("sws.conf.path");
+        File confFolder = writeUpgradeSql("partial-webapi-article-extension",
+                "ALTER TABLE log ADD COLUMN extensions longtext DEFAULT NULL;\n"
+                        + "CREATE TABLE IF NOT EXISTS log_extension_index(id integer primary key);\n", 24);
+        writeUpgradeSql(confFolder, bundledUpgradeSql(UpgradeVersionHandler.SQL_VERSION),
+                UpgradeVersionHandler.SQL_VERSION);
+        try {
+            System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
+            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+                db.update("drop table log_extension_index");
+                db.update("alter table log drop column sticky");
+
+                new DbUpgradeService(asWebApi(db.dataSource()), 23).tryDoUpgrade();
+
+                assertEquals(0L, ((Number) db.scalar("select count(extensions) from log")).longValue());
+                assertEquals(0L, ((Number) db.scalar("select count(1) from log_extension_index")).longValue());
+                assertEquals(0L, ((Number) db.scalar("select count(sticky) from log")).longValue());
+                assertEquals(String.valueOf(UpgradeVersionHandler.SQL_VERSION),
+                        db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+            }
+        } finally {
+            restoreProperty("sws.conf.path", previousConfPath);
+        }
+    }
+
+    @Test
+    public void shouldConvertArticleExtensionMigrationToD1CompatibleStatements() throws Exception {
+        List<String> statements = SqlConvertUtils.doMySQLToSqliteBySqlText(bundledUpgradeSql(24));
+
+        assertEquals(4, statements.size());
+        assertTrue(statements.get(1).contains("INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT"));
+        assertFalse(statements.get(1).contains("AUTO_INCREMENT"));
+        assertFalse(statements.get(1).contains("log_extension_article"));
+        assertFalse(statements.get(1).contains("log_extension_filter"));
+        assertTrue(statements.stream().anyMatch(sql -> sql.startsWith("CREATE INDEX `log_extension_article`")));
+        assertTrue(statements.stream().anyMatch(sql -> sql.startsWith("CREATE INDEX `log_extension_filter`")));
+    }
+
+    @Test
     public void shouldResumeAfterLaterMigrationFailsWithoutReplayingArticleExtensions() throws Exception {
         String previousConfPath = System.getProperty("sws.conf.path");
         File confFolder = writeUpgradeSql("resumable-article-migrations",
@@ -185,6 +232,22 @@ public class DbUpgradeServiceDatabaseTest {
             }
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         }
+    }
+
+    private DataSourceWrapper asWebApi(DataSourceWrapper delegate) {
+        return (DataSourceWrapper) Proxy.newProxyInstance(
+                DataSourceWrapper.class.getClassLoader(),
+                new Class[]{DataSourceWrapper.class},
+                (proxy, method, args) -> {
+                    if ("isWebApi".equals(method.getName())) {
+                        return true;
+                    }
+                    try {
+                        return method.invoke(delegate, args);
+                    } catch (InvocationTargetException e) {
+                        throw e.getCause();
+                    }
+                });
     }
 
     private static void restoreProperty(String key, String value) {

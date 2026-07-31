@@ -126,7 +126,14 @@ public class DbUpgradeService {
                         if (StringUtils.isEmpty(sql.trim())) {
                             continue;
                         }
-                        dao.execute(sql);
+                        try {
+                            dao.execute(sql);
+                        } catch (Exception e) {
+                            if (!isAlreadyAppliedWebApiColumn(sql, e)) {
+                                throw e;
+                            }
+                            LOGGER.info("Skip already applied WebApi column migration: " + sql);
+                        }
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "execution sql ", e);
@@ -148,5 +155,22 @@ public class DbUpgradeService {
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "", e);
         }
+    }
+
+    private boolean isAlreadyAppliedWebApiColumn(String sql, Exception exception) {
+        if (!dataSource.isWebApi()) {
+            return false;
+        }
+        String normalizedSql = sql.trim().toLowerCase(Locale.ROOT);
+        if (!normalizedSql.startsWith("alter table ") || !normalizedSql.contains(" add column ")) {
+            return false;
+        }
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            String message = cause.getMessage();
+            if (message != null && message.toLowerCase(Locale.ROOT).contains("duplicate column name")) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -5,6 +5,7 @@ import com.hibegin.common.util.http.HttpUtil;
 import com.hibegin.common.util.http.handle.HttpFileHandle;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.exception.DownloadUpgradeFileException;
+import com.zrlog.business.rest.response.BackupProtectionStatus;
 import com.zrlog.business.rest.response.CheckVersionResponse;
 import com.zrlog.business.rest.response.PreCheckVersionResponse;
 import com.zrlog.business.rest.response.UpgradeProcessResponse;
@@ -18,8 +19,11 @@ import com.zrlog.util.ThreadUtils;
 import com.zrlog.util.ZrLogUtil;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -28,6 +32,15 @@ import java.util.concurrent.atomic.AtomicReference;
 public class UpgradeService {
 
     private final UpgradeNoticeService upgradeNoticeService = new UpgradeNoticeService();
+    private final BackupProtectionService backupProtectionService;
+
+    public UpgradeService() {
+        this(new BackupProtectionService());
+    }
+
+    UpgradeService(BackupProtectionService backupProtectionService) {
+        this.backupProtectionService = backupProtectionService;
+    }
 
     public CheckVersionResponse getCheckVersionResponse(boolean fetchAble, UpdateVersionInfoPlugin plugin) {
         if (Objects.isNull(plugin)) {
@@ -67,6 +80,9 @@ public class UpgradeService {
         checkVersionResponse.setSystemServiceMode(isSystemServiceMode());
         boolean disable = isOnlineUpgradeDisabled();
         checkVersionResponse.setOnlineUpgradable(!disable);
+        if (!disable) {
+            checkVersionResponse.setBackupProtection(backupProtectionService.getStatus());
+        }
         if (disable && Objects.equals(checkVersionResponse.getUpgrade(), true)) {
             UpgradeProcessResponse upgradeProcessResponse = buildManualUpgradeResponse(checkVersionResponse.getVersion(),
                     I18nUtil.getBackend());
@@ -76,6 +92,10 @@ public class UpgradeService {
     }
 
     static boolean isErrorFile(File file, long length, String md5sum) {
+        return isErrorFile(file, length, null, md5sum);
+    }
+
+    static boolean isErrorFile(File file, long length, String sha256, String md5sum) {
         try {
             if (Objects.isNull(file) || !file.exists()) {
                 return true;
@@ -84,6 +104,9 @@ public class UpgradeService {
             if (length > 0 && length != file.length()) {
                 return true;
             }
+            if (StringUtils.isNotEmpty(sha256)) {
+                return !sha256ByFile(file).equalsIgnoreCase(sha256);
+            }
             if (StringUtils.isNotEmpty(md5sum)) {
                 return !SecurityUtils.md5ByFile(file).equals(md5sum);
             }
@@ -91,6 +114,22 @@ public class UpgradeService {
         } catch (Exception e) {
             return true;
         }
+    }
+
+    static String sha256ByFile(File file) throws IOException, NoSuchAlgorithmException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        try (FileInputStream inputStream = new FileInputStream(file)) {
+            byte[] buffer = new byte[8192];
+            int length;
+            while ((length = inputStream.read(buffer)) >= 0) {
+                digest.update(buffer, 0, length);
+            }
+        }
+        StringBuilder hex = new StringBuilder();
+        for (byte value : digest.digest()) {
+            hex.append(String.format("%02x", value & 0xff));
+        }
+        return hex.toString();
     }
 
     static int getDownloadProcess(File file, long totalLength) {
@@ -123,12 +162,17 @@ public class UpgradeService {
         return isWarMode() ? version.getWarMd5sum() : version.getZipMd5sum();
     }
 
+    private String getPackageSha256(Version version) {
+        return isWarMode() ? version.getWarSha256() : version.getZipSha256();
+    }
+
     private File downloadUpgradePackage(Version version, UpgradeProgressListener progressListener,
                                         Map<String, Object> backend) {
         HttpFileHandle fileHandle = createFileHandle();
         File file = fileHandle.getT();
         String downloadUrl = getPackageDownloadUrl(version);
         long fileSize = getPackageFileSize(version);
+        String sha256 = getPackageSha256(version);
         String md5sum = getPackageMd5sum(version);
         publishProgress(progressListener, UpgradeProgressEvent.STAGE_DOWNLOAD, UpgradeProgressEvent.STATUS_RUNNING,
                 getDownloadMessage(backend, null), null);
@@ -162,7 +206,7 @@ public class UpgradeService {
             }
         }
         if (Objects.nonNull(downloadException.get()) || fileHandle.getStatusCode() != 200 ||
-                isErrorFile(file, fileSize, md5sum)) {
+                isErrorFile(file, fileSize, sha256, md5sum)) {
             throw new DownloadUpgradeFileException(downloadException.get());
         }
         publishProgress(progressListener, UpgradeProgressEvent.STAGE_DOWNLOAD, UpgradeProgressEvent.STATUS_COMPLETE,
@@ -180,6 +224,11 @@ public class UpgradeService {
 
     public UpgradeProcessResponse doUpgrade(UpdateVersionInfoPlugin plugin, UpgradeProgressListener progressListener,
                                             Map<String, Object> backend) {
+        return doUpgrade(plugin, progressListener, backend, false);
+    }
+
+    public UpgradeProcessResponse doUpgrade(UpdateVersionInfoPlugin plugin, UpgradeProgressListener progressListener,
+                                            Map<String, Object> backend, boolean backupRiskAccepted) {
         CheckVersionResponse checkVersionResponse = getCheckVersionResponse(true, plugin);
         Version version = checkVersionResponse.getVersion();
         if (Objects.isNull(version) || !Objects.equals(checkVersionResponse.getUpgrade(), true)) {
@@ -187,6 +236,11 @@ public class UpgradeService {
         }
         if (isOnlineUpgradeDisabled()) {
             return buildManualUpgradeResponse(version, backend);
+        }
+        BackupProtectionStatus backupProtection = backupProtectionService.getStatus();
+        if (!Objects.equals(backupProtection.getReady(), true) && !backupRiskAccepted) {
+            return new UpgradeProcessResponse(false,
+                    backendString(backend, "upgrade.backupProtection.riskAcceptanceRequired"));
         }
         File upgradePackage = downloadUpgradePackage(version, progressListener, backend);
         UpdateVersionHandler updateVersionHandler = newOnlineUpdateVersionHandler(version, upgradePackage,

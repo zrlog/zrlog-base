@@ -3,6 +3,7 @@ package com.zrlog.business.service;
 import com.sun.net.httpserver.HttpServer;
 import com.zrlog.business.exception.DownloadUpgradeFileException;
 import com.zrlog.business.rest.response.CheckVersionResponse;
+import com.zrlog.business.rest.response.BackupProtectionStatus;
 import com.zrlog.business.rest.response.PreCheckVersionResponse;
 import com.zrlog.business.rest.response.UpgradeProcessResponse;
 import com.zrlog.common.updater.UpgradeProgressEvent;
@@ -141,6 +142,19 @@ public class UpgradeServicePublicFlowTest {
     }
 
     @Test
+    public void shouldRequireExplicitRiskAcceptanceBeforeOnlineUpgrade() {
+        FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(futureVersion("99.0.0"));
+        TestableUpgradeService service = new TestableUpgradeService(false, false, false, true,
+                false, false);
+
+        UpgradeProcessResponse blocked = service.doUpgrade(plugin, UpgradeProgressListener.NONE, backend());
+
+        assertFalse(blocked.getFinish());
+        assertEquals("Verify a recent backup or accept the backup risk", blocked.getMessage());
+        assertNull(service.onlinePackage);
+    }
+
+    @Test
     public void shouldFailUpgradeWhenDownloadedPackageChecksumMismatches() throws Exception {
         byte[] packageBytes = "zip-bytes".getBytes(StandardCharsets.UTF_8);
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -271,6 +285,8 @@ public class UpgradeServicePublicFlowTest {
         backend.put("upgrade.tips.systemService", "/etc/init.d/zrlog upgrade");
         backend.put("upgrade.status.downloading", "Downloading");
         backend.put("upgrade.status.downloaded", "Downloaded");
+        backend.put("upgrade.backupProtection.riskAcceptanceRequired",
+                "Verify a recent backup or accept the backup risk");
         return backend;
     }
 
@@ -312,11 +328,31 @@ public class UpgradeServicePublicFlowTest {
 
         TestableUpgradeService(boolean dockerMode, boolean systemServiceMode, boolean faasMode,
                                boolean faasOnlineUpgradeSupported, boolean warMode) {
+            this(dockerMode, systemServiceMode, faasMode, faasOnlineUpgradeSupported, warMode, true);
+        }
+
+        TestableUpgradeService(boolean dockerMode, boolean systemServiceMode, boolean faasMode,
+                               boolean faasOnlineUpgradeSupported, boolean warMode, boolean backupReady) {
+            super(backupProtection(backupReady));
             this.dockerMode = dockerMode;
             this.systemServiceMode = systemServiceMode;
             this.faasMode = faasMode;
             this.faasOnlineUpgradeSupported = faasOnlineUpgradeSupported;
             this.warMode = warMode;
+        }
+
+        private static BackupProtectionService backupProtection(boolean ready) {
+            return new BackupProtectionService() {
+                @Override
+                public BackupProtectionStatus getStatus() {
+                    BackupProtectionStatus status = new BackupProtectionStatus();
+                    status.setReady(ready);
+                    status.setRequiresRiskAcceptance(!ready);
+                    status.setStatus(ready ? BackupProtectionStatus.READY
+                            : BackupProtectionStatus.MISSING_VERIFICATION);
+                    return status;
+                }
+            };
         }
 
         @Override

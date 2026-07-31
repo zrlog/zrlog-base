@@ -49,6 +49,11 @@ public class UpgradeServiceHelpersTest {
         assertTrue(UpgradeService.isErrorFile(file, 6L, ""));
         assertTrue(UpgradeService.isErrorFile(file, 5L, "bad-md5"));
         assertFalse(UpgradeService.isErrorFile(file, 5L, "5d41402abc4b2a76b9719d911017c592"));
+        assertTrue(UpgradeService.isErrorFile(file, 5L, "bad-sha256",
+                "5d41402abc4b2a76b9719d911017c592"));
+        assertFalse(UpgradeService.isErrorFile(file, 5L,
+                "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+                "bad-md5"));
         assertFalse(UpgradeService.isErrorFile(file, 0L, ""));
     }
 

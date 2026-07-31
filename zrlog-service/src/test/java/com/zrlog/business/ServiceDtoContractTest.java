@@ -10,6 +10,7 @@ import com.zrlog.business.rest.response.CheckVersionResponse;
 import com.zrlog.business.rest.response.PluginCoreStatus;
 import com.zrlog.business.rest.response.PluginStatusResponse;
 import com.zrlog.business.rest.response.PreCheckVersionResponse;
+import com.zrlog.business.rest.response.BackupProtectionStatus;
 import com.zrlog.business.rest.response.PublicInfoVO;
 import com.zrlog.business.rest.response.UpgradeProcessResponse;
 import com.zrlog.common.exception.AbstractBusinessException;
@@ -40,6 +41,7 @@ public class ServiceDtoContractTest {
         assertBeanProperties(CheckVersionResponse.class);
         assertBeanProperties(PluginStatusResponse.class);
         assertBeanProperties(PreCheckVersionResponse.class);
+        assertBeanProperties(BackupProtectionStatus.class);
         assertBeanProperties(RequestInfo.class);
     }
 

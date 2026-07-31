@@ -45,6 +45,12 @@ public class Version implements Serializable {
 
     private String zipDownloadUrl;
     private String warMd5sum;
+    private String checksumAlgorithm;
+    private String zipSha256;
+    private String warSha256;
+    private String sourceCommit;
+    private String sourceRepository;
+    private String buildWorkflow;
 
     public String getZipMd5sum() {
         return zipMd5sum;
@@ -52,6 +58,54 @@ public class Version implements Serializable {
 
     public void setZipMd5sum(String zipMd5sum) {
         this.zipMd5sum = zipMd5sum;
+    }
+
+    public String getChecksumAlgorithm() {
+        return checksumAlgorithm;
+    }
+
+    public void setChecksumAlgorithm(String checksumAlgorithm) {
+        this.checksumAlgorithm = checksumAlgorithm;
+    }
+
+    public String getZipSha256() {
+        return zipSha256;
+    }
+
+    public void setZipSha256(String zipSha256) {
+        this.zipSha256 = zipSha256;
+    }
+
+    public String getWarSha256() {
+        return warSha256;
+    }
+
+    public void setWarSha256(String warSha256) {
+        this.warSha256 = warSha256;
+    }
+
+    public String getSourceCommit() {
+        return sourceCommit;
+    }
+
+    public void setSourceCommit(String sourceCommit) {
+        this.sourceCommit = sourceCommit;
+    }
+
+    public String getSourceRepository() {
+        return sourceRepository;
+    }
+
+    public void setSourceRepository(String sourceRepository) {
+        this.sourceRepository = sourceRepository;
+    }
+
+    public String getBuildWorkflow() {
+        return buildWorkflow;
+    }
+
+    public void setBuildWorkflow(String buildWorkflow) {
+        this.buildWorkflow = buildWorkflow;
     }
 
     private String zipMd5sum;

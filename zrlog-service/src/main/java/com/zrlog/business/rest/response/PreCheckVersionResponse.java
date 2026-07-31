@@ -6,6 +6,7 @@ public class PreCheckVersionResponse extends CheckVersionResponse {
     private String disableUpgradeReason;
     private Boolean dockerMode;
     private Boolean systemServiceMode;
+    private BackupProtectionStatus backupProtection;
 
     public Boolean getOnlineUpgradable() {
         return onlineUpgradable;
@@ -39,5 +40,13 @@ public class PreCheckVersionResponse extends CheckVersionResponse {
     @Deprecated
     public void setSystemServiceMode(Boolean systemServiceMode) {
         this.systemServiceMode = systemServiceMode;
+    }
+
+    public BackupProtectionStatus getBackupProtection() {
+        return backupProtection;
+    }
+
+    public void setBackupProtection(BackupProtectionStatus backupProtection) {
+        this.backupProtection = backupProtection;
     }
 }

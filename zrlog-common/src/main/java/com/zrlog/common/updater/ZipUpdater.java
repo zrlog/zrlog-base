@@ -6,12 +6,14 @@ import com.zrlog.common.Constants;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
 import com.zrlog.common.vo.Version;
+import com.zrlog.util.ArgsParser;
 
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -36,7 +38,7 @@ public class ZipUpdater implements Updater {
         return UpdaterTypeEnum.ZIP;
     }
 
-    public void restartProcessAsync(Version upgradeVersion) {
+    List<String> buildRestartCommand() {
         List<String> inputArguments = ManagementFactory.getRuntimeMXBean().getInputArguments();
         // 构造完整的命令
         List<String> cmdArgs = new ArrayList<>();
@@ -46,8 +48,15 @@ public class ZipUpdater implements Updater {
         cmdArgs.add(execFile.toString());
         cmdArgs.addAll(Arrays.asList(args));
         if (cmdArgs.stream().noneMatch(e -> e.startsWith("--port="))) {
-            cmdArgs.add("--port=" + Constants.zrLogConfig.getServerConfig().getPort());
+            int port = Objects.nonNull(Constants.zrLogConfig) ? Constants.zrLogConfig.getServerConfig().getPort() :
+                    ArgsParser.getPort(args);
+            cmdArgs.add("--port=" + port);
         }
+        return cmdArgs;
+    }
+
+    public void restartProcessAsync(Version upgradeVersion) {
+        List<String> cmdArgs = buildRestartCommand();
         LOGGER.info("ZrLog file updated. exec cmd\n" + String.join(" ", cmdArgs));
         RestartProcessRunner.restartAsync(() -> Runtime.getRuntime().exec(cmdArgs.toArray(new String[0])));
     }

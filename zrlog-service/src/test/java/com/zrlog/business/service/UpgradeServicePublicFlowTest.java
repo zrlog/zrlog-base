@@ -10,6 +10,7 @@ import com.zrlog.common.updater.UpgradeProgressEvent;
 import com.zrlog.common.updater.UpdateVersionHandler;
 import com.zrlog.business.updater.UpdateVersionInfoPlugin;
 import com.zrlog.common.updater.UpgradeProgressListener;
+import com.zrlog.common.Updater;
 import com.zrlog.common.updater.handle.FaasUpdateVersionHandler;
 import com.zrlog.common.updater.handle.WarUpdateVersionHandle;
 import com.zrlog.common.updater.handle.ZipUpdateVersionHandle;
@@ -92,6 +93,14 @@ public class UpgradeServicePublicFlowTest {
         assertEquals("No change", response.getMessage());
         assertEquals(1, plugin.fetchTrueCount);
         assertEquals(1, plugin.fetchFalseCount);
+    }
+
+    @Test
+    public void shouldRejectExplicitUpgradeWithoutUpdater() {
+        UpgradeProcessResponse response = new TestableUpgradeService(false, false, false, true)
+                .doUpgrade(futureVersion("99.0.0"), null, UpgradeProgressListener.NONE, backend());
+
+        assertFalse(response.getFinish());
     }
 
     @Test
@@ -371,12 +380,12 @@ public class UpgradeServicePublicFlowTest {
         @Override
         UpdateVersionHandler newOnlineUpdateVersionHandler(Version version, File upgradePackage,
                                                            UpgradeProgressListener progressListener,
-                                                           Map<String, Object> backend) {
+                                                           Map<String, Object> backend, Updater updater) {
             onlinePackage = upgradePackage;
             if (onlineHandler != null) {
                 return onlineHandler;
             }
-            return super.newOnlineUpdateVersionHandler(version, upgradePackage, progressListener, backend);
+            return super.newOnlineUpdateVersionHandler(version, upgradePackage, progressListener, backend, updater);
         }
     }
 

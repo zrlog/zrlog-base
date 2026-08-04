@@ -24,6 +24,7 @@ public class ZipUpdateVersionHandle implements Serializable, UpdateVersionHandle
     private final Map<String, Object> backendRes;
     private final Version upgradeVersion;
     private final UpgradeProgressListener progressListener;
+    private final Updater updater;
 
     public ZipUpdateVersionHandle(File file, Map<String, Object> backendRes, Version upgradeVersion) {
         this(file, backendRes, upgradeVersion, UpgradeProgressListener.NONE);
@@ -31,10 +32,16 @@ public class ZipUpdateVersionHandle implements Serializable, UpdateVersionHandle
 
     public ZipUpdateVersionHandle(File file, Map<String, Object> backendRes, Version upgradeVersion,
                                   UpgradeProgressListener progressListener) {
+        this(file, backendRes, upgradeVersion, progressListener, null);
+    }
+
+    public ZipUpdateVersionHandle(File file, Map<String, Object> backendRes, Version upgradeVersion,
+                                  UpgradeProgressListener progressListener, Updater updater) {
         this.file = file;
         this.backendRes = backendRes;
         this.upgradeVersion = upgradeVersion;
         this.progressListener = progressListener;
+        this.updater = updater;
     }
 
     /**
@@ -75,10 +82,11 @@ public class ZipUpdateVersionHandle implements Serializable, UpdateVersionHandle
 
     @Override
     public void doHandle() {
+        Updater currentUpdater = Objects.requireNonNullElseGet(updater, () -> Constants.zrLogConfig.getUpdater());
         publishStatus(UpgradeProgressEvent.STAGE_UNZIP, UpgradeProgressEvent.STATUS_RUNNING,
                 "upgrade.status.unzipping", file.getName());
         try {
-            ZipUtil.unZip(file.toString(), Constants.zrLogConfig.getUpdater().getUnzipPath());
+            ZipUtil.unZip(file.toString(), currentUpdater.getUnzipPath());
         } catch (Exception e) {
             publishStatus(UpgradeProgressEvent.STAGE_ERROR, UpgradeProgressEvent.STATUS_ERROR, "upgrade.error.unzip",
                     e.getMessage());
@@ -93,8 +101,7 @@ public class ZipUpdateVersionHandle implements Serializable, UpdateVersionHandle
             if (finish) {
                 return;
             }
-            Updater updater = Constants.zrLogConfig.getUpdater();
-            updater.restartProcessAsync(upgradeVersion);
+            currentUpdater.restartProcessAsync(upgradeVersion);
             publishStatus(UpgradeProgressEvent.STAGE_RESTART, UpgradeProgressEvent.STATUS_COMPLETE,
                     "upgrade.status.restartSubmitted", null);
             publishStatus(UpgradeProgressEvent.STAGE_COMPLETE, UpgradeProgressEvent.STATUS_COMPLETE,

@@ -15,7 +15,9 @@ class RestartProcessRunner {
     static void restartAsync(ProcessStarter processStarter) {
         Thread thread = new Thread(() -> {
             try {
-                Constants.zrLogConfig.stop();
+                if (Constants.zrLogConfig != null) {
+                    Constants.zrLogConfig.stop();
+                }
                 Thread.sleep(2000);
                 processStarter.start();
                 System.exit(0);

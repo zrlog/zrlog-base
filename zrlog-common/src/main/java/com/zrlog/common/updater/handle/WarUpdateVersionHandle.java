@@ -23,6 +23,7 @@ public class WarUpdateVersionHandle implements Serializable, UpdateVersionHandle
     private final String upgradeKey;
     private final Version version;
     private final UpgradeProgressListener progressListener;
+    private final Updater updater;
 
     public WarUpdateVersionHandle(File file, Map<String, Object> backendRes, String upgradeKey, Version version) {
         this(file, backendRes, upgradeKey, version, UpgradeProgressListener.NONE);
@@ -30,11 +31,17 @@ public class WarUpdateVersionHandle implements Serializable, UpdateVersionHandle
 
     public WarUpdateVersionHandle(File file, Map<String, Object> backendRes, String upgradeKey, Version version,
                                   UpgradeProgressListener progressListener) {
+        this(file, backendRes, upgradeKey, version, progressListener, null);
+    }
+
+    public WarUpdateVersionHandle(File file, Map<String, Object> backendRes, String upgradeKey, Version version,
+                                  UpgradeProgressListener progressListener, Updater updater) {
         this.file = file;
         this.backendRes = backendRes;
         this.upgradeKey = upgradeKey;
         this.version = version;
         this.progressListener = progressListener;
+        this.updater = updater;
     }
 
     /**
@@ -53,19 +60,19 @@ public class WarUpdateVersionHandle implements Serializable, UpdateVersionHandle
     @Override
     public void doHandle() {
         try {
-            Updater updater = Constants.zrLogConfig.getUpdater();
+            Updater currentUpdater = Objects.requireNonNullElseGet(updater, () -> Constants.zrLogConfig.getUpdater());
             if (Objects.isNull(backup)) {
                 publishStatus(UpgradeProgressEvent.STAGE_BACKUP, UpgradeProgressEvent.STATUS_RUNNING,
                         "upgrade.status.backingUp", null);
-                backup = updater.backup();
+                backup = currentUpdater.backup();
             }
             publishStatus(UpgradeProgressEvent.STAGE_BACKUP, UpgradeProgressEvent.STATUS_COMPLETE,
                     "upgrade.status.backup", backup);
             if (Objects.isNull(upgradeFile)) {
                 publishStatus(UpgradeProgressEvent.STAGE_MERGE, UpgradeProgressEvent.STATUS_RUNNING,
                         "upgrade.status.merge", null);
-                updater.restartProcessAsync(version);
-                upgradeFile = updater.buildUpgradeFile(file.toString(), upgradeKey);
+                currentUpdater.restartProcessAsync(version);
+                upgradeFile = currentUpdater.buildUpgradeFile(file.toString(), upgradeKey);
             }
             publishStatus(UpgradeProgressEvent.STAGE_MERGE, UpgradeProgressEvent.STATUS_COMPLETE,
                     "upgrade.status.merged", upgradeFile);

@@ -12,6 +12,8 @@ import com.zrlog.business.updater.UpdateVersionInfoPlugin;
 import com.zrlog.common.updater.*;
 import com.zrlog.common.updater.handle.*;
 import com.zrlog.common.Constants;
+import com.zrlog.common.Updater;
+import com.zrlog.common.UpdaterTypeEnum;
 import com.zrlog.common.vo.Version;
 import com.zrlog.util.I18nUtil;
 import com.zrlog.util.ThreadUtils;
@@ -138,9 +140,8 @@ public class UpgradeService {
         return (int) Math.min(file.length() * 100 / totalLength, 100);
     }
 
-    private HttpFileHandle createFileHandle() {
-        File updateTempPath = Objects.nonNull(Constants.zrLogConfig) && Objects.nonNull(Constants.zrLogConfig.getUpdater()) ?
-                Constants.zrLogConfig.getUpdater().getUpdateTempPath() : new File(PathUtil.getTempPath());
+    private HttpFileHandle createFileHandle(Updater updater) {
+        File updateTempPath = Objects.nonNull(updater) ? updater.getUpdateTempPath() : new File(PathUtil.getTempPath());
         File file = new File(updateTempPath, "zrlog-" + System.currentTimeMillis() + "-" +
                 Math.abs(System.nanoTime()) + ".zip");
         file.getParentFile().mkdirs();
@@ -149,30 +150,30 @@ public class UpgradeService {
         return handle;
     }
 
-    private String getPackageDownloadUrl(Version version) {
-        return isWarMode() ? version.getWarDownloadUrl() : version.getZipDownloadUrl();
+    private String getPackageDownloadUrl(Version version, Updater updater) {
+        return isWarMode(updater) ? version.getWarDownloadUrl() : version.getZipDownloadUrl();
     }
 
-    private long getPackageFileSize(Version version) {
-        return isWarMode() ? version.getWarFileSize() : version.getZipFileSize();
+    private long getPackageFileSize(Version version, Updater updater) {
+        return isWarMode(updater) ? version.getWarFileSize() : version.getZipFileSize();
     }
 
-    private String getPackageMd5sum(Version version) {
-        return isWarMode() ? version.getWarMd5sum() : version.getZipMd5sum();
+    private String getPackageMd5sum(Version version, Updater updater) {
+        return isWarMode(updater) ? version.getWarMd5sum() : version.getZipMd5sum();
     }
 
-    private String getPackageSha256(Version version) {
-        return isWarMode() ? version.getWarSha256() : version.getZipSha256();
+    private String getPackageSha256(Version version, Updater updater) {
+        return isWarMode(updater) ? version.getWarSha256() : version.getZipSha256();
     }
 
     private File downloadUpgradePackage(Version version, UpgradeProgressListener progressListener,
-                                        Map<String, Object> backend) {
-        HttpFileHandle fileHandle = createFileHandle();
+                                        Map<String, Object> backend, Updater updater) {
+        HttpFileHandle fileHandle = createFileHandle(updater);
         File file = fileHandle.getT();
-        String downloadUrl = getPackageDownloadUrl(version);
-        long fileSize = getPackageFileSize(version);
-        String sha256 = getPackageSha256(version);
-        String md5sum = getPackageMd5sum(version);
+        String downloadUrl = getPackageDownloadUrl(version, updater);
+        long fileSize = getPackageFileSize(version, updater);
+        String sha256 = getPackageSha256(version, updater);
+        String md5sum = getPackageMd5sum(version, updater);
         publishProgress(progressListener, UpgradeProgressEvent.STAGE_DOWNLOAD, UpgradeProgressEvent.STATUS_RUNNING,
                 getDownloadMessage(backend, null), null);
         AtomicReference<Exception> downloadException = new AtomicReference<>();
@@ -233,12 +234,32 @@ public class UpgradeService {
         if (Objects.isNull(version) || !Objects.equals(checkVersionResponse.getUpgrade(), true)) {
             return new UpgradeProcessResponse(true, backendString(backend, "upgrade.result.noChange"));
         }
+        Updater updater = Objects.nonNull(Constants.zrLogConfig) ? Constants.zrLogConfig.getUpdater() : null;
         if (isOnlineUpgradeDisabled()) {
             return buildManualUpgradeResponse(version, backend);
         }
-        File upgradePackage = downloadUpgradePackage(version, progressListener, backend);
+        File upgradePackage = downloadUpgradePackage(version, progressListener, backend, updater);
         UpdateVersionHandler updateVersionHandler = newOnlineUpdateVersionHandler(version, upgradePackage,
                 progressListener, backend);
+        updateVersionHandler.doHandle();
+        return new UpgradeProcessResponse(updateVersionHandler.isFinish(), updateVersionHandler.getMessage());
+    }
+
+    public UpgradeProcessResponse doUpgrade(Version version, Updater updater,
+                                            UpgradeProgressListener progressListener, Map<String, Object> backend) {
+        if (Objects.isNull(version) || !ZrLogUtil.greatThenCurrentVersion(version.getBuildId(),
+                version.getBuildDate(), version.getVersion())) {
+            return new UpgradeProcessResponse(true, backendString(backend, "upgrade.result.noChange"));
+        }
+        if (isOnlineUpgradeDisabled()) {
+            return buildManualUpgradeResponse(version, backend);
+        }
+        if (Objects.isNull(updater)) {
+            return new UpgradeProcessResponse(false, backendString(backend, "upgrade.error.unsupportedRuntime"));
+        }
+        File upgradePackage = downloadUpgradePackage(version, progressListener, backend, updater);
+        UpdateVersionHandler updateVersionHandler = newOnlineUpdateVersionHandler(version, upgradePackage,
+                progressListener, backend, updater);
         updateVersionHandler.doHandle();
         return new UpgradeProcessResponse(updateVersionHandler.isFinish(), updateVersionHandler.getMessage());
     }
@@ -246,16 +267,23 @@ public class UpgradeService {
     UpdateVersionHandler newOnlineUpdateVersionHandler(Version version, File upgradePackage,
                                                        UpgradeProgressListener progressListener,
                                                        Map<String, Object> backend) {
+        Updater updater = Objects.nonNull(Constants.zrLogConfig) ? Constants.zrLogConfig.getUpdater() : null;
+        return newOnlineUpdateVersionHandler(version, upgradePackage, progressListener, backend, updater);
+    }
+
+    UpdateVersionHandler newOnlineUpdateVersionHandler(Version version, File upgradePackage,
+                                                       UpgradeProgressListener progressListener,
+                                                       Map<String, Object> backend, Updater updater) {
         if (isFaaSMode()) {
             return new FaasUpdateVersionHandler(backend, version, upgradePackage,
                     progressListener);
         }
-        if (isWarMode()) {
+        if (isWarMode(updater)) {
             return new WarUpdateVersionHandle(upgradePackage, backend,
-                    buildUpgradeKey(version), version, progressListener);
+                    buildUpgradeKey(version), version, progressListener, updater);
         }
         return new ZipUpdateVersionHandle(upgradePackage, backend, version,
-                progressListener);
+                progressListener, updater);
     }
 
     private boolean isOnlineUpgradeDisabled() {
@@ -288,6 +316,10 @@ public class UpgradeService {
 
     boolean isWarMode() {
         return ZrLogUtil.isWarMode();
+    }
+
+    boolean isWarMode(Updater updater) {
+        return Objects.nonNull(updater) ? updater.getType() == UpdaterTypeEnum.WAR : isWarMode();
     }
 
     boolean isFaaSMode() {

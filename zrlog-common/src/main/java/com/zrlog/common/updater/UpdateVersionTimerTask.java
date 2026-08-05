@@ -34,6 +34,7 @@ public class UpdateVersionTimerTask extends TimerTask {
     private final boolean previewAble;
     private final String lang;
     private final Consumer<Version> versionConsumer;
+    private final Consumer<UpdateVersionCheckResult> checkResultConsumer;
 
     public UpdateVersionTimerTask(boolean previewAble, String lang) {
         this(previewAble, lang, version -> {
@@ -41,9 +42,16 @@ public class UpdateVersionTimerTask extends TimerTask {
     }
 
     public UpdateVersionTimerTask(boolean previewAble, String lang, Consumer<Version> versionConsumer) {
+        this(previewAble, lang, versionConsumer, result -> {
+        });
+    }
+
+    public UpdateVersionTimerTask(boolean previewAble, String lang, Consumer<Version> versionConsumer,
+                                  Consumer<UpdateVersionCheckResult> checkResultConsumer) {
         this.previewAble = previewAble;
         this.lang = lang;
         this.versionConsumer = versionConsumer;
+        this.checkResultConsumer = checkResultConsumer;
     }
 
     public static boolean isHtml(String str) {
@@ -74,8 +82,10 @@ public class UpdateVersionTimerTask extends TimerTask {
     @Override
     public void run() {
         try {
-            Version lastVersion = fetchLastVersion(previewAble);
+            UpdateVersionCheckResult checkResult = fetchLastVersion(previewAble);
+            Version lastVersion = checkResult.getVersion();
             versionConsumer.accept(lastVersion);
+            checkResultConsumer.accept(checkResult);
             //build date ok
             if (lastVersion.getBuildDate().getTime() > 0) {
                 this.version = lastVersion;
@@ -85,25 +95,29 @@ public class UpdateVersionTimerTask extends TimerTask {
         }
     }
 
-    private Version fetchLastVersion(boolean ckPreview) throws IOException, ParseException, URISyntaxException, InterruptedException {
+    protected UpdateVersionCheckResult fetchLastVersion(boolean ckPreview) throws IOException, ParseException,
+            URISyntaxException, InterruptedException {
         Version lastVersion = getVersion(ckPreview);
         if (!ckPreview) {
-            if (ZrLogUtil.greatThenCurrentVersion(lastVersion.getBuildId(), lastVersion.getBuildDate(), lastVersion.getVersion())) {
-                LOGGER.info("ZrLog New release update found new [" + lastVersion.getVersion() + "-" + lastVersion.getBuildId() + "]");
-            }
-            return lastVersion;
+            return checkResult(lastVersion, UpdateChannel.RELEASE);
         }
         //存在预览版本
         if (ZrLogUtil.greatThenCurrentVersion(lastVersion.getBuildId(), lastVersion.getBuildDate(), lastVersion.getVersion())) {
-            LOGGER.info("ZrLog New preview update found new [" + lastVersion.getVersion() + "-" + lastVersion.getBuildId() + "]");
-            return lastVersion;
+            return new UpdateVersionCheckResult(lastVersion, UpdateChannel.PREVIEW, true);
         }
         //如果已是最新预览版，那么尝试检查正式版本
         Version lastReleaseVersion = getVersion(false);
         if (ZrLogUtil.greatThenCurrentVersion(lastReleaseVersion.getBuildId(), lastReleaseVersion.getBuildDate(), lastReleaseVersion.getVersion())) {
-            LOGGER.info("ZrLog New release update found new [" + lastReleaseVersion.getVersion() + "-" + lastReleaseVersion.getBuildId() + "]");
+            return new UpdateVersionCheckResult(lastReleaseVersion, UpdateChannel.RELEASE, true);
         }
-        return lastVersion.getBuildDate().after(lastReleaseVersion.getBuildDate()) ? lastVersion : lastReleaseVersion;
+        return lastVersion.getBuildDate().after(lastReleaseVersion.getBuildDate()) ?
+                new UpdateVersionCheckResult(lastVersion, UpdateChannel.PREVIEW, false) :
+                new UpdateVersionCheckResult(lastReleaseVersion, UpdateChannel.RELEASE, false);
+    }
+
+    private static UpdateVersionCheckResult checkResult(Version version, UpdateChannel channel) {
+        return new UpdateVersionCheckResult(version, channel,
+                ZrLogUtil.greatThenCurrentVersion(version.getBuildId(), version.getBuildDate(), version.getVersion()));
     }
 
     private static String getJsonFilename() {

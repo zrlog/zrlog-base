@@ -101,7 +101,7 @@ public class UpdateVersionInfoPlugin implements IPlugin {
 
     UpdateVersionTimerTask newUpdateVersionTimerTask(UpgradeWebSiteInfo upgradeWebSiteInfo) {
         return new UpdateVersionTimerTask(upgradeWebSiteInfo.getUpgradePreview(), Constants.getLanguage(),
-                version -> new UpgradeNoticeService().sync(version));
+                version -> new UpgradeNoticeService().sync(version), CommandLineUpgradeNotice::notifyUpdate);
     }
 
     @Override

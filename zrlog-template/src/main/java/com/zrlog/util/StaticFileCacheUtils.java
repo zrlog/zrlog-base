@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
@@ -34,31 +35,34 @@ public class StaticFileCacheUtils {
     }
 
     private Map<String, String> getCacheFileMap() {
-        //cache fileMap
         List<File> staticFiles = new ArrayList<>();
-        FileUtils.getAllFiles(PathUtil.getStaticPath(), staticFiles);
+        String staticPath = PathUtil.getStaticPath();
+        FileUtils.getAllFiles(staticPath, staticFiles);
         Map<String, String> cacheMap = new HashMap<>();
         List<String> cacheableFileExts = Arrays.asList(".css", ".js", ".png", ".jpg", ".png", ".webp", ".ico");
+        Path staticRoot = Path.of(staticPath).toAbsolutePath().normalize();
         for (File file : staticFiles) {
-            //目录长度不够
-            if (file.toString().length() <= PathUtil.getStaticPath().length()) {
+            Path filePath = file.toPath().toAbsolutePath().normalize();
+            if (!filePath.startsWith(staticRoot) || file.isDirectory()) {
                 continue;
             }
-            String uri = file.toString().substring(PathUtil.getStaticPath().length());
+            String uri = staticRoot.relativize(filePath).toString().replace(File.separatorChar, '/');
             if (cacheableFileExts.stream().noneMatch(e -> uri.toLowerCase().endsWith(e))) {
                 continue;
             }
-            getFileFlagFirstByCache(uri);
+            try (FileInputStream fileInputStream = new FileInputStream(file)) {
+                cacheMap.put(uri, getStreamTag(fileInputStream));
+            } catch (IOException e) {
+                LOGGER.warning("Get " + uri + " stream tag error " + e.getMessage());
+            }
         }
         return cacheMap;
     }
 
 
     public void refreshCacheFileMap() {
-        //缓存静态资源map
         Map<String, String> tempMap = getCacheFileMap();
         cacheFileMap.clear();
-        //重新填充Map
         cacheFileMap.putAll(tempMap);
     }
 

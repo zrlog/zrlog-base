@@ -6,11 +6,11 @@
     <parent>
         <groupId>com.hibegin</groupId>
         <artifactId>zrlog-base</artifactId>
-        <version>3.5.9-SNAPSHOT</version>
+        <version>3.5.10-SNAPSHOT</version>
     </parent>
 
     <artifactId>zrlog-template</artifactId>
-    <version>3.5.9-SNAPSHOT</version>
+    <version>3.5.10-SNAPSHOT</version>
     <name>ZrLog Template</name>
 
     <dependencies>

@@ -28,17 +28,26 @@ public class CacheUtils {
 
     public static void updateCache(boolean async, HttpRequest request, List<StaticSiteType> staticSiteTypeList) {
         try {
-            BaseDataInitVO initVO = Constants.zrLogConfig.getCacheService().refreshInitData();
             if (async) {
+                BaseDataInitVO initVO = Constants.zrLogConfig.getCacheService().refreshInitData();
                 ThreadUtils.start(() -> {
                     refreshPluginCacheData(initVO.getVersion() + "", request, staticSiteTypeList);
                 });
             } else {
-                refreshPluginCacheData(initVO.getVersion() + "", request, staticSiteTypeList);
+                updateCacheSynchronouslyOrThrow(request, staticSiteTypeList);
             }
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Refresh cache error ", e);
         }
+    }
+
+    /**
+     * Refreshes cache data synchronously for callers that need to report the actual completion result.
+     */
+    public static void updateCacheSynchronouslyOrThrow(HttpRequest request,
+                                                       List<StaticSiteType> staticSiteTypeList) {
+        BaseDataInitVO initVO = Constants.zrLogConfig.getCacheService().refreshInitData();
+        refreshPluginCacheData(initVO.getVersion() + "", request, staticSiteTypeList);
     }
 
 

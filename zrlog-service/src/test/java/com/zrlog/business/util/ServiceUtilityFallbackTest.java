@@ -334,6 +334,27 @@ public class ServiceUtilityFallbackTest {
     }
 
     @Test
+    public void shouldUpdateCacheSynchronouslyOrThrowAndNotifyPluginCore() throws Exception {
+        ZrLogConfig previousConfig = Constants.zrLogConfig;
+        FakePluginCorePlugin pluginCorePlugin = new FakePluginCorePlugin();
+        FakeCacheService cacheService = new FakeCacheService(78L);
+        try {
+            PathUtil.setRootPath(temporaryFolder.newFolder("zrlog-update-cache-strict").getAbsolutePath());
+            Constants.zrLogConfig = new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
+
+            CacheUtils.updateCacheSynchronouslyOrThrow(
+                    request("http"), Collections.singletonList(StaticSiteType.BLOG));
+
+            assertEquals(1, cacheService.refreshInitDataCount);
+            assertEquals(1, pluginCorePlugin.startCount);
+            assertEquals(1, pluginCorePlugin.refreshCacheCount);
+            assertEquals("78", pluginCorePlugin.lastCacheVersion);
+        } finally {
+            Constants.zrLogConfig = previousConfig;
+        }
+    }
+
+    @Test
     public void shouldSwallowCacheRefreshFailureDuringUpdateCache() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
@@ -341,6 +362,23 @@ public class ServiceUtilityFallbackTest {
                     new ThrowingCacheService());
 
             CacheUtils.updateCache(false, request("http"), Collections.singletonList(StaticSiteType.BLOG));
+        } finally {
+            Constants.zrLogConfig = previousConfig;
+        }
+    }
+
+    @Test
+    public void shouldPropagateCacheRefreshFailureDuringSynchronousStrictUpdate() throws Exception {
+        ZrLogConfig previousConfig = Constants.zrLogConfig;
+        try {
+            Constants.zrLogConfig = new CacheTestConfig(new FakePluginCorePlugin(), new FakeStaticSitePlugin(),
+                    new ThrowingCacheService());
+
+            IllegalStateException error = assertThrows(IllegalStateException.class,
+                    () -> CacheUtils.updateCacheSynchronouslyOrThrow(
+                            request("http"), Collections.singletonList(StaticSiteType.BLOG)));
+
+            assertEquals("refresh failed", error.getMessage());
         } finally {
             Constants.zrLogConfig = previousConfig;
         }

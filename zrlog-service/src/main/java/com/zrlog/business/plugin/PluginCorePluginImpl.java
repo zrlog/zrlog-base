@@ -39,6 +39,7 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
     private final PluginCoreProcess pluginCoreProcess;
     private final String token;
     private volatile String pluginServerBaseUrl;
+    private volatile String pendingPluginServerBaseUrl;
 
     public PluginCorePluginImpl(File dbPropertiesPath, String contextPath) {
         this.dbPropertiesPath = dbPropertiesPath;
@@ -101,23 +102,34 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
         return map;
     }
 
-    private void waitToStarted() {
+    private boolean waitToStarted() {
         lock.lock();
         try {
             if (this.isStarted()) {
-                return;
+                return true;
             }
-            this.start();
+            return this.start();
         } finally {
             lock.unlock();
         }
     }
 
+    private String requirePluginServerBaseUrl() throws IOException {
+        if (!waitToStarted()) {
+            throw new IOException("plugin-core is not ready");
+        }
+        String serverBaseUrl = pluginServerBaseUrl;
+        if (Objects.isNull(serverBaseUrl)) {
+            throw new IOException("plugin-core is not ready");
+        }
+        return serverBaseUrl;
+    }
+
     @Override
     public CloseResponseHandle getContext(String uri, HttpMethod method, HttpRequest request, AdminTokenVO adminTokenVO) throws IOException, URISyntaxException, InterruptedException {
-        waitToStarted();
+        String serverBaseUrl = requirePluginServerBaseUrl();
         CloseResponseHandle handle = new CloseResponseHandle();
-        String forwardUrl = pluginServerBaseUrl + uri + (uri.contains("?") ? "&" : "?") + request.getQueryStr();
+        String forwardUrl = serverBaseUrl + uri + (uri.contains("?") ? "&" : "?") + request.getQueryStr();
         //GET请求不关心request.getInputStream() 的数据
         if (method.equals(request.getMethod()) && method == HttpMethod.GET) {
             HttpUtil.getInstance().sendGetRequest(forwardUrl, new HashMap<>(), handle, genHeaderMapByRequest(request, adminTokenVO));
@@ -129,14 +141,16 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
 
     @Override
     public <T> T requestService(HttpRequest inputRequest, Map<String, String[]> body, AdminTokenVO adminTokenVO, Class<T> clazz) throws IOException, InterruptedException {
-        waitToStarted();
-        return HttpUtil.getInstance().sendPostRequest(pluginServerBaseUrl + "/service", body, new HttpResponseJsonHandle<>(clazz), genHeaderMapByRequest(inputRequest, adminTokenVO)).getT();
+        String serverBaseUrl = requirePluginServerBaseUrl();
+        return HttpUtil.getInstance().sendPostRequest(serverBaseUrl + "/service", body, new HttpResponseJsonHandle<>(clazz), genHeaderMapByRequest(inputRequest, adminTokenVO)).getT();
     }
 
 
     @Override
     public boolean accessPlugin(String uri, HttpRequest request, HttpResponse response, AdminTokenVO adminTokenVO) throws IOException, URISyntaxException, InterruptedException {
-        waitToStarted();
+        if (!waitToStarted()) {
+            return false;
+        }
         CloseResponseHandle handle = getContext(uri, request.getMethod(), request, adminTokenVO);
         if (Objects.isNull(handle.getT()) || Objects.isNull(handle.getT().body())) {
             return false;
@@ -177,11 +191,26 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
             if (isStarted()) {
                 return true;
             }
-            //加载 ZrLog 提供的插件
-            int port = pluginCoreProcess.pluginServerStart(dbPropertiesPath.toString(), pluginJvmArgs, PathUtil.getStaticPath(), BlogBuildInfoUtil.getVersion(), token);
-            String serverUrl = "http://127.0.0.1:" + port;
-            waitToStarted(serverUrl, token, 360);
+            String serverUrl = pendingPluginServerBaseUrl;
+            if (Objects.isNull(serverUrl)) {
+                //加载 ZrLog 提供的插件
+                int port = pluginCoreProcess.pluginServerStart(dbPropertiesPath.toString(), pluginJvmArgs,
+                        PathUtil.getStaticPath(), BlogBuildInfoUtil.getVersion(), token);
+                if (port <= 0) {
+                    pluginCoreProcess.stopPluginCore();
+                    this.pluginServerBaseUrl = null;
+                    this.pendingPluginServerBaseUrl = null;
+                    return false;
+                }
+                serverUrl = "http://127.0.0.1:" + port;
+                this.pendingPluginServerBaseUrl = serverUrl;
+            }
+            if (!waitToStarted(serverUrl, token)) {
+                LOGGER.warning("plugin-core is not ready yet at " + serverUrl);
+                return false;
+            }
             this.pluginServerBaseUrl = serverUrl;
+            this.pendingPluginServerBaseUrl = null;
             return true;
         } finally {
             lock.unlock();
@@ -200,15 +229,20 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
 
     @Override
     public boolean stop() {
-        pluginCoreProcess.stopPluginCore();
-        pluginServerBaseUrl = null;
-        return true;
+        lock.lock();
+        try {
+            pluginServerBaseUrl = null;
+            pendingPluginServerBaseUrl = null;
+            pluginCoreProcess.stopPluginCore();
+            return true;
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
     public boolean refreshCache(String cacheVersion, HttpRequest request) {
-        waitToStarted();
-        if (Objects.isNull(pluginServerBaseUrl)) {
+        if (!waitToStarted() || Objects.isNull(pluginServerBaseUrl)) {
             return false;
         }
         refreshCacheWithRetry(EnvKit.isFaaSMode() ? Integer.MAX_VALUE : 5, cacheVersion);
@@ -238,36 +272,56 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
         Thread.sleep(2000);
     }
 
-    private static void waitToStarted(String pluginServerBaseUrl, String token, int retryCount) {
+    boolean waitToStarted(String pluginServerBaseUrl, String token) {
+        return waitToStarted(pluginServerBaseUrl, token, 360);
+    }
+
+    private static boolean waitToStarted(String pluginServerBaseUrl, String token, int retryCount) {
         if (retryCount < 0) {
-            LOGGER.severe("refresh plugin cache error, timeout");
-            return;
+            LOGGER.severe("plugin-core readiness check has no attempts remaining");
+            return false;
         }
         int seek = 1000;
-        try {
-            HttpHandle<PluginStatusResponse> httpHandle = HttpUtil.getInstance().sendGetRequest(pluginServerBaseUrl + "/api/status?token=" + token, new HttpResponseJsonHandle<>(PluginStatusResponse.class), new ConcurrentHashMap<>());
-            PluginStatusResponse statusResponse = httpHandle.getT();
-            if (Objects.isNull(statusResponse) || Objects.isNull(statusResponse.getStatus())) {
-                LOGGER.info("Need upgrade plugin-core");
-                return;
+        Exception lastFailure = null;
+        for (int remainingRetries = retryCount; remainingRetries >= 0; remainingRetries--) {
+            try {
+                HttpHandle<PluginStatusResponse> httpHandle = HttpUtil.getInstance().sendGetRequest(
+                        pluginServerBaseUrl + "/api/status?token=" + token,
+                        new HttpResponseJsonHandle<>(PluginStatusResponse.class), new ConcurrentHashMap<>());
+                PluginStatusResponse statusResponse = httpHandle.getT();
+                if (Objects.nonNull(statusResponse) && Objects.nonNull(statusResponse.getStatus())) {
+                    if (Constants.debugLoggerPrintAble()) {
+                        LOGGER.info("Plugin status: " + new Gson().toJson(statusResponse));
+                    }
+                    if (Objects.equals(statusResponse.getStatus(), PluginCoreStatus.STARTED)) {
+                        return true;
+                    }
+                } else {
+                    lastFailure = new IllegalStateException("plugin-core status response is missing status");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LOGGER.log(Level.WARNING, "plugin-core readiness check interrupted", e);
+                return false;
+            } catch (Exception e) {
+                lastFailure = e;
             }
-            if (Constants.debugLoggerPrintAble()) {
-                LOGGER.info("Plugin status: " + new Gson().toJson(statusResponse));
+            if (remainingRetries == 0) {
+                break;
             }
-            if (!Objects.equals(statusResponse.getStatus(), PluginCoreStatus.STARTED)) {
-                int rCount = retryCount - 1;
-                Thread.sleep(seek);
-                waitToStarted(pluginServerBaseUrl, token, rCount);
-            }
-        } catch (Exception e) {
-            int rCount = retryCount - 1;
-
             try {
                 Thread.sleep(seek);
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LOGGER.log(Level.WARNING, "plugin-core readiness wait interrupted", e);
+                return false;
             }
-            waitToStarted(pluginServerBaseUrl, token, rCount);
         }
+        if (Objects.isNull(lastFailure)) {
+            LOGGER.severe("plugin-core readiness timed out at " + pluginServerBaseUrl);
+        } else {
+            LOGGER.log(Level.WARNING, "plugin-core readiness failed at " + pluginServerBaseUrl, lastFailure);
+        }
+        return false;
     }
 }

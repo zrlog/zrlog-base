@@ -34,6 +34,11 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -320,6 +325,126 @@ public class PluginCorePluginImplTest {
     }
 
     @Test
+    public void shouldKeepPendingSupervisorAndReuseItAfterReadinessTimeout() throws Exception {
+        AtomicInteger startCount = new AtomicInteger();
+        AtomicInteger stopCount = new AtomicInteger();
+        AtomicInteger readinessCount = new AtomicInteger();
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog") {
+            @Override
+            boolean waitToStarted(String pluginServerBaseUrl, String token) {
+                assertEquals("http://127.0.0.1:21000", pluginServerBaseUrl);
+                return readinessCount.incrementAndGet() > 1;
+            }
+        };
+        setPluginCoreProcess(plugin, new PluginCoreProcess() {
+            @Override
+            public int pluginServerStart(String dbProperties, String pluginJvmArgs, String runtimePath,
+                                         String runTimeVersion, String token) {
+                startCount.incrementAndGet();
+                return 21000;
+            }
+
+            @Override
+            public void stopPluginCore() {
+                stopCount.incrementAndGet();
+            }
+        });
+
+        assertFalse(plugin.start());
+        assertFalse(plugin.isStarted());
+        assertEquals(1, startCount.get());
+        assertEquals(0, stopCount.get());
+
+        assertTrue(plugin.start());
+        assertTrue(plugin.isStarted());
+        assertEquals(1, startCount.get());
+        assertEquals(0, stopCount.get());
+    }
+
+    @Test
+    public void shouldLaunchOnlyOneSupervisorForConcurrentStarts() throws Exception {
+        AtomicInteger startCount = new AtomicInteger();
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog") {
+            @Override
+            boolean waitToStarted(String pluginServerBaseUrl, String token) {
+                return true;
+            }
+        };
+        setPluginCoreProcess(plugin, pluginCoreProcess(startCount, new AtomicInteger(), 21000));
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch startGate = new CountDownLatch(1);
+        try {
+            Future<Boolean> first = executor.submit(() -> {
+                startGate.await();
+                return plugin.start();
+            });
+            Future<Boolean> second = executor.submit(() -> {
+                startGate.await();
+                return plugin.start();
+            });
+
+            startGate.countDown();
+
+            assertTrue(first.get(5, TimeUnit.SECONDS));
+            assertTrue(second.get(5, TimeUnit.SECONDS));
+            assertEquals(1, startCount.get());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void shouldRejectForwardingWhilePendingWithoutBuildingNullUrl() throws Exception {
+        AtomicInteger startCount = new AtomicInteger();
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog") {
+            @Override
+            boolean waitToStarted(String pluginServerBaseUrl, String token) {
+                return false;
+            }
+        };
+        setPluginCoreProcess(plugin, pluginCoreProcess(startCount, new AtomicInteger(), 21000));
+
+        try {
+            plugin.getContext("/api/test", HttpMethod.GET, request(Collections.emptyMap()), null);
+            throw new AssertionError("Expected plugin-core readiness failure");
+        } catch (java.io.IOException e) {
+            assertEquals("plugin-core is not ready", e.getMessage());
+        }
+        try {
+            plugin.requestService(request(Collections.emptyMap()), Collections.emptyMap(), null,
+                    PluginStatusResponse.class);
+            throw new AssertionError("Expected plugin-core readiness failure");
+        } catch (java.io.IOException e) {
+            assertEquals("plugin-core is not ready", e.getMessage());
+        }
+        assertFalse(plugin.accessPlugin("/test", request(Collections.emptyMap()),
+                new CapturedHostResponse().proxy(), null));
+        assertFalse(plugin.refreshCache("cache-123", request(Collections.emptyMap())));
+        assertEquals(1, startCount.get());
+    }
+
+    @Test
+    public void shouldClearPendingSupervisorOnExplicitStop() throws Exception {
+        AtomicInteger startCount = new AtomicInteger();
+        AtomicInteger stopCount = new AtomicInteger();
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog") {
+            @Override
+            boolean waitToStarted(String pluginServerBaseUrl, String token) {
+                return false;
+            }
+        };
+        setPluginCoreProcess(plugin, pluginCoreProcess(startCount, stopCount, 21000));
+
+        assertFalse(plugin.start());
+        assertEquals(1, startCount.get());
+        assertTrue(plugin.stop());
+        assertEquals(1, stopCount.get());
+
+        assertFalse(plugin.start());
+        assertEquals(2, startCount.get());
+    }
+
+    @Test
     public void shouldRefreshPluginCacheThroughStartedPluginCoreServer() throws Exception {
         AtomicReference<String> queryRef = new AtomicReference<>();
         HttpServer server = localServer();
@@ -367,7 +492,7 @@ public class PluginCorePluginImplTest {
     }
 
     @Test
-    public void shouldWaitToStartedReturnWhenStatusPayloadIsMissing() throws Exception {
+    public void shouldWaitToStartedFailWhenStatusPayloadIsMissing() throws Exception {
         HttpServer server = localServer();
         server.createContext("/api/status", exchange -> {
             byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
@@ -377,7 +502,8 @@ public class PluginCorePluginImplTest {
         });
         server.start();
         try {
-            invokeWaitToStarted("http://127.0.0.1:" + server.getAddress().getPort(), "token", 1);
+            assertFalse(invokeWaitToStarted(
+                    "http://127.0.0.1:" + server.getAddress().getPort(), "token", 0));
         } finally {
             server.stop(0);
         }
@@ -396,7 +522,8 @@ public class PluginCorePluginImplTest {
         });
         server.start();
         try {
-            invokeWaitToStarted("http://127.0.0.1:" + server.getAddress().getPort(), "token", 1);
+            assertTrue(invokeWaitToStarted(
+                    "http://127.0.0.1:" + server.getAddress().getPort(), "token", 1));
 
             assertEquals(2, count.get());
         } finally {
@@ -406,7 +533,7 @@ public class PluginCorePluginImplTest {
 
     @Test
     public void shouldWaitToStartedReturnImmediatelyAfterRetriesExhausted() throws Exception {
-        invokeWaitToStarted("http://127.0.0.1:1", "token", -1);
+        assertFalse(invokeWaitToStarted("http://127.0.0.1:1", "token", -1));
     }
 
     @SuppressWarnings("unchecked")
@@ -473,11 +600,27 @@ public class PluginCorePluginImplTest {
         field.set(plugin, process);
     }
 
-    private static void invokeWaitToStarted(String serverBaseUrl, String token, int retryCount) throws Exception {
+    private static PluginCoreProcess pluginCoreProcess(AtomicInteger startCount, AtomicInteger stopCount, int port) {
+        return new PluginCoreProcess() {
+            @Override
+            public int pluginServerStart(String dbProperties, String pluginJvmArgs, String runtimePath,
+                                         String runTimeVersion, String token) {
+                startCount.incrementAndGet();
+                return port;
+            }
+
+            @Override
+            public void stopPluginCore() {
+                stopCount.incrementAndGet();
+            }
+        };
+    }
+
+    private static boolean invokeWaitToStarted(String serverBaseUrl, String token, int retryCount) throws Exception {
         Method method = PluginCorePluginImpl.class.getDeclaredMethod("waitToStarted", String.class, String.class,
                 int.class);
         method.setAccessible(true);
-        method.invoke(null, serverBaseUrl, token, retryCount);
+        return (boolean) method.invoke(null, serverBaseUrl, token, retryCount);
     }
 
     private static void invokeRefreshCacheWithRetry(PluginCorePluginImpl plugin, int retryCount,

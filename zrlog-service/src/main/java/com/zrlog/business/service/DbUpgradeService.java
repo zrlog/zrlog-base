@@ -163,7 +163,8 @@ public class DbUpgradeService {
         }
         String normalizedSql = sql.trim().toLowerCase(Locale.ROOT);
         boolean addColumn = normalizedSql.startsWith("alter table ") && normalizedSql.contains(" add column ");
-        boolean createIndex = normalizedSql.startsWith("create index ");
+        boolean createIndex = normalizedSql.startsWith("create index ")
+                || normalizedSql.startsWith("create unique index ");
         if (!addColumn && !createIndex) {
             return false;
         }

@@ -3,6 +3,7 @@ package com.zrlog.business.plugin;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.business.service.WebsiteKvService;
 import com.zrlog.business.support.InMemoryZrLogDatabase;
+import com.zrlog.business.support.InMemoryZrLogDatabase.DatabaseType;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
@@ -11,6 +12,10 @@ import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import org.junit.Test;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
+import org.junit.runner.RunWith;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -31,7 +36,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+@RunWith(Theories.class)
 public class PluginLifecycleContractTest {
+
+    @DataPoints
+    public static final DatabaseType[] DATABASES = DatabaseType.values();
 
     @Test
     public void shouldClosePluginConsoleAndDeleteOutputFile() throws Exception {
@@ -271,11 +280,11 @@ public class PluginLifecycleContractTest {
         assertFalse(plugin.isStarted());
     }
 
-    @Test
-    public void shouldRefreshInitDataWhenCacheTimeoutExpiresUsingDatabaseConfig() throws Exception {
+    @Theory
+    public void shouldRefreshInitDataWhenCacheTimeoutExpiresUsingDatabaseConfig(DatabaseType databaseType) throws Exception {
         long previousLastAccessTime = Constants.getLastAccessTime();
         AtomicInteger refreshCount = new AtomicInteger();
-        try (InMemoryZrLogDatabase ignored = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase ignored = InMemoryZrLogDatabase.open(databaseType)) {
             new WebsiteKvService().putString("cache_timeout_minutes", "0.001");
             CacheManagerPlugin plugin = new CacheManagerPlugin(new TestZrLogConfig(countingCacheService(refreshCount)));
             try {

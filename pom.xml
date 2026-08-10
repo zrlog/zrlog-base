@@ -25,6 +25,7 @@
         <sws.version>4.1.6</sws.version>
         <zrlog-install-web.version>3.3.8-SNAPSHOT</zrlog-install-web.version>
         <h2.version>2.2.224</h2.version>
+        <sqlite-jdbc.version>3.53.2.1</sqlite-jdbc.version>
         <project.build.outputTimestamp>2026-07-04T12:50:31Z</project.build.outputTimestamp>
         <gpg.passphrase/>
     </properties>
@@ -96,6 +97,12 @@
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <version>${h2.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>${sqlite-jdbc.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

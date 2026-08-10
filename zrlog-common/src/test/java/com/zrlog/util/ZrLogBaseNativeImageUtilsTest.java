@@ -5,6 +5,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -53,6 +54,7 @@ public class ZrLogBaseNativeImageUtilsTest {
 
     @Test
     public void shouldRunNativeImageRegistrationSmoke() {
+        assertTrue(ZrLogBaseNativeImageUtils.gsonClasses().contains(LinkedHashMap.class));
         ZrLogBaseNativeImageUtils.reg();
 
         assertTrue(true);

@@ -12,6 +12,7 @@ import com.zrlog.util.ThreadUtils;
 import com.zrlog.util.ZrLogUtil;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -36,6 +37,7 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
     static final long MIN_NATIVE_MAX_HEAP_SIZE = 64L * 1024L * 1024L;
     static final long MAX_NATIVE_MAX_HEAP_SIZE = 512L * 1024L * 1024L;
     private static final String NATIVE_MAX_HEAP_SIZE_KEY = "pluginCoreNativeMaxHeapSize";
+    static final String PLUGIN_CORE_MAIN_CLASS = "com.zrlog.plugincore.server.Application";
 
     private AbstractPluginCoreProcessHandle pluginCoreProcessHandle;
     private final AtomicBoolean stopped = new AtomicBoolean(false);
@@ -120,9 +122,7 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
             args.add("-XX:MaxHeapSize=" + nativeMaxHeapSize());
             args.add("-XX:+ExitOnOutOfMemoryError");
         } else {
-            args.addAll(Arrays.asList(pluginJvmArgs.split(" ")));
-            args.add("-jar");
-            args.add(pluginCoreFile.toString());
+            args.addAll(jvmLaunchArguments(pluginCoreFile, dbProperties, pluginJvmArgs));
         }
         //args start
         args.add(randomServerPort + "");
@@ -153,6 +153,38 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
         cmd.add(programName(pluginCoreFile));
         cmd.addAll(args);
         return new ProcessBuilder(cmd).redirectOutput(infoLogFile).redirectError(errorLogFile).start();
+    }
+
+    static List<String> jvmLaunchArguments(File pluginCoreFile, String dbProperties, String pluginJvmArgs) {
+        List<String> args = new ArrayList<>(Arrays.asList(pluginJvmArgs.split(" ")));
+        if (usesLocalSqlite(dbProperties)) {
+            String parentClasspath = System.getProperty("java.class.path", "");
+            String pluginCoreClasspath = pluginCoreFile.toString();
+            if (!parentClasspath.isEmpty()) {
+                pluginCoreClasspath += File.pathSeparator + parentClasspath;
+            }
+            args.add("-cp");
+            args.add(pluginCoreClasspath);
+            args.add(PLUGIN_CORE_MAIN_CLASS);
+        } else {
+            args.add("-jar");
+            args.add(pluginCoreFile.toString());
+        }
+        return args;
+    }
+
+    static boolean usesLocalSqlite(String dbProperties) {
+        if (dbProperties == null) {
+            return false;
+        }
+        Properties properties = new Properties();
+        try (FileInputStream inputStream = new FileInputStream(dbProperties)) {
+            properties.load(inputStream);
+        } catch (IOException e) {
+            return false;
+        }
+        String jdbcUrl = properties.getProperty("jdbcUrl");
+        return jdbcUrl != null && jdbcUrl.regionMatches(true, 0, "jdbc:sqlite:", 0, "jdbc:sqlite:".length());
     }
 
     long nativeMaxHeapSize() {

@@ -106,6 +106,38 @@ public class PluginCoreProcessImplTest {
     }
 
     @Test
+    public void shouldUseParentClasspathOnlyForLocalSqlitePluginCore() throws Exception {
+        Path root = Files.createTempDirectory("zrlog-plugin-core-jvm-command");
+        try {
+            File pluginCore = root.resolve("plugin-core.jar").toFile();
+            Path sqliteProperties = root.resolve("sqlite.properties");
+            Path mysqlProperties = root.resolve("mysql.properties");
+            Path webApiProperties = root.resolve("webapi.properties");
+            Files.writeString(sqliteProperties, "jdbcUrl=jdbc:sqlite:/tmp/zrlog.db\n", StandardCharsets.UTF_8);
+            Files.writeString(mysqlProperties, "jdbcUrl=jdbc:mysql://localhost/zrlog\n", StandardCharsets.UTF_8);
+            Files.writeString(webApiProperties, "jdbcUrl=jdbc:webapi://example.com/zrlog\n", StandardCharsets.UTF_8);
+
+            List<String> sqliteArgs = PluginCoreProcessImpl.jvmLaunchArguments(
+                    pluginCore, sqliteProperties.toString(), "-Xmx64m");
+            assertEquals("-Xmx64m", sqliteArgs.get(0));
+            assertEquals("-cp", sqliteArgs.get(1));
+            assertEquals(pluginCore + File.pathSeparator + System.getProperty("java.class.path"), sqliteArgs.get(2));
+            assertEquals(PluginCoreProcessImpl.PLUGIN_CORE_MAIN_CLASS, sqliteArgs.get(3));
+            assertFalse(sqliteArgs.contains("-jar"));
+
+            assertEquals(List.of("-Xmx64m", "-jar", pluginCore.toString()),
+                    PluginCoreProcessImpl.jvmLaunchArguments(pluginCore, mysqlProperties.toString(), "-Xmx64m"));
+            assertEquals(List.of("-Xmx64m", "-jar", pluginCore.toString()),
+                    PluginCoreProcessImpl.jvmLaunchArguments(pluginCore, webApiProperties.toString(), "-Xmx64m"));
+            assertEquals(List.of("-Xmx64m", "-jar", pluginCore.toString()),
+                    PluginCoreProcessImpl.jvmLaunchArguments(pluginCore, root.resolve("missing.properties").toString(),
+                            "-Xmx64m"));
+        } finally {
+            delete(root);
+        }
+    }
+
+    @Test
     public void shouldUsePluginCoreFileAsProgramInNativeImage() throws Exception {
         PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog");
         File pluginCore = new File("plugin-core-Linux-x86_64.bin");

@@ -3,7 +3,10 @@ package com.zrlog.model;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.dto.FaviconBase64DTO;
 import com.zrlog.data.support.InMemoryZrLogDatabase;
+import com.zrlog.data.support.InMemoryZrLogDatabase.DatabaseType;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.util.List;
 import java.util.Map;
@@ -12,11 +15,23 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+@RunWith(Parameterized.class)
 public class WebSiteDatabaseTest {
+
+    @Parameterized.Parameters(name = "{0}")
+    public static DatabaseType[] databases() {
+        return DatabaseType.values();
+    }
+
+    private final DatabaseType databaseType;
+
+    public WebSiteDatabaseTest(DatabaseType databaseType) {
+        this.databaseType = databaseType;
+    }
 
     @Test
     public void shouldInsertUpdateAndReadWebsiteValuesUsingInstallSchema() throws Exception {
-        try (InMemoryZrLogDatabase ignored = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase ignored = InMemoryZrLogDatabase.open(databaseType)) {
             WebSite webSite = new WebSite();
 
             assertTrue(webSite.updateByKV("title", "ZrLog"));
@@ -36,7 +51,7 @@ public class WebSiteDatabaseTest {
     @Test
     @SuppressWarnings("unchecked")
     public void shouldReadPublicInfoTemplateConfigAndFaviconValues() throws Exception {
-        try (InMemoryZrLogDatabase ignored = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase ignored = InMemoryZrLogDatabase.open(databaseType)) {
             WebSite webSite = new WebSite();
             webSite.updateByKV("title", "ZrLog");
             webSite.updateByKV("host", "https://example.com");

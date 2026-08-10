@@ -11,9 +11,12 @@ import com.zrlog.common.cache.dto.UserBasicDTO;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.support.InMemoryZrLogDatabase;
+import com.zrlog.data.support.InMemoryZrLogDatabase.DatabaseType;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
@@ -25,12 +28,24 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+@RunWith(Parameterized.class)
 public class CacheServiceImplDatabaseTest {
+
+    @Parameterized.Parameters(name = "{0}")
+    public static DatabaseType[] databases() {
+        return DatabaseType.values();
+    }
+
+    private final DatabaseType databaseType;
+
+    public CacheServiceImplDatabaseTest(DatabaseType databaseType) {
+        this.databaseType = databaseType;
+    }
 
     @Test
     public void shouldLoadExistingInitCacheFromWebsiteTable() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             Constants.zrLogConfig = testConfig(true);
             BaseDataInitVO cached = cachedInit();
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
@@ -56,7 +71,7 @@ public class CacheServiceImplDatabaseTest {
     @Test
     public void shouldFallbackToDatabaseWhenStoredInitCacheIsInvalid() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             Constants.zrLogConfig = testConfig(false);
             seedLookupTables(db);
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
@@ -82,7 +97,7 @@ public class CacheServiceImplDatabaseTest {
     @Test
     public void shouldReadPublicWebsiteInfoFromDatabaseWhenInstalledAndCacheIsMissing() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             Constants.zrLogConfig = testConfig(true);
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     "base_data_init_cache_v3", "{bad-json", "");

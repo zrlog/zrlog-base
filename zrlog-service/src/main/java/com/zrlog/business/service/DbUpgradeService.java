@@ -46,8 +46,9 @@ public class DbUpgradeService {
             return "";
         }
         String normalizedUrl = jdbcUrl.replace("jdbc:", "");
+        String urlWithoutParams = normalizedUrl.split("[?;]", 2)[0];
         try {
-            URI uri = URI.create(normalizedUrl);
+            URI uri = URI.create(urlWithoutParams);
             String path = uri.getPath();
             if (StringUtils.isNotEmpty(path) && path.length() > 1) {
                 String pathWithoutLeadingSlash = path.substring(1);
@@ -59,7 +60,6 @@ public class DbUpgradeService {
             }
         } catch (IllegalArgumentException ignored) {
         }
-        String urlWithoutParams = normalizedUrl.split(";", 2)[0];
         int slashIndex = urlWithoutParams.lastIndexOf('/');
         if (slashIndex >= 0 && slashIndex < urlWithoutParams.length() - 1) {
             return urlWithoutParams.substring(slashIndex + 1);
@@ -91,7 +91,7 @@ public class DbUpgradeService {
             int fileVersion = f.getKey();
             if (fileVersion > dbVersion) {
                 List<String> executableSql;
-                if (dataSource.isWebApi()) {
+                if (usesSqliteDialect()) {
                     executableSql = SqlConvertUtils.doMySQLToSqliteBySqlText(f.getValue());
                 } else {
                     executableSql = SqlConvertUtils.extractExecutableSql(f.getValue());
@@ -129,10 +129,10 @@ public class DbUpgradeService {
                         try {
                             dao.execute(sql);
                         } catch (Exception e) {
-                            if (!isAlreadyAppliedWebApiSchemaChange(sql, e)) {
+                            if (!isAlreadyAppliedSqliteSchemaChange(sql, e)) {
                                 throw e;
                             }
-                            LOGGER.info("Skip already applied WebApi schema migration: " + sql);
+                            LOGGER.info("Skip already applied SQLite schema migration: " + sql);
                         }
                     }
                 } catch (Exception e) {
@@ -157,8 +157,16 @@ public class DbUpgradeService {
         }
     }
 
-    private boolean isAlreadyAppliedWebApiSchemaChange(String sql, Exception exception) {
-        if (!dataSource.isWebApi()) {
+    private boolean usesSqliteDialect() {
+        if (dataSource.isWebApi()) {
+            return true;
+        }
+        String jdbcUrl = dataSource.getDataSourceProperties().getProperty("jdbcUrl");
+        return jdbcUrl != null && jdbcUrl.regionMatches(true, 0, "jdbc:sqlite:", 0, "jdbc:sqlite:".length());
+    }
+
+    private boolean isAlreadyAppliedSqliteSchemaChange(String sql, Exception exception) {
+        if (!usesSqliteDialect()) {
             return false;
         }
         String normalizedSql = sql.trim().toLowerCase(Locale.ROOT);

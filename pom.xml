@@ -22,7 +22,7 @@
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.test.skip>false</maven.test.skip>
-        <sws.version>4.1.6</sws.version>
+        <sws.version>4.1.12</sws.version>
         <zrlog-install-web.version>3.3.9-SNAPSHOT</zrlog-install-web.version>
         <h2.version>2.2.224</h2.version>
         <sqlite-jdbc.version>3.53.2.1</sqlite-jdbc.version>

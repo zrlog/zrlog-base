@@ -445,6 +445,45 @@ public class PluginCorePluginImplTest {
     }
 
     @Test
+    public void shouldStopWithoutWaitingForPendingReadiness() throws Exception {
+        AtomicInteger startCount = new AtomicInteger();
+        AtomicInteger stopCount = new AtomicInteger();
+        CountDownLatch readinessEntered = new CountDownLatch(1);
+        CountDownLatch releaseReadiness = new CountDownLatch(1);
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog") {
+            @Override
+            boolean waitToStarted(String pluginServerBaseUrl, String token) {
+                readinessEntered.countDown();
+                try {
+                    releaseReadiness.await();
+                    return true;
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+        };
+        setPluginCoreProcess(plugin, pluginCoreProcess(startCount, stopCount, 21000));
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Boolean> startResult = executor.submit(plugin::start);
+            assertTrue(readinessEntered.await(1, TimeUnit.SECONDS));
+
+            Future<Boolean> stopResult = executor.submit(plugin::stop);
+            assertTrue(stopResult.get(1, TimeUnit.SECONDS));
+            assertEquals(1, stopCount.get());
+
+            releaseReadiness.countDown();
+            assertFalse(startResult.get(1, TimeUnit.SECONDS));
+            assertFalse(plugin.isStarted());
+            assertEquals(1, startCount.get());
+        } finally {
+            releaseReadiness.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     public void shouldRefreshPluginCacheThroughStartedPluginCoreServer() throws Exception {
         AtomicReference<String> queryRef = new AtomicReference<>();
         HttpServer server = localServer();

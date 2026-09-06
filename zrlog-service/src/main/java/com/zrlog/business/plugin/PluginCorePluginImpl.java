@@ -40,6 +40,7 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
     private final String token;
     private volatile String pluginServerBaseUrl;
     private volatile String pendingPluginServerBaseUrl;
+    private long pluginServerGeneration;
 
     public PluginCorePluginImpl(File dbPropertiesPath, String contextPath) {
         this.dbPropertiesPath = dbPropertiesPath;
@@ -183,15 +184,14 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
      */
     @Override
     public boolean start() {
-        if (isStarted()) {
-            return true;
-        }
+        String serverUrl;
+        long serverGeneration;
         lock.lock();
         try {
             if (isStarted()) {
                 return true;
             }
-            String serverUrl = pendingPluginServerBaseUrl;
+            serverUrl = pendingPluginServerBaseUrl;
             if (Objects.isNull(serverUrl)) {
                 //加载 ZrLog 提供的插件
                 int port = pluginCoreProcess.pluginServerStart(dbPropertiesPath.toString(), pluginJvmArgs,
@@ -204,9 +204,27 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
                 }
                 serverUrl = "http://127.0.0.1:" + port;
                 this.pendingPluginServerBaseUrl = serverUrl;
+                pluginServerGeneration++;
             }
-            if (!waitToStarted(serverUrl, token)) {
-                LOGGER.warning("plugin-core is not ready yet at " + serverUrl);
+            serverGeneration = pluginServerGeneration;
+        } finally {
+            lock.unlock();
+        }
+
+        if (!waitToStarted(serverUrl, token)) {
+            LOGGER.warning("plugin-core is not ready yet at " + serverUrl);
+            return false;
+        }
+
+        lock.lock();
+        try {
+            if (serverGeneration != pluginServerGeneration) {
+                return false;
+            }
+            if (Objects.equals(pluginServerBaseUrl, serverUrl)) {
+                return true;
+            }
+            if (!Objects.equals(pendingPluginServerBaseUrl, serverUrl)) {
                 return false;
             }
             this.pluginServerBaseUrl = serverUrl;
@@ -231,6 +249,7 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
     public boolean stop() {
         lock.lock();
         try {
+            pluginServerGeneration++;
             pluginServerBaseUrl = null;
             pendingPluginServerBaseUrl = null;
             pluginCoreProcess.stopPluginCore();

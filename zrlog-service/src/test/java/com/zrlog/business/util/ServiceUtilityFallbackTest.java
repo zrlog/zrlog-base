@@ -37,6 +37,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import com.sun.net.httpserver.HttpServer;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,12 +46,18 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
 import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
@@ -60,6 +67,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
+import java.util.zip.CRC32;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertArrayEquals;
@@ -168,25 +178,32 @@ public class ServiceUtilityFallbackTest {
 
     @Test
     public void shouldReturnExistingPluginCoreFileWithoutDownload() throws Exception {
+        AtomicInteger requestCount = new AtomicInteger();
+        byte[] pluginCoreJar = pluginCoreJar();
+        HttpServer server = startDownloadServer("plugin-core.jar", 200, pluginCoreJar.length, pluginCoreJar,
+                requestCount);
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
         File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core").toFile();
         File pluginCore = new File(pluginsFolder, "plugin-core.jar");
-        Files.writeString(pluginCore.toPath(), "jar");
+        Files.write(pluginCore.toPath(), pluginCoreJar);
+        try {
+            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
 
-        File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
-
-        assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
+            assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
+            assertArrayEquals(pluginCoreJar, Files.readAllBytes(result.toPath()));
+            assertEquals(0, requestCount.get());
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
     }
 
     @Test
     public void shouldDownloadPluginCoreFileFromConfiguredResourceHost() throws Exception {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/plugin/core/plugin-core.jar", exchange -> {
-            byte[] body = "downloaded-jar".getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
-        });
-        server.start();
+        byte[] body = pluginCoreJar();
+        HttpServer server = startDownloadServer("plugin-core.jar", 200, body.length, body);
         String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
                 "http://127.0.0.1:" + server.getAddress().getPort());
         try {
@@ -195,7 +212,8 @@ public class ServiceUtilityFallbackTest {
             File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
 
             assertEquals("plugin-core.jar", result.getName());
-            assertEquals("downloaded-jar", Files.readString(result.toPath()));
+            assertArrayEquals(body, Files.readAllBytes(result.toPath()));
+            assertNoPluginCoreDownloadParts(pluginsFolder);
         } finally {
             setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
             server.stop(0);
@@ -217,8 +235,180 @@ public class ServiceUtilityFallbackTest {
                     () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath()));
 
             assertTrue(thrown.getMessage().contains("download plugin core error"));
+            assertFalse(new File(pluginsFolder, "plugin-core.jar").exists());
+            assertNoPluginCoreDownloadParts(pluginsFolder);
         } finally {
             setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+        }
+    }
+
+    @Test
+    public void shouldReplaceInvalidPluginCoreJarAfterSuccessfulDownload() throws Exception {
+        byte[] body = pluginCoreJar();
+        HttpServer server = startDownloadServer("plugin-core.jar", 200, body.length, body);
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-invalid").toFile();
+            File pluginCore = new File(pluginsFolder, "plugin-core.jar");
+            Files.writeString(pluginCore.toPath(), "truncated-jar", StandardCharsets.UTF_8);
+
+            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
+
+            assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
+            assertArrayEquals(body, Files.readAllBytes(result.toPath()));
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void shouldKeepExistingInvalidPluginCoreWhenReplacementDownloadFails() throws Exception {
+        int unusedPort;
+        try (java.net.ServerSocket serverSocket = new java.net.ServerSocket(0)) {
+            unusedPort = serverSocket.getLocalPort();
+        }
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + unusedPort);
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-invalid-download-fail").toFile();
+            File pluginCore = new File(pluginsFolder, "plugin-core.jar");
+            byte[] invalidJar = "truncated-jar".getBytes(StandardCharsets.UTF_8);
+            Files.write(pluginCore.toPath(), invalidJar);
+
+            assertThrows(RuntimeException.class,
+                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath()));
+
+            assertTrue(pluginCore.isFile());
+            assertArrayEquals(invalidJar, Files.readAllBytes(pluginCore.toPath()));
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+        }
+    }
+
+    @Test
+    public void shouldRemoveStalePluginCorePartWithoutTouchingOtherFiles() throws Exception {
+        byte[] body = pluginCoreJar();
+        HttpServer server = startDownloadServer("plugin-core.jar", 200, body.length, body);
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-stale-part").toFile();
+            File stalePart = new File(pluginsFolder, "plugin-core.jar.999999999.12345.part");
+            File unrelatedPart = new File(pluginsFolder, "other-plugin.jar.999999999.12345.part");
+            Files.writeString(stalePart.toPath(), "stale", StandardCharsets.UTF_8);
+            Files.writeString(unrelatedPart.toPath(), "keep", StandardCharsets.UTF_8);
+
+            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
+
+            assertArrayEquals(body, Files.readAllBytes(result.toPath()));
+            assertFalse(stalePart.exists());
+            assertTrue(unrelatedPart.isFile());
+            assertEquals("keep", Files.readString(unrelatedPart.toPath()));
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void shouldPreservePluginCorePartOwnedByCurrentProcess() throws Exception {
+        File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-live-part").toFile();
+        File pluginCore = new File(pluginsFolder, "plugin-core.jar");
+        Files.write(pluginCore.toPath(), pluginCoreJar());
+        File livePart = new File(pluginsFolder, "plugin-core.jar." + ProcessHandle.current().pid()
+                + ".active.part");
+        Files.writeString(livePart.toPath(), "in-progress", StandardCharsets.UTF_8);
+
+        File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
+
+        assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
+        assertTrue(livePart.isFile());
+        assertEquals("in-progress", Files.readString(livePart.toPath()));
+    }
+
+    @Test
+    public void shouldPreserveNativeChecksumPartOwnedByCurrentProcess() throws Exception {
+        File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-live-checksum-part").toFile();
+        File pluginCore = new File(pluginsFolder, "plugin-core-Linux-x86_64.bin");
+        Files.write(pluginCore.toPath(), nativeElf());
+        File livePart = new File(pluginsFolder, pluginCore.getName() + ".md5."
+                + ProcessHandle.current().pid() + ".active.part");
+        Files.writeString(livePart.toPath(), "in-progress", StandardCharsets.UTF_8);
+
+        File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
+                true, "Linux-x86_64");
+
+        assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
+        assertTrue(livePart.isFile());
+        assertEquals("in-progress", Files.readString(livePart.toPath()));
+    }
+
+    @Test
+    public void shouldRejectPluginCoreJarWithInvalidEntryCrcWithoutPublishingIt() throws Exception {
+        byte[] body = pluginCoreJarWithInvalidEntryCrc();
+        HttpServer server = startDownloadServer("plugin-core.jar", 200, body.length, body);
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-invalid-crc").toFile();
+
+            RuntimeException thrown = assertThrows(RuntimeException.class,
+                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath()));
+
+            assertTrue(thrown.getMessage().contains("download plugin core error"));
+            assertFalse(new File(pluginsFolder, "plugin-core.jar").exists());
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void shouldRejectTruncatedPluginCoreJarWithoutPublishingIt() throws Exception {
+        byte[] completeBody = pluginCoreJar();
+        byte[] partialBody = Arrays.copyOf(completeBody, completeBody.length / 2);
+        HttpServer server = startDownloadServer("plugin-core.jar", 200, completeBody.length, partialBody);
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-truncated").toFile();
+
+            RuntimeException thrown = assertThrows(RuntimeException.class,
+                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath()));
+
+            assertTrue(thrown.getMessage().contains("download plugin core error"));
+            assertFalse(new File(pluginsFolder, "plugin-core.jar").exists());
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void shouldRejectHttpErrorWithoutPublishingPluginCoreJar() throws Exception {
+        byte[] body = "unavailable".getBytes(StandardCharsets.UTF_8);
+        HttpServer server = startDownloadServer("plugin-core.jar", 503, body.length, body);
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-http-error").toFile();
+
+            RuntimeException thrown = assertThrows(RuntimeException.class,
+                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath()));
+
+            assertTrue(thrown.getMessage().contains("HTTP 503"));
+            assertFalse(new File(pluginsFolder, "plugin-core.jar").exists());
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
         }
     }
 
@@ -241,7 +431,8 @@ public class ServiceUtilityFallbackTest {
     public void shouldMarkExistingNativePluginCoreBinExecutableWithoutDownload() throws Exception {
         File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native").toFile();
         File pluginCore = new File(pluginsFolder, "plugin-core-Linux-x86_64.bin");
-        Files.writeString(pluginCore.toPath(), "bin");
+        byte[] body = nativeElf();
+        Files.write(pluginCore.toPath(), body);
         assertTrue(pluginCore.setExecutable(false, false));
         assertFalse(pluginCore.canExecute());
 
@@ -249,7 +440,262 @@ public class ServiceUtilityFallbackTest {
                 true, "Linux-x86_64");
 
         assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
+        assertArrayEquals(body, Files.readAllBytes(result.toPath()));
         assertTrue(pluginCore.canExecute());
+    }
+
+    @Test
+    public void shouldReplaceExistingNonemptyTruncatedNativePluginCore() throws Exception {
+        String fileName = "plugin-core-Linux-x86_64.bin";
+        byte[] completeBody = nativeElf();
+        byte[] truncatedBody = Arrays.copyOf(completeBody, completeBody.length / 2);
+        HttpServer server = startNativeDownloadServer(fileName, completeBody.length, completeBody,
+                md5(completeBody));
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-existing-truncated").toFile();
+            File pluginCore = new File(pluginsFolder, fileName);
+            Files.write(pluginCore.toPath(), truncatedBody);
+
+            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
+                    true, "Linux-x86_64");
+
+            assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
+            assertArrayEquals(completeBody, Files.readAllBytes(result.toPath()));
+            assertEquals(md5(completeBody) + "  " + fileName + "\n",
+                    Files.readString(new File(pluginsFolder, fileName + ".md5").toPath()));
+            assertTrue(result.canExecute());
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void shouldValidateNativeChecksumWhenContentLengthIsMissing() throws Exception {
+        String fileName = "plugin-core-Linux-x86_64.bin";
+        byte[] body = nativeElf();
+        HttpServer server = startNativeDownloadServer(fileName, 0, body, md5(body));
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-chunked").toFile();
+
+            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
+                    true, "Linux-x86_64");
+
+            assertArrayEquals(body, Files.readAllBytes(result.toPath()));
+            assertEquals(md5(body) + "  " + fileName + "\n",
+                    Files.readString(new File(pluginsFolder, fileName + ".md5").toPath()));
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void shouldRejectNativePluginCoreWhenPublishedChecksumDoesNotMatch() throws Exception {
+        String fileName = "plugin-core-Linux-x86_64.bin";
+        byte[] body = nativeElf();
+        HttpServer server = startNativeDownloadServer(fileName, body.length, body,
+                "00000000000000000000000000000000");
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-checksum-mismatch").toFile();
+
+            RuntimeException thrown = assertThrows(RuntimeException.class,
+                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
+                            true, "Linux-x86_64"));
+
+            assertTrue(thrown.getMessage().contains("checksum mismatch"));
+            assertFalse(new File(pluginsFolder, fileName).exists());
+            assertFalse(new File(pluginsFolder, fileName + ".md5").exists());
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void shouldNotPublishNativePluginCoreWhenChecksumCannotBePublished() throws Exception {
+        String fileName = "plugin-core-Linux-x86_64.bin";
+        byte[] body = nativeElf();
+        HttpServer server = startNativeDownloadServer(fileName, body.length, body, md5(body));
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-checksum-publish").toFile();
+            Path checksumPath = new File(pluginsFolder, fileName + ".md5").toPath();
+            Files.createDirectory(checksumPath);
+            Files.writeString(checksumPath.resolve("keep"), "occupied", StandardCharsets.UTF_8);
+
+            assertThrows(RuntimeException.class,
+                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
+                            true, "Linux-x86_64"));
+
+            assertFalse(new File(pluginsFolder, fileName).exists());
+            assertTrue(Files.isDirectory(checksumPath));
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void shouldAcceptExistingWindowsPortableExecutable() throws Exception {
+        File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-windows").toFile();
+        File pluginCore = new File(pluginsFolder, "plugin-core-Windows-x86_64.exe");
+        byte[] body = nativePortableExecutable();
+        Files.write(pluginCore.toPath(), body);
+
+        File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
+                true, "Windows-x86_64");
+
+        assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
+        assertArrayEquals(body, Files.readAllBytes(result.toPath()));
+    }
+
+    @Test
+    public void shouldAcceptExistingMacMachOExecutable() throws Exception {
+        File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-macos").toFile();
+        File pluginCore = new File(pluginsFolder, "plugin-core-Darwin-arm64.bin");
+        byte[] body = nativeMachO();
+        Files.write(pluginCore.toPath(), body);
+
+        File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
+                true, "Darwin-arm64");
+
+        assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
+        assertArrayEquals(body, Files.readAllBytes(result.toPath()));
+        assertTrue(result.canExecute());
+    }
+
+    @Test
+    public void shouldReplaceNativePluginCoreWhenLocalChecksumDoesNotMatch() throws Exception {
+        String fileName = "plugin-core-Linux-x86_64.bin";
+        byte[] body = nativeElf();
+        HttpServer server = startNativeDownloadServer(fileName, body.length, body, md5(body));
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-local-checksum").toFile();
+            File pluginCore = new File(pluginsFolder, fileName);
+            Files.write(pluginCore.toPath(), body);
+            Files.writeString(new File(pluginsFolder, fileName + ".md5").toPath(),
+                    "00000000000000000000000000000000  " + fileName + "\n");
+
+            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
+                    true, "Linux-x86_64");
+
+            assertArrayEquals(body, Files.readAllBytes(result.toPath()));
+            assertEquals(md5(body) + "  " + fileName + "\n",
+                    Files.readString(new File(pluginsFolder, fileName + ".md5").toPath()));
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void shouldReplaceNativeExecutableForWrongTargetPlatform() throws Exception {
+        String fileName = "plugin-core-Windows-x86_64.exe";
+        byte[] windowsBody = nativePortableExecutable();
+        HttpServer server = startNativeDownloadServer(fileName, windowsBody.length, windowsBody,
+                md5(windowsBody));
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-wrong-platform").toFile();
+            File pluginCore = new File(pluginsFolder, fileName);
+            Files.write(pluginCore.toPath(), nativeElf());
+
+            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
+                    true, "Windows-x86_64");
+
+            assertArrayEquals(windowsBody, Files.readAllBytes(result.toPath()));
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void shouldRejectMachOExecutablePublishedForLinuxTarget() throws Exception {
+        String fileName = "plugin-core-Linux-amd64.bin";
+        byte[] body = nativeMachO();
+        HttpServer server = startNativeDownloadServer(fileName, body.length, body, md5(body));
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-wrong-os").toFile();
+
+            RuntimeException thrown = assertThrows(RuntimeException.class,
+                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
+                            true, "Linux-amd64"));
+
+            assertTrue(thrown.getMessage().contains("target platform"));
+            assertFalse(new File(pluginsFolder, fileName).exists());
+            assertFalse(new File(pluginsFolder, fileName + ".md5").exists());
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void shouldRejectX86ExecutablePublishedForArmTarget() throws Exception {
+        String fileName = "plugin-core-Linux-arm64.bin";
+        byte[] body = nativeElf();
+        HttpServer server = startNativeDownloadServer(fileName, body.length, body, md5(body));
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-wrong-arch").toFile();
+
+            RuntimeException thrown = assertThrows(RuntimeException.class,
+                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
+                            true, "Linux-arm64"));
+
+            assertTrue(thrown.getMessage().contains("architecture does not match"));
+            assertFalse(new File(pluginsFolder, fileName).exists());
+            assertFalse(new File(pluginsFolder, fileName + ".md5").exists());
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void shouldNotPublishTruncatedNativePluginCoreDownload() throws Exception {
+        byte[] body = "partial-native".getBytes(StandardCharsets.UTF_8);
+        HttpServer server = startNativeDownloadServer("plugin-core-Linux-x86_64.bin",
+                body.length + 20, body, md5(body));
+        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
+                "http://127.0.0.1:" + server.getAddress().getPort());
+        try {
+            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-truncated").toFile();
+
+            RuntimeException thrown = assertThrows(RuntimeException.class,
+                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
+                            true, "Linux-x86_64"));
+
+            assertTrue(thrown.getMessage().contains("download plugin core error"));
+            assertFalse(new File(pluginsFolder, "plugin-core-Linux-x86_64.bin").exists());
+            assertNoPluginCoreDownloadParts(pluginsFolder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previousResourceDownloadUrl);
+            server.stop(0);
+        }
     }
 
     @Test
@@ -482,6 +928,174 @@ public class ServiceUtilityFallbackTest {
 
     private static void restoreDefaultDataSource(DataSourceWrapper previousDataSource) {
         DAO.setDs(previousDataSource);
+    }
+
+    private static byte[] pluginCoreJar() throws IOException {
+        byte[] entryBody = "zrlog-plugin-core".getBytes(StandardCharsets.UTF_8);
+        CRC32 crc32 = new CRC32();
+        crc32.update(entryBody);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        try (JarOutputStream jarOutputStream = new JarOutputStream(outputStream)) {
+            JarEntry entry = new JarEntry("com/zrlog/plugincore/server/Application.class");
+            entry.setMethod(JarEntry.STORED);
+            entry.setSize(entryBody.length);
+            entry.setCompressedSize(entryBody.length);
+            entry.setCrc(crc32.getValue());
+            jarOutputStream.putNextEntry(entry);
+            jarOutputStream.write(entryBody);
+            jarOutputStream.closeEntry();
+        }
+        return outputStream.toByteArray();
+    }
+
+    private static byte[] pluginCoreJarWithInvalidEntryCrc() throws IOException {
+        byte[] jar = pluginCoreJar();
+        byte[] entryBody = "zrlog-plugin-core".getBytes(StandardCharsets.UTF_8);
+        int entryOffset = indexOf(jar, entryBody);
+        if (entryOffset < 0) {
+            throw new IOException("test JAR entry was not stored verbatim");
+        }
+        jar[entryOffset] ^= 1;
+        return jar;
+    }
+
+    private static byte[] nativeElf() {
+        byte[] executable = new byte[256];
+        executable[0] = 0x7f;
+        executable[1] = 'E';
+        executable[2] = 'L';
+        executable[3] = 'F';
+        executable[4] = 2;
+        executable[5] = 1;
+        executable[6] = 1;
+        ByteBuffer header = ByteBuffer.wrap(executable).order(ByteOrder.LITTLE_ENDIAN);
+        header.putShort(16, (short) 2);
+        header.putShort(18, (short) 62);
+        header.putInt(20, 1);
+        header.putLong(32, 64);
+        header.putShort(52, (short) 64);
+        header.putShort(54, (short) 56);
+        header.putShort(56, (short) 1);
+        header.putInt(64, 1);
+        header.putInt(68, 5);
+        header.putLong(72, 0);
+        header.putLong(96, executable.length);
+        header.putLong(104, executable.length);
+        header.putLong(112, 4096);
+        return executable;
+    }
+
+    private static byte[] nativePortableExecutable() {
+        byte[] executable = new byte[512];
+        ByteBuffer header = ByteBuffer.wrap(executable).order(ByteOrder.LITTLE_ENDIAN);
+        header.putShort(0, (short) 0x5a4d);
+        header.putInt(60, 0x80);
+        header.putInt(0x80, 0x00004550);
+        header.putShort(0x84, (short) 0x8664);
+        header.putShort(0x86, (short) 1);
+        header.putShort(0x94, (short) 0xf0);
+        header.putShort(0x98, (short) 0x20b);
+        int section = 0x188;
+        header.putInt(section + 16, 64);
+        header.putInt(section + 20, 448);
+        return executable;
+    }
+
+    private static byte[] nativeMachO() {
+        byte[] executable = new byte[128];
+        ByteBuffer header = ByteBuffer.wrap(executable).order(ByteOrder.LITTLE_ENDIAN);
+        header.putInt(0, 0xfeedfacf);
+        header.putInt(4, 0x0100000c);
+        header.putInt(8, 0);
+        header.putInt(12, 2);
+        header.putInt(16, 1);
+        header.putInt(20, 72);
+        header.putInt(32, 0x19);
+        header.putInt(36, 72);
+        header.putLong(72, 0);
+        header.putLong(80, executable.length);
+        return executable;
+    }
+
+    private static String md5(byte[] body) {
+        final MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        StringBuilder value = new StringBuilder(32);
+        for (byte part : digest.digest(body)) {
+            value.append(String.format(Locale.ROOT, "%02x", part & 0xff));
+        }
+        return value.toString();
+    }
+
+    private static int indexOf(byte[] value, byte[] pattern) {
+        for (int index = 0; index <= value.length - pattern.length; index++) {
+            int patternIndex = 0;
+            while (patternIndex < pattern.length && value[index + patternIndex] == pattern[patternIndex]) {
+                patternIndex++;
+            }
+            if (patternIndex == pattern.length) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static HttpServer startDownloadServer(String fileName, int statusCode, long contentLength,
+                                                  byte[] body) throws IOException {
+        return startDownloadServer(fileName, statusCode, contentLength, body, null);
+    }
+
+    private static HttpServer startDownloadServer(String fileName, int statusCode, long contentLength,
+                                                  byte[] body, AtomicInteger requestCount) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/plugin/core/" + fileName, exchange -> {
+            if (requestCount != null) {
+                requestCount.incrementAndGet();
+            }
+            exchange.sendResponseHeaders(statusCode, contentLength);
+            try {
+                exchange.getResponseBody().write(body);
+            } finally {
+                exchange.close();
+            }
+        });
+        server.start();
+        return server;
+    }
+
+    private static HttpServer startNativeDownloadServer(String fileName, long contentLength,
+                                                        byte[] body, String checksum) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/plugin/core/" + fileName, exchange -> {
+            exchange.sendResponseHeaders(200, contentLength);
+            try {
+                exchange.getResponseBody().write(body);
+            } finally {
+                exchange.close();
+            }
+        });
+        byte[] checksumBody = (checksum + "  " + fileName + "\n").getBytes(StandardCharsets.UTF_8);
+        server.createContext("/plugin/core/" + fileName + ".md5", exchange -> {
+            exchange.sendResponseHeaders(200, checksumBody.length);
+            try {
+                exchange.getResponseBody().write(checksumBody);
+            } finally {
+                exchange.close();
+            }
+        });
+        server.start();
+        return server;
+    }
+
+    private static void assertNoPluginCoreDownloadParts(File pluginsFolder) {
+        File[] downloadParts = pluginsFolder.listFiles((dir, name) -> name.startsWith("plugin-core")
+                && name.endsWith(".part"));
+        assertNotNull(downloadParts);
+        assertEquals(0, downloadParts.length);
     }
 
     private static String setBlogBuildInfoString(String fieldName, String value) throws Exception {

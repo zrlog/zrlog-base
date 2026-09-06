@@ -67,6 +67,10 @@ public class UpgradeServicePublicFlowTest {
         assertTrue(response.getOnlineUpgradable());
         assertFalse(response.getDockerMode());
         assertFalse(response.getSystemServiceMode());
+        assertFalse(response.getFaasMode());
+        assertFalse(response.getWarMode());
+        assertNotNull(response.getNativeImageMode());
+        assertNotNull(response.getBackupProtection());
         assertNull(response.getDisableUpgradeReason());
     }
 
@@ -113,7 +117,10 @@ public class UpgradeServicePublicFlowTest {
         assertTrue(preCheckResponse.getUpgrade());
         assertTrue(preCheckResponse.getDockerMode());
         assertFalse(preCheckResponse.getSystemServiceMode());
+        assertFalse(preCheckResponse.getFaasMode());
+        assertFalse(preCheckResponse.getWarMode());
         assertFalse(preCheckResponse.getOnlineUpgradable());
+        assertNotNull(preCheckResponse.getBackupProtection());
         assertNotNull(preCheckResponse.getDisableUpgradeReason());
 
         FakeUpdateVersionInfoPlugin upgradePlugin = new FakeUpdateVersionInfoPlugin(futureVersion("99.0.0"));

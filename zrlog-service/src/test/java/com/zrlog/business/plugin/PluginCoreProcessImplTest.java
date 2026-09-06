@@ -17,6 +17,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -118,20 +120,26 @@ public class PluginCoreProcessImplTest {
             Files.writeString(webApiProperties, "jdbcUrl=jdbc:webapi://example.com/zrlog\n", StandardCharsets.UTF_8);
 
             List<String> sqliteArgs = PluginCoreProcessImpl.jvmLaunchArguments(
-                    pluginCore, sqliteProperties.toString(), "-Xmx64m");
+                    pluginCore, sqliteProperties.toString(), "-Xmx64m", 25);
             assertEquals("-Xmx64m", sqliteArgs.get(0));
-            assertEquals("-cp", sqliteArgs.get(1));
-            assertEquals(pluginCore + File.pathSeparator + System.getProperty("java.class.path"), sqliteArgs.get(2));
-            assertEquals(PluginCoreProcessImpl.PLUGIN_CORE_MAIN_CLASS, sqliteArgs.get(3));
+            assertEquals(PluginCoreProcessImpl.ENABLE_NATIVE_ACCESS_ARGUMENT, sqliteArgs.get(1));
+            assertEquals("-cp", sqliteArgs.get(2));
+            assertEquals(pluginCore + File.pathSeparator + System.getProperty("java.class.path"), sqliteArgs.get(3));
+            assertEquals(PluginCoreProcessImpl.PLUGIN_CORE_MAIN_CLASS, sqliteArgs.get(4));
             assertFalse(sqliteArgs.contains("-jar"));
 
-            assertEquals(List.of("-Xmx64m", "-jar", pluginCore.toString()),
-                    PluginCoreProcessImpl.jvmLaunchArguments(pluginCore, mysqlProperties.toString(), "-Xmx64m"));
-            assertEquals(List.of("-Xmx64m", "-jar", pluginCore.toString()),
-                    PluginCoreProcessImpl.jvmLaunchArguments(pluginCore, webApiProperties.toString(), "-Xmx64m"));
+            assertEquals(List.of("-Xmx64m", PluginCoreProcessImpl.ENABLE_NATIVE_ACCESS_ARGUMENT,
+                            "-jar", pluginCore.toString()),
+                    PluginCoreProcessImpl.jvmLaunchArguments(pluginCore, mysqlProperties.toString(), "-Xmx64m", 25));
+            assertEquals(List.of("-Xmx64m", PluginCoreProcessImpl.ENABLE_NATIVE_ACCESS_ARGUMENT,
+                            "-jar", pluginCore.toString()),
+                    PluginCoreProcessImpl.jvmLaunchArguments(pluginCore, webApiProperties.toString(), "-Xmx64m", 25));
             assertEquals(List.of("-Xmx64m", "-jar", pluginCore.toString()),
                     PluginCoreProcessImpl.jvmLaunchArguments(pluginCore, root.resolve("missing.properties").toString(),
-                            "-Xmx64m"));
+                            "-Xmx64m", 11));
+            assertFalse(PluginCoreProcessImpl.jvmLaunchArguments(
+                    pluginCore, sqliteProperties.toString(), "-Xmx64m", 11)
+                    .contains(PluginCoreProcessImpl.ENABLE_NATIVE_ACCESS_ARGUMENT));
         } finally {
             delete(root);
         }
@@ -278,9 +286,7 @@ public class PluginCoreProcessImplTest {
         Path argsFile = root.resolve("plugin-args.txt");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
         Files.createDirectories(pluginCore.getParent());
-        Files.writeString(pluginCore,
-                "#!/bin/sh\nprintf 'launch %s %s %s\\n' \"$3\" \"$4\" \"$7\" >> " + argsFile + "\n",
-                StandardCharsets.UTF_8);
+        Files.write(pluginCore, minimalElfExecutable());
         assertTrue(pluginCore.toFile().setExecutable(true));
         String previousRootPath = System.getProperty("sws.root.path");
         ZrLogConfig previousConfig = Constants.zrLogConfig;
@@ -289,7 +295,7 @@ public class PluginCoreProcessImplTest {
             System.setProperty("sws.root.path", root.toString());
             Constants.zrLogConfig = new TestZrLogConfig();
             ImageInfo.setInImageRuntimeCode(true);
-            TestablePluginCoreProcessImpl process = new TestablePluginCoreProcessImpl(null, "/blog");
+            TestablePluginCoreProcessImpl process = new TestablePluginCoreProcessImpl(null, "/blog", argsFile);
 
             int port = process.pluginServerStart("db=ok", "-Xmx64m", root.resolve("static").toString(),
                     "3.6.0", "token-456");
@@ -297,7 +303,7 @@ public class PluginCoreProcessImplTest {
             assertTrue(port >= 20000);
             assertNotNull(process.handle.get());
             process.handle.get().run();
-            assertTrue(awaitFile(argsFile));
+            assertTrue(Files.exists(argsFile));
             process.stopPluginCore();
 
             List<String> launches = Files.readAllLines(argsFile);
@@ -319,7 +325,7 @@ public class PluginCoreProcessImplTest {
         Path root = Files.createTempDirectory("zrlog-plugin-core-restart");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
         Files.createDirectories(pluginCore.getParent());
-        Files.writeString(pluginCore, "fake-plugin-core", StandardCharsets.UTF_8);
+        Files.write(pluginCore, minimalElfExecutable());
         String previousRootPath = System.getProperty("sws.root.path");
         String previousFileArch = setFileArch("Linux-x86_64");
         ControlledProcess oldProcess = new ControlledProcess(false, true);
@@ -359,7 +365,7 @@ public class PluginCoreProcessImplTest {
         Path root = Files.createTempDirectory("zrlog-plugin-core-connect-retry");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
         Files.createDirectories(pluginCore.getParent());
-        Files.writeString(pluginCore, "fake-plugin-core", StandardCharsets.UTF_8);
+        Files.write(pluginCore, minimalElfExecutable());
         String previousRootPath = System.getProperty("sws.root.path");
         String previousFileArch = setFileArch("Linux-x86_64");
         ControlledProcess oldProcess = new ControlledProcess(true, true);
@@ -393,7 +399,7 @@ public class PluginCoreProcessImplTest {
         Path root = Files.createTempDirectory("zrlog-plugin-core-ready-timeout");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
         Files.createDirectories(pluginCore.getParent());
-        Files.writeString(pluginCore, "fake-plugin-core", StandardCharsets.UTF_8);
+        Files.write(pluginCore, minimalElfExecutable());
         String previousRootPath = System.getProperty("sws.root.path");
         String previousFileArch = setFileArch("Linux-x86_64");
         ControlledProcess oldProcess = new ControlledProcess(false, true);
@@ -430,7 +436,7 @@ public class PluginCoreProcessImplTest {
         Path root = Files.createTempDirectory("zrlog-plugin-core-crash-backoff");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
         Files.createDirectories(pluginCore.getParent());
-        Files.writeString(pluginCore, "fake-plugin-core", StandardCharsets.UTF_8);
+        Files.write(pluginCore, minimalElfExecutable());
         String previousRootPath = System.getProperty("sws.root.path");
         String previousFileArch = setFileArch("Linux-x86_64");
         try {
@@ -464,7 +470,7 @@ public class PluginCoreProcessImplTest {
         Path root = Files.createTempDirectory("zrlog-plugin-core-restart-io");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
         Files.createDirectories(pluginCore.getParent());
-        Files.writeString(pluginCore, "fake-plugin-core", StandardCharsets.UTF_8);
+        Files.write(pluginCore, minimalElfExecutable());
         String previousRootPath = System.getProperty("sws.root.path");
         String previousFileArch = setFileArch("Linux-x86_64");
         try {
@@ -496,7 +502,7 @@ public class PluginCoreProcessImplTest {
         Path root = Files.createTempDirectory("zrlog-plugin-core-initial-retry");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
         Files.createDirectories(pluginCore.getParent());
-        Files.writeString(pluginCore, "fake-plugin-core", StandardCharsets.UTF_8);
+        Files.write(pluginCore, minimalElfExecutable());
         String previousRootPath = System.getProperty("sws.root.path");
         String previousFileArch = setFileArch("Linux-x86_64");
         try {
@@ -530,7 +536,7 @@ public class PluginCoreProcessImplTest {
         Path root = Files.createTempDirectory("zrlog-plugin-core-watcher-runtime");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
         Files.createDirectories(pluginCore.getParent());
-        Files.writeString(pluginCore, "fake-plugin-core", StandardCharsets.UTF_8);
+        Files.write(pluginCore, minimalElfExecutable());
         String previousRootPath = System.getProperty("sws.root.path");
         String previousFileArch = setFileArch("Linux-x86_64");
         try {
@@ -563,13 +569,14 @@ public class PluginCoreProcessImplTest {
         Path root = Files.createTempDirectory("zrlog-plugin-core-stop-backoff");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
         Files.createDirectories(pluginCore.getParent());
-        Files.writeString(pluginCore, "fake-plugin-core", StandardCharsets.UTF_8);
+        Files.write(pluginCore, minimalElfExecutable());
         String previousRootPath = System.getProperty("sws.root.path");
         String previousFileArch = setFileArch("Linux-x86_64");
-        CrashLoopPluginCoreProcessImpl process = new CrashLoopPluginCoreProcessImpl(true, 1000L);
+        CrashLoopPluginCoreProcessImpl process = null;
         try {
             System.setProperty("sws.root.path", root.toString());
             ImageInfo.setInImageRuntimeCode(true);
+            process = new CrashLoopPluginCoreProcessImpl(true, 1000L);
             setField(process, "infoLogFile", Files.createFile(root.resolve("plugin-info.log")).toFile());
             setField(process, "errorLogFile", Files.createFile(root.resolve("plugin-error.log")).toFile());
 
@@ -584,7 +591,9 @@ public class PluginCoreProcessImplTest {
             assertFalse(runner.isAlive());
             assertEquals(1, process.startCount.get());
         } finally {
-            process.stopPluginCore();
+            if (process != null) {
+                process.stopPluginCore();
+            }
             ImageInfo.setInImageRuntimeCode(false);
             setFileArch(previousFileArch);
             restoreProperty("sws.root.path", previousRootPath);
@@ -597,7 +606,7 @@ public class PluginCoreProcessImplTest {
         Path root = Files.createTempDirectory("zrlog-plugin-core-still-alive");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
         Files.createDirectories(pluginCore.getParent());
-        Files.writeString(pluginCore, "fake-plugin-core", StandardCharsets.UTF_8);
+        Files.write(pluginCore, minimalElfExecutable());
         String previousRootPath = System.getProperty("sws.root.path");
         String previousFileArch = setFileArch("Linux-x86_64");
         AtomicInteger forcedStopAttempts = new AtomicInteger();
@@ -679,15 +688,41 @@ public class PluginCoreProcessImplTest {
         }
     }
 
-    private static boolean awaitFile(Path path) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 1000L;
+    private static byte[] minimalElfExecutable() {
+        byte[] executable = new byte[256];
+        executable[0] = 0x7f;
+        executable[1] = 'E';
+        executable[2] = 'L';
+        executable[3] = 'F';
+        executable[4] = 2;
+        executable[5] = 1;
+        executable[6] = 1;
+        ByteBuffer header = ByteBuffer.wrap(executable).order(ByteOrder.LITTLE_ENDIAN);
+        header.putShort(16, (short) 2);
+        header.putShort(18, (short) 62);
+        header.putInt(20, 1);
+        header.putLong(32, 64);
+        header.putShort(52, (short) 64);
+        header.putShort(54, (short) 56);
+        header.putShort(56, (short) 1);
+        header.putInt(64, 1);
+        header.putInt(68, 5);
+        header.putLong(72, 0);
+        header.putLong(96, executable.length);
+        header.putLong(104, executable.length);
+        header.putLong(112, 4096);
+        return executable;
+    }
+
+    private static boolean awaitNonEmptyFile(Path path) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 5000L;
         while (System.currentTimeMillis() < deadline) {
-            if (Files.exists(path)) {
+            if (Files.isRegularFile(path) && path.toFile().length() > 0L) {
                 return true;
             }
             Thread.sleep(5L);
         }
-        return Files.exists(path);
+        return Files.isRegularFile(path) && path.toFile().length() > 0L;
     }
 
     private static void delete(Path path) throws IOException {
@@ -1132,12 +1167,23 @@ public class PluginCoreProcessImplTest {
 
     private static class TestablePluginCoreProcessImpl extends PluginCoreProcessImpl {
 
+        private final Path launchMarker;
         private final AtomicReference<AbstractPluginCoreProcessHandle> handle = new AtomicReference<>();
         private final AtomicInteger handleStartCount = new AtomicInteger();
         private final AtomicInteger watcherCount = new AtomicInteger();
 
-        TestablePluginCoreProcessImpl(Runnable onStopRunnable, String contextPath) {
+        TestablePluginCoreProcessImpl(Runnable onStopRunnable, String contextPath, Path launchMarker) {
             super(onStopRunnable, contextPath);
+            this.launchMarker = launchMarker;
+        }
+
+        @Override
+        Process startPluginCore(File pluginCoreFile, String dbProperties, String pluginJvmArgs, String runtimePath,
+                                String runTimeVersion, String token, int randomServerPort, int pluginMasterPort,
+                                int randomWatcherListenPort) throws IOException {
+            Files.writeString(launchMarker, "launch " + randomServerPort + " " + pluginMasterPort + " "
+                    + randomWatcherListenPort + "\n", StandardCharsets.UTF_8);
+            return new ControlledProcess(true, true);
         }
 
         @Override
@@ -1146,6 +1192,12 @@ public class PluginCoreProcessImplTest {
                 @Override
                 public boolean doWatch() {
                     watcherCount.incrementAndGet();
+                    try {
+                        assertTrue("plugin-core launch marker was not written", awaitNonEmptyFile(launchMarker));
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
                     TestablePluginCoreProcessImpl.this.stopPluginCore();
                     return true;
                 }

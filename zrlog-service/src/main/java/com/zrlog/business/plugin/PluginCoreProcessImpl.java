@@ -36,6 +36,7 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
     static final long DEFAULT_NATIVE_MAX_HEAP_SIZE = 128L * 1024L * 1024L;
     static final long MIN_NATIVE_MAX_HEAP_SIZE = 64L * 1024L * 1024L;
     static final long MAX_NATIVE_MAX_HEAP_SIZE = 512L * 1024L * 1024L;
+    static final String ENABLE_NATIVE_ACCESS_ARGUMENT = "--enable-native-access=ALL-UNNAMED";
     private static final String NATIVE_MAX_HEAP_SIZE_KEY = "pluginCoreNativeMaxHeapSize";
     static final String PLUGIN_CORE_MAIN_CLASS = "com.zrlog.plugincore.server.Application";
 
@@ -156,7 +157,15 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
     }
 
     static List<String> jvmLaunchArguments(File pluginCoreFile, String dbProperties, String pluginJvmArgs) {
+        return jvmLaunchArguments(pluginCoreFile, dbProperties, pluginJvmArgs, Runtime.version().feature());
+    }
+
+    static List<String> jvmLaunchArguments(File pluginCoreFile, String dbProperties, String pluginJvmArgs,
+                                           int runtimeFeatureVersion) {
         List<String> args = new ArrayList<>(Arrays.asList(pluginJvmArgs.split(" ")));
+        if (runtimeFeatureVersion >= 22 && !args.contains(ENABLE_NATIVE_ACCESS_ARGUMENT)) {
+            args.add(ENABLE_NATIVE_ACCESS_ARGUMENT);
+        }
         if (usesLocalSqlite(dbProperties)) {
             String parentClasspath = System.getProperty("java.class.path", "");
             String pluginCoreClasspath = pluginCoreFile.toString();

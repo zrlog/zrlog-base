@@ -6,6 +6,9 @@ public class PreCheckVersionResponse extends CheckVersionResponse {
     private String disableUpgradeReason;
     private Boolean dockerMode;
     private Boolean systemServiceMode;
+    private Boolean faasMode;
+    private Boolean warMode;
+    private Boolean nativeImageMode;
     private BackupProtectionStatus backupProtection;
 
     public Boolean getOnlineUpgradable() {
@@ -40,6 +43,30 @@ public class PreCheckVersionResponse extends CheckVersionResponse {
     @Deprecated
     public void setSystemServiceMode(Boolean systemServiceMode) {
         this.systemServiceMode = systemServiceMode;
+    }
+
+    public Boolean getFaasMode() {
+        return faasMode;
+    }
+
+    public void setFaasMode(Boolean faasMode) {
+        this.faasMode = faasMode;
+    }
+
+    public Boolean getWarMode() {
+        return warMode;
+    }
+
+    public void setWarMode(Boolean warMode) {
+        this.warMode = warMode;
+    }
+
+    public Boolean getNativeImageMode() {
+        return nativeImageMode;
+    }
+
+    public void setNativeImageMode(Boolean nativeImageMode) {
+        this.nativeImageMode = nativeImageMode;
     }
 
     public BackupProtectionStatus getBackupProtection() {

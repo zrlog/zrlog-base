@@ -5,6 +5,8 @@ import java.util.regex.Pattern;
 
 public class UserAgentUtils {
 
+    private static final Pattern ZRLOGCTL_PATTERN = Pattern.compile(
+            "(?:^|\\s)zrlogctl/([-!#$%&'*+.^_`|~0-9A-Za-z]+)(?=\\s|$)", Pattern.CASE_INSENSITIVE);
     private static final Pattern CRAWLER_PATTERN = Pattern.compile(
             "(bot|spider|crawler|crawl|slurp|curl|wget|python-requests|python-urllib|java/|okhttp|apache-httpclient|httpclient|go-http-client|postmanruntime|headlesschrome|phantomjs|bingpreview|facebookexternalhit|googleweblight|baiduspider|bytespider|petalbot|semrushbot|ahrefsbot|mj12bot|yandexbot)",
             Pattern.CASE_INSENSITIVE);
@@ -62,7 +64,11 @@ public class UserAgentUtils {
             os = "Linux";
         }
 
-        if (lowerUa.contains("micromessenger")) {
+        Matcher zrlogCtl = ZRLOGCTL_PATTERN.matcher(ua);
+        if (zrlogCtl.find()) {
+            browser = "ZrLogCtl";
+            version = zrlogCtl.group(1);
+        } else if (lowerUa.contains("micromessenger")) {
             browser = "WeChat";
             version = getVersion(ua, "MicroMessenger/(\\d+(\\.\\d+)*)");
         } else if (lowerUa.contains("edg/")) {

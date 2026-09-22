@@ -36,7 +36,7 @@ public class TemplateHelper {
             templateDownloadPlugin.precheckTemplate(templatePath);
         }
         if (!TemplateInfoHelper.existByTemplatePath(templatePath)) {
-            templatePath = Constants.DEFAULT_TEMPLATE_PATH;
+            templatePath = Constants.getDefaultTemplatePath();
         }
         return templatePath;
     }

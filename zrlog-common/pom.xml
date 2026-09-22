@@ -12,6 +12,8 @@
     <name>ZrLog Common</name>
 
     <dependencies>
+        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-template-default</artifactId><version>1.0</version><scope>test</scope></dependency>
+        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-template-spi</artifactId><version>1.0.0</version></dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>

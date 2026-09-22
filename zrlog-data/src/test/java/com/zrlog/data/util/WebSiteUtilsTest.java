@@ -23,7 +23,7 @@ public class WebSiteUtilsTest {
         assertEquals(WebSiteUtils.DEFAULT_COLOR_PRIMARY_COLOR, info.getAdmin_color_primary());
         assertEquals("default", info.getAdmin_theme());
         assertEquals(Constants.DEFAULT_LANGUAGE, info.getLanguage());
-        assertEquals(Constants.DEFAULT_TEMPLATE_PATH, info.getTemplate());
+        assertEquals(Constants.getDefaultTemplatePath(), info.getTemplate());
         assertEquals("comment", info.getComment_plugin_name());
         assertFalse(info.getAdmin_darkMode());
         assertFalse(info.getDisable_comment_status());

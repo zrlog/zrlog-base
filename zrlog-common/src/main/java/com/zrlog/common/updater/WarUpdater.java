@@ -1,5 +1,7 @@
 package com.zrlog.common.updater;
 
+import com.zrlog.theme.spi.BundledThemes;
+
 import com.hibegin.common.util.FileUtils;
 import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.ZipUtil;
@@ -19,10 +21,6 @@ import java.util.logging.Logger;
 
 public class WarUpdater implements Updater {
     private static final Logger LOGGER = LoggerUtil.getLogger(WarUpdater.class);
-    private static final List<String> CLASS_PATH_TEMPLATES = Arrays.asList(Constants.DEFAULT_TEMPLATE_PATH,
-            Constants.TEMPLATE_BASE_PATH + "hexo-theme-fluid", Constants.TEMPLATE_BASE_PATH + "hexo-theme-butterfly",
-            Constants.TEMPLATE_BASE_PATH + "template-www", Constants.TEMPLATE_BASE_PATH + "hexo-theme-shiro",
-            Constants.TEMPLATE_BASE_PATH + "hexo-theme-next");
     private final File warFilePath;
 
     public WarUpdater(File warFilePath) {
@@ -41,7 +39,7 @@ public class WarUpdater implements Updater {
     }
 
     private static boolean isClassPathTemplate(String path) {
-        return CLASS_PATH_TEMPLATES.stream().anyMatch(path::startsWith);
+        return BundledThemes.getInstance().containsResource(path);
     }
 
     private void fillTemplateCopyInfo(File tempFilePath, Map<String, String> copyFileMap) {

@@ -51,7 +51,7 @@ public class WebSiteUtils {
             info.setLanguage(Constants.DEFAULT_LANGUAGE);
         }
         if (StringUtils.isEmpty(info.getTemplate())) {
-            info.setTemplate(Constants.DEFAULT_TEMPLATE_PATH);
+            info.setTemplate(Constants.getDefaultTemplatePath());
         }
         boolean changyanStatus = ResultValueConvertUtils.toBoolean(info.getChangyan_status());
         if (changyanStatus) {

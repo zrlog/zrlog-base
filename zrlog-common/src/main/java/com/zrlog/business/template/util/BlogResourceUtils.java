@@ -1,5 +1,7 @@
 package com.zrlog.business.template.util;
 
+import com.zrlog.theme.spi.BundledThemes;
+
 import com.hibegin.common.util.IOUtil;
 
 import java.io.InputStream;
@@ -25,6 +27,9 @@ public class BlogResourceUtils {
             this.resources = Arrays.stream(IOUtil.getStringInputStream(resourceAsStream).split("\n")).collect(Collectors.toList());
         } else {
             this.resources = new ArrayList<>();
+        }
+        for (String resource : BundledThemes.getInstance().resources()) {
+            if (!resources.contains(resource)) resources.add(resource);
         }
     }
 

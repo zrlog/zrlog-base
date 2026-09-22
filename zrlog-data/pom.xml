@@ -12,6 +12,7 @@
     <name>ZrLog Data</name>
 
     <dependencies>
+        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-template-default</artifactId><version>1.0</version><scope>test</scope></dependency>
         <dependency>
             <groupId>com.hibegin</groupId>
             <artifactId>zrlog-common</artifactId>

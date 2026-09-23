@@ -65,11 +65,11 @@ final class CommandLineUpgradeNotice {
     }
 
     private static String buildCommand(UpdaterTypeEnum updaterType, File execFile, String channel) {
-        String executable = quote(execFile.getAbsolutePath());
         if (updaterType == UpdaterTypeEnum.ZIP) {
-            return "java -jar " + executable + " upgrade --channel=" + channel;
+            return "java -jar " + quote(execFile.getName()) + " upgrade --channel=" + channel;
         }
-        return executable + " upgrade --channel=" + channel;
+        String executable = (File.separatorChar == '/' ? "./" : "") + execFile.getName();
+        return quote(executable) + " upgrade --channel=" + channel;
     }
 
     private static String displayVersion(String version) {

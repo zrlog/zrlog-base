@@ -9,6 +9,7 @@ import com.hibegin.common.util.http.handle.HttpFileHandle;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.common.Constants;
 import com.zrlog.util.BlogBuildInfoUtil;
+import com.zrlog.util.StaticFileCacheUtils;
 import com.zrlog.util.ZrLogUtil;
 
 import java.io.File;
@@ -38,6 +39,7 @@ public class TemplateDownloadUtils {
 
     public static void installByZipFile(File zipFile, String templatePath) throws IOException {
         ZipUtil.unZip(zipFile.toString(), PathUtil.getStaticFile(templatePath).toString());
+        StaticFileCacheUtils.getInstance().refreshCacheFileMap();
         LOGGER.info("Install template [" + new File(templatePath).getName() + "] success");
 
     }

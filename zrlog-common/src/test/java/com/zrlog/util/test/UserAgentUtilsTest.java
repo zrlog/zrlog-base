@@ -7,6 +7,17 @@ import org.junit.Test;
 public class UserAgentUtilsTest {
 
     @Test
+    public void shouldParseZrLogCtlProductAndVersion() {
+        UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse("zrlogctl/0.1.42-beta.1");
+
+        Assert.assertEquals("Unknown", info.getOs());
+        Assert.assertEquals("ZrLogCtl", info.getBrowser());
+        Assert.assertEquals("0.1.42-beta.1", info.getBrowserVersion());
+        Assert.assertEquals("ZrLogCtl 0.1.42-beta.1", info.getFullBrowser());
+        Assert.assertFalse(info.isCrawler());
+    }
+
+    @Test
     public void shouldParseChromeVersion() {
         UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(
                 "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36");

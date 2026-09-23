@@ -3,6 +3,7 @@ package com.zrlog.business.plugin;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.business.service.WebsiteKvService;
 import com.zrlog.business.support.InMemoryZrLogDatabase;
+import com.zrlog.business.support.InMemoryZrLogDatabase.DatabaseType;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
@@ -11,13 +12,21 @@ import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import org.junit.Test;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
+import org.junit.runner.RunWith;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.RandomAccessFile;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -27,7 +36,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+@RunWith(Theories.class)
 public class PluginLifecycleContractTest {
+
+    @DataPoints
+    public static final DatabaseType[] DATABASES = DatabaseType.values();
 
     @Test
     public void shouldClosePluginConsoleAndDeleteOutputFile() throws Exception {
@@ -67,6 +80,109 @@ public class PluginLifecycleContractTest {
     }
 
     @Test
+    public void shouldStreamLargePluginConsoleDeltaExactlyOnce() throws Exception {
+        File output = Files.createTempFile("zrlog-plugin-console-large", ".log").toFile();
+        File marker = Files.createTempFile("zrlog-plugin-server", ".lock").toFile();
+        PluginConsole console = new PluginConsole(output, marker, false);
+        PrintStream previousOut = System.out;
+        ByteArrayOutputStream outputCapture = new ByteArrayOutputStream();
+        byte[] first = repeatedAsciiBytes(PluginConsole.READ_BUFFER_SIZE * 4 + 317, 'a');
+        byte[] second = repeatedAsciiBytes(PluginConsole.READ_BUFFER_SIZE * 2 + 113, 'b');
+        try {
+            System.setOut(new PrintStream(outputCapture, true, StandardCharsets.UTF_8.name()));
+
+            Files.write(output.toPath(), first);
+            console.printAsync();
+            waitUntil(() -> outputCapture.size() == first.length);
+            Files.write(output.toPath(), second, StandardOpenOption.APPEND);
+            waitUntil(() -> outputCapture.size() == first.length + second.length);
+        } finally {
+            console.close();
+            System.setOut(previousOut);
+        }
+
+        byte[] expected = new byte[first.length + second.length];
+        System.arraycopy(first, 0, expected, 0, first.length);
+        System.arraycopy(second, 0, expected, first.length, second.length);
+        assertTrue(Arrays.equals(expected, outputCapture.toByteArray()));
+        assertTrue(marker.exists());
+    }
+
+    @Test
+    public void shouldLimitPluginConsoleBytesProcessedPerPoll() throws Exception {
+        File output = Files.createTempFile("zrlog-plugin-console-poll-budget", ".log").toFile();
+        File marker = Files.createTempFile("zrlog-plugin-server", ".lock").toFile();
+        PluginConsole console = new PluginConsole(output, marker, false);
+        PrintStream previousOut = System.out;
+        ByteArrayOutputStream outputCapture = new ByteArrayOutputStream();
+        byte[] content = repeatedAsciiBytes((int) PluginConsole.MAX_BYTES_PER_POLL + 317, 'p');
+        try {
+            System.setOut(new PrintStream(outputCapture, true, StandardCharsets.UTF_8.name()));
+            Files.write(output.toPath(), content);
+
+            assertEquals(PluginConsole.MAX_BYTES_PER_POLL, console.printNewContent());
+            assertEquals(PluginConsole.MAX_BYTES_PER_POLL, outputCapture.size());
+            assertEquals(317L, console.printNewContent());
+        } finally {
+            console.close();
+            System.setOut(previousOut);
+        }
+
+        assertTrue(Arrays.equals(content, outputCapture.toByteArray()));
+        assertTrue(marker.exists());
+    }
+
+    @Test
+    public void shouldBoundPluginConsolePollForSparseDeltaLargerThanTwoGiB() throws Exception {
+        File output = Files.createTempFile("zrlog-plugin-console-sparse", ".log").toFile();
+        File marker = Files.createTempFile("zrlog-plugin-server", ".lock").toFile();
+        PluginConsole console = new PluginConsole(output, marker, false);
+        PrintStream previousOut = System.out;
+        long sparseLength = (long) Integer.MAX_VALUE + PluginConsole.READ_BUFFER_SIZE;
+        try {
+            try (RandomAccessFile randomAccessFile = new RandomAccessFile(output, "rw")) {
+                randomAccessFile.setLength(sparseLength);
+            }
+            System.setOut(new PrintStream(OutputStream.nullOutputStream()));
+
+            assertEquals(PluginConsole.MAX_BYTES_PER_POLL, console.printNewContent());
+            assertEquals(sparseLength, output.length());
+        } finally {
+            console.close();
+            System.setOut(previousOut);
+        }
+
+        assertTrue(marker.exists());
+    }
+
+    @Test
+    public void shouldRestartPluginConsoleTailAfterFileTruncation() throws Exception {
+        File output = Files.createTempFile("zrlog-plugin-console-rotated", ".log").toFile();
+        File marker = Files.createTempFile("zrlog-plugin-server", ".lock").toFile();
+        PluginConsole console = new PluginConsole(output, marker, false);
+        PrintStream previousOut = System.out;
+        ByteArrayOutputStream outputCapture = new ByteArrayOutputStream();
+        String first = new String(repeatedAsciiBytes(PluginConsole.READ_BUFFER_SIZE + 73, 'x'), StandardCharsets.US_ASCII);
+        String rotated = "rotated";
+        try {
+            System.setOut(new PrintStream(outputCapture, true, StandardCharsets.UTF_8.name()));
+
+            Files.writeString(output.toPath(), first, StandardCharsets.UTF_8);
+            console.printAsync();
+            waitUntil(() -> outputCapture.size() == first.length());
+            Files.writeString(output.toPath(), rotated, StandardCharsets.UTF_8,
+                    StandardOpenOption.TRUNCATE_EXISTING);
+            waitUntil(() -> outputCapture.size() == first.length() + rotated.length());
+        } finally {
+            console.close();
+            System.setOut(previousOut);
+        }
+
+        assertEquals(first + rotated, captured(outputCapture));
+        assertTrue(marker.exists());
+    }
+
+    @Test
     public void shouldPrintInvalidJarErrorAndDeleteServerMarker() throws Exception {
         File output = Files.createTempFile("zrlog-plugin-console-error", ".log").toFile();
         File marker = Files.createTempFile("zrlog-plugin-server", ".lock").toFile();
@@ -81,6 +197,33 @@ public class PluginLifecycleContractTest {
             console.printAsync();
             waitUntil(() -> captured(errorCapture).contains("Invalid or corrupt jarfile")
                     && !marker.exists());
+        } finally {
+            console.close();
+            System.setErr(previousErr);
+        }
+
+        assertFalse(output.exists());
+        assertFalse(marker.exists());
+    }
+
+    @Test
+    public void shouldDetectInvalidJarMarkerAcrossReadBuffers() throws Exception {
+        File output = Files.createTempFile("zrlog-plugin-console-error-buffered", ".log").toFile();
+        File marker = Files.createTempFile("zrlog-plugin-server", ".lock").toFile();
+        PluginConsole console = new PluginConsole(output, marker, true);
+        PrintStream previousErr = System.err;
+        ByteArrayOutputStream errorCapture = new ByteArrayOutputStream();
+        byte[] prefix = repeatedAsciiBytes(PluginConsole.READ_BUFFER_SIZE - 4, 'x');
+        prefix[prefix.length - 1] = '\n';
+        String invalidJarMessage = "Error: Invalid or corrupt jarfile plugin-core.jar";
+        try {
+            System.setErr(new PrintStream(errorCapture, true, StandardCharsets.UTF_8.name()));
+
+            Files.write(output.toPath(), prefix);
+            Files.writeString(output.toPath(), invalidJarMessage, StandardCharsets.UTF_8,
+                    StandardOpenOption.APPEND);
+            console.printAsync();
+            waitUntil(() -> captured(errorCapture).contains(invalidJarMessage) && !marker.exists());
         } finally {
             console.close();
             System.setErr(previousErr);
@@ -137,11 +280,11 @@ public class PluginLifecycleContractTest {
         assertFalse(plugin.isStarted());
     }
 
-    @Test
-    public void shouldRefreshInitDataWhenCacheTimeoutExpiresUsingDatabaseConfig() throws Exception {
+    @Theory
+    public void shouldRefreshInitDataWhenCacheTimeoutExpiresUsingDatabaseConfig(DatabaseType databaseType) throws Exception {
         long previousLastAccessTime = Constants.getLastAccessTime();
         AtomicInteger refreshCount = new AtomicInteger();
-        try (InMemoryZrLogDatabase ignored = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase ignored = InMemoryZrLogDatabase.open(databaseType)) {
             new WebsiteKvService().putString("cache_timeout_minutes", "0.001");
             CacheManagerPlugin plugin = new CacheManagerPlugin(new TestZrLogConfig(countingCacheService(refreshCount)));
             try {
@@ -164,6 +307,12 @@ public class PluginLifecycleContractTest {
 
     private static String captured(ByteArrayOutputStream outputCapture) {
         return new String(outputCapture.toByteArray(), StandardCharsets.UTF_8);
+    }
+
+    private static byte[] repeatedAsciiBytes(int length, char value) {
+        byte[] bytes = new byte[length];
+        Arrays.fill(bytes, (byte) value);
+        return bytes;
     }
 
     private static ScheduledExecutorService scheduler(PluginConsole console) throws Exception {

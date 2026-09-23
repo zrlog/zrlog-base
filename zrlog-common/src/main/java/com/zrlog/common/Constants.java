@@ -1,5 +1,7 @@
 package com.zrlog.common;
 
+import com.zrlog.theme.spi.BundledThemes;
+
 import com.hibegin.common.util.EnvKit;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 
@@ -16,7 +18,7 @@ public class Constants {
     public static final String API_PUBLIC_ADMIN_RESOURCE = "/api/public/adminResource";
     public static final String API_PUBLIC_VERSION = "/api/public/version";
     public static final String TEMPLATE_BASE_PATH = "/include/templates/";
-    public static final String DEFAULT_TEMPLATE_PATH = TEMPLATE_BASE_PATH + "default";
+    public static String getDefaultTemplatePath() { return BundledThemes.getInstance().defaultPath(); }
     public static final String ATTACHED_FOLDER = "/attached/";
     public static final String TEMPLATE_CONFIG_STR_KEY = "configStr";
     public static final String DATE_FORMAT_PATTERN = "yyyy-MM-dd HH:mm:ssXXX";

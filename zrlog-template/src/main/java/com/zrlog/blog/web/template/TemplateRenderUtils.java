@@ -250,18 +250,18 @@ public class TemplateRenderUtils {
         }
     }
 
-    private static void fullNavBar(HttpRequest request, String suffix, BaseDataInitVO baseDataInitVO) {
+    static void fullNavBar(HttpRequest request, String suffix, BaseDataInitVO baseDataInitVO) {
         List<LogNavDTO> logNavList = baseDataInitVO.getLogNavs();
         for (LogNavDTO logNav : logNavList) {
             String url = logNav.getUrl();
-            boolean current;
-            if ("/".equals(url) && isHomePage(request)) {
-                current = true;
-            } else if (url.startsWith("/")) {
+            boolean current = "/".equals(url) && isHomePage(request);
+            if (url.startsWith("/")) {
                 url = getNavUrl(request, suffix, url);
                 logNav.setUrl(url);
-                current = ignoreScheme(request.getUrl(), suffix).equals(ignoreScheme(url, suffix));
-            } else {
+                if (!current) {
+                    current = ignoreScheme(request.getUrl(), suffix).equals(ignoreScheme(url, suffix));
+                }
+            } else if (!current) {
                 current = ignoreScheme(request.getUrl(), suffix).equals(ignoreScheme(url, suffix));
             }
             logNav.setCurrent(current);

@@ -79,11 +79,12 @@ public class UpgradeService {
         PreCheckVersionResponse checkVersionResponse = getPreCheckVersionResponse(fetchAble, plugin);
         checkVersionResponse.setDockerMode(isDockerMode());
         checkVersionResponse.setSystemServiceMode(isSystemServiceMode());
+        checkVersionResponse.setFaasMode(isFaaSMode());
+        checkVersionResponse.setWarMode(isWarMode());
+        checkVersionResponse.setNativeImageMode(EnvKit.isNativeImage());
         boolean disable = isOnlineUpgradeDisabled();
         checkVersionResponse.setOnlineUpgradable(!disable);
-        if (!disable) {
-            checkVersionResponse.setBackupProtection(backupProtectionService.getStatus());
-        }
+        checkVersionResponse.setBackupProtection(backupProtectionService.getStatus());
         if (disable && Objects.equals(checkVersionResponse.getUpgrade(), true)) {
             UpgradeProcessResponse upgradeProcessResponse = buildManualUpgradeResponse(checkVersionResponse.getVersion(),
                     I18nUtil.getBackend());

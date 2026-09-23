@@ -11,6 +11,8 @@ import com.zrlog.util.ArgsParser;
 import com.zrlog.util.BlogBuildInfoUtil;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
@@ -26,7 +28,7 @@ public class NativeImageUpdater implements Updater {
 
     public NativeImageUpdater(String[] args, File execFile) {
         this.args = args;
-        this.execFile = execFile;
+        this.execFile = execFile.toPath().toAbsolutePath().normalize().toFile();
     }
 
     public File execFile() {
@@ -38,34 +40,39 @@ public class NativeImageUpdater implements Updater {
         return UpdaterTypeEnum.NATIVE_IMAGE;
     }
 
-    private String buildExec() {
+    String buildExec(File root, File updateTemp, long oldPid) {
         StringJoiner shells = new StringJoiner("\n");
         shells.add("#!/bin/sh");
         shells.add("set -e");
-        shells.add("sleep 1");
-        String zipBinName = "zrlog";
-        shells.add("chmod a+x " + getUpdateTempPath() + "/" + zipBinName);
-        shells.add("# upgrade " + zipBinName);
-        shells.add("cp -r " + getUpdateTempPath() + "/*" + " " + PathUtil.getRootPath());
-        File newBinFile = new File(PathUtil.getRootPath() + "/" + zipBinName);
-        //try update exec name
-        if (!Objects.equals(newBinFile.toString(), execFile.toString())) {
-            shells.add("mv " + newBinFile + " " + execFile);
+        shells.add("trap 'result=$?; if [ \"$result\" -ne 0 ]; then echo \"ZrLog upgrade failed (exit $result)\" >&2; fi' 0");
+        // The running native executable must be released before it can be overwritten.
+        shells.add("while kill -0 " + oldPid + " 2>/dev/null; do sleep 1; done");
+        shells.add("cd " + shellQuote(root.getAbsolutePath()));
+        shells.add("cp -R " + shellQuote(updateTemp.getAbsolutePath() + "/.") + " "
+                + shellQuote(root.getAbsolutePath()));
+        File newBinFile = new File(root, "zrlog").toPath().toAbsolutePath().normalize().toFile();
+        if (!newBinFile.equals(execFile)) {
+            shells.add("mv " + shellQuote(newBinFile.toString()) + " " + shellQuote(execFile.toString()));
         }
-        shells.add("rm -rf " + getUpdateTempPath());
-        shells.add("# start " + zipBinName);
-        shells.add(buildStartExec());
-        return shells.toString();
+        shells.add("chmod a+x " + shellQuote(execFile.toString()));
+        shells.add("rm -rf " + shellQuote(updateTemp.getAbsolutePath()));
+        shells.add("echo 'Starting upgraded ZrLog'");
+        shells.add("exec " + buildStartExec(false));
+        return shells + "\n";
     }
 
-    private String buildStartExec() {
+    private static String shellQuote(String value) {
+        return "'" + value.replace("'", "'\"'\"'") + "'";
+    }
+
+    private String buildStartExec(boolean windows) {
         StringJoiner cmdArgs = new StringJoiner(" ");
-        cmdArgs.add(execFile.toString());
+        cmdArgs.add(windows ? "\"" + execFile + "\"" : shellQuote(execFile.toString()));
         for (String arg : args) {
             if (arg.startsWith("--port=")) {
                 continue;
             }
-            cmdArgs.add(arg);
+            cmdArgs.add(windows ? "\"" + arg + "\"" : shellQuote(arg));
         }
         cmdArgs.add("--port=" + ArgsParser.getPort(args));
         return cmdArgs.toString();
@@ -81,11 +88,11 @@ public class NativeImageUpdater implements Updater {
         if (!Objects.equals(newBinFile.toString(), execFile.toString())) {
             shells.add("move " + newBinFile + " " + execFile);
         }
-        shells.add(buildStartExec());
+        shells.add(buildStartExec(true));
         return shells.toString();
     }
 
-    private String buildUpgradeCmd(Version upgradeVersion) {
+    private ProcessBuilder buildUpgradeProcess(Version upgradeVersion) throws IOException {
         StringJoiner stringJoiner = new StringJoiner("-");
         stringJoiner.add("upgrade");
         if (Objects.nonNull(upgradeVersion) && StringUtils.isNotEmpty(upgradeVersion.getVersion())) {
@@ -96,26 +103,33 @@ public class NativeImageUpdater implements Updater {
         }
         stringJoiner.add(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
         String fileName = stringJoiner.toString();
-        if (BlogBuildInfoUtil.getFileArch().startsWith("Windows")) {
-            File tempUpgradeFile = new File(PathUtil.getTempPath() + "/" + fileName + ".bat");
-            IOUtil.writeStrToFile(buildWindowsBatExec(), tempUpgradeFile);
-            return "cmd /c start " + tempUpgradeFile;
-        }
-        File tempUpgradeFile = new File(PathUtil.getTempPath() + "/" + fileName + ".sh");
-        IOUtil.writeStrToFile(buildExec(), tempUpgradeFile);
-        return "sh " + tempUpgradeFile + " &";
-
+        Files.createDirectories(new File(PathUtil.getTempPath()).toPath());
+        boolean windows = BlogBuildInfoUtil.getFileArch().startsWith("Windows");
+        File tempUpgradeFile = new File(PathUtil.getTempPath(), fileName + (windows ? ".bat" : ".sh"));
+        IOUtil.writeStrToFile(windows ? buildWindowsBatExec()
+                : buildExec(new File(PathUtil.getRootPath()), getUpdateTempPath(), ProcessHandle.current().pid()),
+                tempUpgradeFile);
+        File logFile = new File(PathUtil.getTempPath(), fileName + ".log");
+        ProcessBuilder process = windows
+                ? new ProcessBuilder("cmd", "/c", tempUpgradeFile.getAbsolutePath())
+                : new ProcessBuilder("nohup", "sh", tempUpgradeFile.getAbsolutePath());
+        process.directory(new File(PathUtil.getRootPath()));
+        process.redirectInput(new File(windows ? "NUL" : "/dev/null"));
+        process.redirectErrorStream(true);
+        process.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile));
+        LOGGER.info("ZrLog upgrade script: " + tempUpgradeFile + "; output: " + logFile);
+        return process;
     }
 
     @Override
     public void restartProcessAsync(Version upgradeVersion) {
-        String cmd = buildUpgradeCmd(upgradeVersion);
-        // 构造完整的命令启动
-        LOGGER.info("ZrLog file updated. exec shell\n" + cmd);
-        RestartProcessRunner.restartAsync(() -> {
-            Runtime.getRuntime().exec(cmd);
-            Thread.sleep(100);
-        });
+        final ProcessBuilder process;
+        try {
+            process = buildUpgradeProcess(upgradeVersion);
+        } catch (IOException e) {
+            throw new IllegalStateException("Unable to prepare native upgrade", e);
+        }
+        RestartProcessRunner.restartAsync(process::start);
     }
 
     @Override

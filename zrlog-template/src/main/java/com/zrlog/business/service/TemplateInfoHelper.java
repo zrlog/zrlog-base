@@ -1,5 +1,7 @@
 package com.zrlog.business.service;
 
+import com.zrlog.theme.spi.BundledThemes;
+
 import com.google.gson.Gson;
 import com.hibegin.common.util.IOUtil;
 import com.hibegin.common.util.LoggerUtil;
@@ -18,21 +20,16 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static com.zrlog.common.Constants.DEFAULT_TEMPLATE_PATH;
 import static com.zrlog.common.Constants.TEMPLATE_BASE_PATH;
 
 public class TemplateInfoHelper {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(TemplateInfoHelper.class);
-    private static final List<String> CLASS_PATH_TEMPLATES = Arrays.asList(DEFAULT_TEMPLATE_PATH,
-            TEMPLATE_BASE_PATH + "hexo-theme-fluid", TEMPLATE_BASE_PATH + "hexo-theme-butterfly", TEMPLATE_BASE_PATH + "template-www",
-            TEMPLATE_BASE_PATH + "hexo-theme-shiro",
-            TEMPLATE_BASE_PATH + "hexo-theme-next");
     public static final String ADMIN_PREVIEW_IMAGE_URI = Constants.ADMIN_URI_BASE_PATH + "/template/preview-image";
 
     public static List<TemplateVO> getClassPathTemplates() {
         List<TemplateVO> templateVOList = new ArrayList<>();
-        for (String path : CLASS_PATH_TEMPLATES) {
+        for (String path : BundledThemes.getInstance().paths()) {
             TemplateVO templateVO = loadTemplateVO(path);
             if (Objects.nonNull(templateVO)) {
                 templateVOList.add(templateVO);
@@ -42,7 +39,7 @@ public class TemplateInfoHelper {
     }
 
     public static boolean isDefaultTemplate(String templatePath) {
-        return CLASS_PATH_TEMPLATES.contains(templatePath);
+        return BundledThemes.getInstance().paths().contains(templatePath);
     }
 
     public static boolean existByTemplatePath(String templatePath) {
@@ -50,7 +47,7 @@ public class TemplateInfoHelper {
     }
 
     public static boolean isDefaultTemplateStartWith(String path) {
-        return CLASS_PATH_TEMPLATES.stream().anyMatch(path::startsWith);
+        return BundledThemes.getInstance().containsResource(path);
     }
 
     public static TemplateVO loadTemplateVO(String templateName) {

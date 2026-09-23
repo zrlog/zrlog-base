@@ -1,5 +1,7 @@
 package com.zrlog.util;
 
+import com.zrlog.theme.spi.BundledThemes;
+
 import com.hibegin.common.util.*;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.util.PathUtil;
@@ -95,7 +97,7 @@ public class I18nUtil {
 
     public static I18nVO addToRequestWithTemplatePath(String templatePath, HttpRequest request) {
         if (StringUtils.isNotEmpty(templatePath)) {
-            if (Objects.equals(templatePath, Constants.DEFAULT_TEMPLATE_PATH)) {
+            if (BundledThemes.getInstance().contains(templatePath)) {
                 File enUSPropertiesFile = new File(templatePath + "/language/i18n_en_US.properties");
                 File zhCNPropertiesFile = new File(templatePath + "/language/i18n_zh_CN.properties");
                 loadI18N(I18nUtil.class.getResourceAsStream(enUSPropertiesFile.toString().replace("\\", "/")), enUSPropertiesFile.getName(), I18N_BLOG_KEY);

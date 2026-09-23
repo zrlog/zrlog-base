@@ -137,9 +137,9 @@ public class CommonWebAndUpdaterTest {
         assertEquals(UpdaterTypeEnum.NATIVE_IMAGE, nativeImageUpdater.getType());
         assertNotNull(nativeImageUpdater.getUnzipPath());
 
-        Method buildStartExec = NativeImageUpdater.class.getDeclaredMethod("buildStartExec");
+        Method buildStartExec = NativeImageUpdater.class.getDeclaredMethod("buildStartExec", boolean.class);
         buildStartExec.setAccessible(true);
-        String cmd = buildStartExec.invoke(nativeImageUpdater).toString();
+        String cmd = buildStartExec.invoke(nativeImageUpdater, false).toString();
         assertTrue(cmd.contains(exec.toString()));
         assertTrue(cmd.contains("--data=/tmp"));
         assertTrue(cmd.contains("--port=8080"));

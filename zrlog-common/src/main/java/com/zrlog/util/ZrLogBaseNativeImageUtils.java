@@ -85,15 +85,7 @@ public class ZrLogBaseNativeImageUtils {
 
         NativeImageUtils.doResourceLoadByResourceNames(resourceFiles);
         //
-        NativeImageUtils.gsonNativeAgentByClazz(Arrays.asList(LockVO.class, I18nVO.class,
-                BaseTemplateVO.class,
-                TemplatePackageJson.class,
-                TemplateVO.class,
-                TemplateVO.TemplateConfigMap.class,
-                TemplateVO.TemplateConfigVO.class,
-                JsonObjectMapAdapter.class,
-                MyBasicRowProcessor.class,
-                MyBasicRowProcessor.createMap().getClass()));
+        NativeImageUtils.gsonNativeAgentByClazz(gsonClasses());
         //freemarker
         regWithGetMethod(TypeDTO.class,
                 LinkDTO.class, LogNavDTO.class, TagDTO.class, PluginDTO.class,
@@ -107,6 +99,19 @@ public class ZrLogBaseNativeImageUtils {
         for (int i = 1; i <= UpgradeVersionHandler.SQL_VERSION; i++) {
             UpgradeVersionHandlerHelpers.getUpgradeVersionHandler(i);
         }
+    }
+
+    static List<Class<?>> gsonClasses() {
+        return Arrays.asList(LockVO.class, I18nVO.class,
+                BaseTemplateVO.class,
+                TemplatePackageJson.class,
+                TemplateVO.class,
+                TemplateVO.TemplateConfigMap.class,
+                TemplateVO.TemplateConfigVO.class,
+                JsonObjectMapAdapter.class,
+                MyBasicRowProcessor.class,
+                MyBasicRowProcessor.createMap().getClass(),
+                LinkedHashMap.class);
     }
 
     public static void regWithGetMethod(Class<?>... objects) {

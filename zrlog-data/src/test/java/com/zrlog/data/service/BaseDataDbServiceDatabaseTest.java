@@ -5,7 +5,10 @@ import com.zrlog.common.cache.dto.TagDTO;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.data.cache.CacheServiceImpl;
 import com.zrlog.data.support.InMemoryZrLogDatabase;
+import com.zrlog.data.support.InMemoryZrLogDatabase.DatabaseType;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.util.List;
 import java.util.Map;
@@ -15,11 +18,23 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+@RunWith(Parameterized.class)
 public class BaseDataDbServiceDatabaseTest {
+
+    @Parameterized.Parameters(name = "{0}")
+    public static DatabaseType[] databases() {
+        return DatabaseType.values();
+    }
+
+    private final DatabaseType databaseType;
+
+    public BaseDataDbServiceDatabaseTest(DatabaseType databaseType) {
+        this.databaseType = databaseType;
+    }
 
     @Test
     public void shouldBuildBaseDataInitFromRealTables() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             seedContent(db);
 
             BaseDataInitVO init = new BaseDataDbService().queryCacheInit(Runnable::run);
@@ -43,7 +58,7 @@ public class BaseDataDbServiceDatabaseTest {
 
     @Test
     public void shouldRefreshAndPersistCacheInitDataThroughWebsiteTable() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             seedContent(db);
 
             CacheServiceImpl cacheService = new CacheServiceImpl();
@@ -68,7 +83,7 @@ public class BaseDataDbServiceDatabaseTest {
 
     @Test
     public void shouldRemoveEmptyDataPluginsFromCacheInit() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             insertPlugin(db, 1, "tags");
             insertPlugin(db, 2, "archives");
             insertPlugin(db, 3, "types");
@@ -89,7 +104,7 @@ public class BaseDataDbServiceDatabaseTest {
     @Test
     public void shouldReturnPartialInitWhenOptionalTablesFailToLoad() throws Exception {
         for (String table : List.of("link", "type", "lognav", "plugin", "user", "tag", "log")) {
-            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
                 db.update("drop table " + table);
 
                 BaseDataInitVO init = new BaseDataDbService().queryCacheInit(Runnable::run);

@@ -4,9 +4,14 @@ import com.hibegin.common.util.EnvKit;
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
 import com.zrlog.business.service.WebsiteKvService;
 import com.zrlog.business.support.InMemoryZrLogDatabase;
+import com.zrlog.business.support.InMemoryZrLogDatabase.DatabaseType;
 import com.zrlog.common.updater.UpdateVersionTimerTask;
 import com.zrlog.common.vo.Version;
 import org.junit.Test;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
+import org.junit.runner.RunWith;
 
 import java.io.IOException;
 import java.util.Date;
@@ -22,7 +27,11 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+@RunWith(Theories.class)
 public class UpdateVersionInfoPluginTest {
+
+    @DataPoints
+    public static final DatabaseType[] DATABASES = DatabaseType.values();
 
     @Test
     public void shouldNormalizePreviewAndReleaseVersionsForDisplay() {
@@ -51,9 +60,9 @@ public class UpdateVersionInfoPluginTest {
         assertFalse(plugin.isStarted());
     }
 
-    @Test
-    public void shouldStartWithoutSchedulingWhenAutoUpgradeIsDisabled() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+    @Theory
+    public void shouldStartWithoutSchedulingWhenAutoUpgradeIsDisabled(DatabaseType databaseType) throws Exception {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
                     String.valueOf(AutoUpgradeVersionType.NEVER.getCycle()), "");
@@ -66,9 +75,9 @@ public class UpdateVersionInfoPluginTest {
         }
     }
 
-    @Test
-    public void shouldStartScheduledVersionTaskFromDatabaseConfigWithoutNetwork() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+    @Theory
+    public void shouldStartScheduledVersionTaskFromDatabaseConfigWithoutNetwork(DatabaseType databaseType) throws Exception {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
                     String.valueOf(AutoUpgradeVersionType.ONE_MINUTE.getCycle()), "");

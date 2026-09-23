@@ -3,15 +3,19 @@ package com.hibegin.common.util;
 import org.junit.Test;
 
 import java.io.File;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 
 public class FileUtilsTest {
 
@@ -70,6 +74,62 @@ public class FileUtilsTest {
         File singleTarget = new File(root, "single-target");
         FileUtils.moveOrCopyFolder(singleFile.getAbsolutePath(), singleTarget.getAbsolutePath(), false);
         assertEquals("single", Files.readString(new File(singleTarget, "single.txt").toPath()));
+    }
+
+    @Test
+    public void shouldKeepAFileWhenSourceAndTargetAreTheSame() throws Exception {
+        Path file = Files.createTempFile("zrlog-same-file", ".txt");
+        Files.writeString(file, "content");
+
+        FileUtils.moveOrCopyFile(file.toString(), file.toString(), true);
+
+        assertEquals("content", Files.readString(file));
+    }
+
+    @Test
+    public void shouldCopyBeforeDeletingForCrossFileStoreMoves() throws Exception {
+        Path root = Files.createTempDirectory("zrlog-cross-store-move");
+        Path source = Files.writeString(root.resolve("source.txt"), "content");
+        Path target = root.resolve("out/target.txt");
+        Files.createDirectories(target.getParent());
+
+        FileUtils.copyThenDelete(source, target);
+
+        assertFalse(Files.exists(source));
+        assertEquals("content", Files.readString(target));
+    }
+
+    @Test
+    public void shouldMoveAcrossFileStoresWhenAvailable() throws Exception {
+        Path source = Files.createTempFile("zrlog-cross-file-store", ".txt");
+        Files.writeString(source, "content");
+        Path buildDirectory = Files.createDirectories(Path.of("target").toAbsolutePath());
+        Path targetRoot = Files.createTempDirectory(buildDirectory, "cross-file-store-");
+        Path target = targetRoot.resolve("target.txt");
+        try {
+            assumeFalse(Files.getFileStore(source).equals(Files.getFileStore(targetRoot)));
+
+            FileUtils.moveOrCopyFile(source.toString(), target.toString(), true);
+
+            assertFalse(Files.exists(source));
+            assertEquals("content", Files.readString(target));
+        } finally {
+            Files.deleteIfExists(source);
+            Files.deleteIfExists(target);
+            Files.deleteIfExists(targetRoot);
+        }
+    }
+
+    @Test
+    public void shouldPreserveTheSourceAndReportMoveFailures() throws Exception {
+        Path root = Files.createTempDirectory("zrlog-failed-move");
+        Path source = Files.writeString(root.resolve("source.txt"), "content");
+        Path targetDirectory = Files.createDirectories(root.resolve("target"));
+        Files.writeString(targetDirectory.resolve("existing.txt"), "existing");
+
+        assertThrows(UncheckedIOException.class,
+                () -> FileUtils.moveOrCopyFile(source.toString(), targetDirectory.toString(), true));
+        assertEquals("content", Files.readString(source));
     }
 
     @Test

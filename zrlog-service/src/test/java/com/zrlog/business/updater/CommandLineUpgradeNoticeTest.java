@@ -11,6 +11,7 @@ import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -26,7 +27,8 @@ public class CommandLineUpgradeNoticeTest {
         assertTrue(notice.contains("ZrLog update available"));
         assertTrue(notice.contains("Latest:  3.9.0"));
         assertTrue(notice.contains("Channel: release"));
-        assertTrue(notice.contains("java -jar \"/opt/zrlog/zrlog-starter.jar\" upgrade --channel=release"));
+        assertTrue(notice.contains("java -jar \"zrlog-starter.jar\" upgrade --channel=release"));
+        assertFalse(notice.contains("/opt/zrlog"));
     }
 
     @Test
@@ -37,7 +39,8 @@ public class CommandLineUpgradeNoticeTest {
         assertNotNull(notice);
         assertTrue(notice.contains("Latest:  3.9.0"));
         assertTrue(notice.contains("Channel: preview"));
-        assertTrue(notice.contains("\"/opt/zrlog/zrlog\" upgrade --channel=preview"));
+        assertTrue(notice.contains("\"./zrlog\" upgrade --channel=preview"));
+        assertFalse(notice.contains("/opt/zrlog"));
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.hibegin.common.dao.dto.OrderBy;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequestImpl;
 import com.hibegin.common.dao.DataSourceWrapper;
+import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
@@ -22,9 +23,12 @@ import com.zrlog.data.dto.ArticleDetailDTO;
 import com.zrlog.data.dto.CommentDTO;
 import com.zrlog.data.dto.VisitorCommentDTO;
 import com.zrlog.data.support.InMemoryZrLogDatabase;
+import com.zrlog.data.support.InMemoryZrLogDatabase.DatabaseType;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
@@ -42,11 +46,23 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+@RunWith(Parameterized.class)
 public class CoreModelDatabaseTest {
+
+    @Parameterized.Parameters(name = "{0}")
+    public static DatabaseType[] databases() {
+        return DatabaseType.values();
+    }
+
+    private final DatabaseType databaseType;
+
+    public CoreModelDatabaseTest(DatabaseType databaseType) {
+        this.databaseType = databaseType;
+    }
 
     @Test
     public void shouldQueryArticleModelViewsThroughRealTables() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             seedContent(db);
             db.update("update log set extensions=? where logId=?",
                     "{\"metadata\":{\"topicIds\":[\"tech\"],\"priority\":3}}", 1);
@@ -92,7 +108,7 @@ public class CoreModelDatabaseTest {
 
     @Test
     public void shouldFilterAdminArticlesByDraftPrivateAndPublishedStatus() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             seedContent(db);
             insertArticle(db, 4, "private", "Private", "Private content", "secret",
                     "2026-02-02 10:00:00", 1, false, true);
@@ -108,7 +124,7 @@ public class CoreModelDatabaseTest {
 
     @Test
     public void shouldOrderAndPaginatePublicHomeArticlesByStickyPriority() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             seedContent(db);
             insertArticle(db, 4, "newest", "Newest", "Newest content", "latest",
                     "2026-02-03 10:00:00", 1, false, false);
@@ -144,7 +160,7 @@ public class CoreModelDatabaseTest {
     @Test
     public void shouldQueryArticleDetailThroughRealTables() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             seedContent(db);
             Constants.zrLogConfig = testConfig();
             Log log = new Log();
@@ -168,7 +184,7 @@ public class CoreModelDatabaseTest {
     @Test
     public void shouldSkipDetailCommentsWhenWebsiteDisablesComments() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             seedContent(db);
             Constants.zrLogConfig = testConfig(true);
 
@@ -184,7 +200,7 @@ public class CoreModelDatabaseTest {
 
     @Test
     public void shouldQueryCommentsThroughRealTables() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             seedContent(db);
             Comment comment = new Comment();
 
@@ -203,14 +219,14 @@ public class CoreModelDatabaseTest {
             assertEquals("Reader", byLog.get(0).get("userName"));
             assertEquals(1, visitorComments.size());
             assertFalse(visitorComments.get(0).getGravatarId().isEmpty());
-            assertEquals(Boolean.TRUE, db.queryOne("select have_read from comment where commentId=?", 1)
-                    .get("have_read"));
+            assertTrue(ResultValueConvertUtils.toBoolean(
+                    db.queryOne("select have_read from comment where commentId=?", 1).get("have_read")));
         }
     }
 
     @Test
     public void shouldQueryNavigationLinkTypeUserPluginAndTagModelsThroughRealTables() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             seedContent(db);
 
             List<LinkDTO> links = new Link().findAll();
@@ -264,7 +280,7 @@ public class CoreModelDatabaseTest {
 
     @Test
     public void shouldRefreshTagsInBatchesForManyUniqueKeywords() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open()) {
+        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
             seedContent(db);
             insertArticle(db, 4, "many-tags", "Many Tags", "Many tag content",
                     "t01,t02,t03,t04,t05,t06,t07,t08,t09,t10,t11,t12",

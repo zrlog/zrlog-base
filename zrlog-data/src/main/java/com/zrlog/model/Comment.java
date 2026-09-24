@@ -28,9 +28,11 @@ public class Comment extends BasePageableDAO {
         this.pk = "commentId";
     }
 
-    public PageData<CommentDTO> find(PageRequest page) {
-        String sql = "select commentId as id,userComment,header,commTime,userMail,userHome,userIp,userName,hide,logId from " + tableName + " order by commTime desc";
-        PageData<CommentDTO> commentDTOPageData = queryPageData(sql, page, new Object[0], CommentDTO.class);
+    public PageData<CommentDTO> find(PageRequest page) { return find(page, null); }
+
+    public PageData<CommentDTO> find(PageRequest page, Integer privateOwnerId) {
+        String sql = "select commentId as id,userComment,header,commTime,userMail,userHome,userIp,userName,hide,logId from " + tableName + (privateOwnerId == null ? "" : " where logId in (select logId from log where privacy=false or userId=?)") + " order by commTime desc";
+        PageData<CommentDTO> commentDTOPageData = queryPageData(sql, page, privateOwnerId == null ? new Object[0] : new Object[]{privateOwnerId}, CommentDTO.class);
         commentDTOPageData.getRows().forEach(e -> {
             e.setCommTime(formatCommentTime(e.getCommTime()));
         });

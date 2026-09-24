@@ -44,17 +44,20 @@ public final class AccountAccess {
     public boolean isOwner() { return enabled && "owner".equals(role); }
     public boolean isAdministrator() { return enabled && ("owner".equals(role) || "admin".equals(role)); }
     public boolean managesAllArticles() { return isAdministrator() || enabled && "editor".equals(role); }
-    public boolean canPublish() { return enabled && !"contributor".equals(role); }
+    public boolean canPublish() { return AccountAction.ARTICLE_PUBLISH.allowed(this); }
     public boolean canAccessArticle(int authorId) { return enabled && (managesAllArticles() || authorId == userId); }
     public boolean canAccessArticle(int authorId, boolean privateArticle) {
         return canAccessArticle(authorId) && (!privateArticle || isAdministrator() || authorId == userId);
     }
     public Set<String> scopes() {
         if (!enabled) return Collections.emptySet();
-        Set<String> scopes = new LinkedHashSet<>(Arrays.asList("articles:read", "articles:read_drafts", "articles:read_private", "articles:write", "assets:write"));
+        Set<String> scopes = new LinkedHashSet<>();
+        for (AccountAction action : AccountAction.values()) {
+            if (action.getScope() != null && action.allowed(this)) scopes.add(action.getScope());
+        }
+        scopes.add("articles:read_drafts");
+        scopes.add("articles:read_private");
         if (managesAllArticles()) scopes.add("articles:all");
-        if (canPublish()) scopes.add("articles:publish");
-        if (!"contributor".equals(role)) scopes.add("articles:delete");
         return Collections.unmodifiableSet(scopes);
     }
 }

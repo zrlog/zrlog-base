@@ -31,6 +31,16 @@ public class AdminTokenThreadLocal {
         }
     }
 
+    /** Explicitly carries a request identity into a worker; restores any previous context afterwards. */
+    public static <T> T withUser(AdminTokenVO user, java.util.concurrent.Callable<T> task) throws Exception {
+        AdminTokenVO previous = userThreadLocal.get();
+        if (user == null) userThreadLocal.remove(); else userThreadLocal.set(user);
+        try { return task.call(); }
+        finally {
+            if (previous == null) userThreadLocal.remove(); else userThreadLocal.set(previous);
+        }
+    }
+
     public static int getUserId() {
         if (Objects.isNull(userThreadLocal.get())) {
             return -1;

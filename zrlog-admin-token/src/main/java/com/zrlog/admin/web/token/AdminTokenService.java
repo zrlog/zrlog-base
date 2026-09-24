@@ -142,7 +142,7 @@ public class AdminTokenService implements TokenService {
             //ignore 发生数据库 secretKey 无法解析 token 的情况下
             userSecretKeyCacheMap.remove(userId);
         } catch (Exception e) {
-            LOGGER.warning("Parse token error " + e.getMessage());
+            LOGGER.warning("Invalid admin token");
         }
         return null;
     }

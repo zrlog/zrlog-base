@@ -12,10 +12,13 @@ public final class ArticleAccess {
         if (draft && !scopes.contains("articles:read_drafts")) return false;
         return !privateArticle || scopes.contains("articles:read_private");
     }
-    public static boolean canWrite(AccountAccess account, Set<String> scopes, int authorId, boolean currentlyPublic, boolean willBePublic, boolean privateArticle) {
+    public static boolean canWrite(AccountAccess account, Set<String> scopes, int authorId, boolean currentDraft, boolean currentPrivate, boolean nextDraft, boolean nextPrivate) {
         if (!account.isEnabled()) return false;
-        if (!account.canAccessArticle(authorId, privateArticle) || !scopes.contains("articles:write")) return false;
+        if (!account.canAccessArticle(authorId, currentPrivate) || !scopes.contains("articles:write")) return false;
         if (authorId != account.getUserId() && !scopes.contains("articles:all")) return false;
+        if ("contributor".equals(account.getRole()) && (!currentDraft || !nextDraft)) return false;
+        boolean currentlyPublic = !currentDraft && !currentPrivate;
+        boolean willBePublic = !nextDraft && !nextPrivate;
         return !(currentlyPublic || willBePublic) || account.canPublish() && scopes.contains("articles:publish");
     }
 }

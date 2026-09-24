@@ -157,7 +157,7 @@ public class DbUpgradeServiceDatabaseTest {
                 assertEquals(0L, ((Number) db.scalar("select count(passkeyUserHandle) from user")).longValue());
                 assertEquals(0L, ((Number) db.scalar("select count(1) from user_passkey")).longValue());
                 assertEquals(0L, ((Number) db.scalar("select count(1) from user_passkey_challenge")).longValue());
-                assertEquals("26",
+                assertEquals(String.valueOf(UpgradeVersionHandler.SQL_VERSION),
                         db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
 
                 db.update("insert into user(userId, userName, passkeyUserHandle) values(?, ?, ?)",
@@ -345,10 +345,41 @@ public class DbUpgradeServiceDatabaseTest {
     }
 
     private void dropPasskeySchema(InMemoryZrLogDatabase db) throws SQLException {
+        dropAccountSchema(db);
         db.update("drop table if exists user_passkey_challenge");
         db.update("drop table if exists user_passkey");
         db.update("drop index if exists user_passkey_handle");
         db.update("alter table user drop column passkeyUserHandle");
+    }
+
+    private void dropAccountSchema(InMemoryZrLogDatabase db) throws SQLException {
+        db.update("drop table if exists oauth_credential");
+        db.update("drop table if exists oauth_grant");
+        db.update("drop table if exists oauth_client");
+        db.update("alter table user drop column role");
+        db.update("alter table user drop column enabled");
+        db.update("alter table user drop column authVersion");
+    }
+
+    @Test
+    public void shouldPreserveExistingUsersAndCreateOneOwnerWithOAuthTables() throws Exception {
+        String previous = System.getProperty("sws.conf.path");
+        File folder = writeUpgradeSql("accounts-conf", bundledUpgradeSql(27), 27);
+        try {
+            System.setProperty("sws.conf.path", folder.getAbsolutePath());
+            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+                dropAccountSchema(db);
+                db.update("insert into user(userId,userName) values(?,?)", 1, "existing");
+                db.update("insert into user(userId,userName) values(?,?)", 2, "second");
+                new DbUpgradeService(db.dataSource(), 26).tryDoUpgrade();
+                assertEquals("owner", db.scalar("select role from user where userId=1"));
+                assertEquals("admin", db.scalar("select role from user where userId=2"));
+                assertEquals(0, ((Number) db.scalar("select authVersion from user where userId=1")).intValue());
+                db.update("insert into oauth_client(clientId,name,redirectUris) values(?,?,?)", "app", "Application", "[]");
+                assertThrows(SQLException.class, () -> db.update("insert into oauth_client(clientId,name,redirectUris) values(?,?,?)", "app", "Duplicate", "[]"));
+                assertEquals("27", db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+            }
+        } finally { restoreProperty("sws.conf.path", previous); }
     }
 
     private void preparePartiallyAppliedPasskeySchemaForWebApi(InMemoryZrLogDatabase db) throws SQLException {

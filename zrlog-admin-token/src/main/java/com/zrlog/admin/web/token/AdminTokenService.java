@@ -15,6 +15,8 @@ import com.zrlog.common.TokenService;
 import com.zrlog.common.vo.AdminFullTokenVO;
 import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.model.User;
+import com.zrlog.data.security.AccountAccess;
+import java.sql.SQLException;
 import com.zrlog.util.CrossUtils;
 import com.zrlog.util.ParseUtil;
 
@@ -38,7 +40,6 @@ public class AdminTokenService implements TokenService {
     private static final Logger LOGGER = LoggerUtil.getLogger(AdminTokenService.class);
     private final String TOKEN_SPLIT_CHAR = "#";
     private final IvParameterSpec iv;
-    private SecretKeySpec secretKeySpec;
     private long sessionTimeout;
     private final Map<Integer, String> userSecretKeyCacheMap = new ConcurrentHashMap<>();
 
@@ -47,6 +48,10 @@ public class AdminTokenService implements TokenService {
         this.iv = new IvParameterSpec("_BLOG_BLOG_BLOG_".getBytes(StandardCharsets.UTF_8));
         //*60000， Cookie过期时间单位为分钟
         this.sessionTimeout = sessionTimeoutInMinutes * 60 * 1000L;
+    }
+
+    protected AccountAccess loadAccount(int userId) throws SQLException {
+        return AccountAccess.load(userId);
     }
 
     @Override
@@ -58,7 +63,7 @@ public class AdminTokenService implements TokenService {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
         //必须要16位
         String newSecretKey = SecurityUtils.md5(secretKey).substring(8, 24);
-        secretKeySpec = new SecretKeySpec(newSecretKey.getBytes(StandardCharsets.UTF_8), "AES");
+        SecretKeySpec secretKeySpec = new SecretKeySpec(newSecretKey.getBytes(StandardCharsets.UTF_8), "AES");
         cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, iv);
         return cipher.doFinal(value);
     }
@@ -67,7 +72,7 @@ public class AdminTokenService implements TokenService {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
         //必须要16位
         String newSecretKey = SecurityUtils.md5(secretKey).substring(8, 24);
-        secretKeySpec = new SecretKeySpec(newSecretKey.getBytes(StandardCharsets.UTF_8), "AES");
+        SecretKeySpec secretKeySpec = new SecretKeySpec(newSecretKey.getBytes(StandardCharsets.UTF_8), "AES");
         cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, iv);
         return cipher.doFinal(encrypted);
     }
@@ -102,16 +107,18 @@ public class AdminTokenService implements TokenService {
 
     private AdminFullTokenVO parseAdminTokenByStr(String tokenString) {
         if (!tokenString.contains(TOKEN_SPLIT_CHAR)) {
-            LOGGER.warning("Error token str " + tokenString);
+            LOGGER.warning("Malformed admin token");
             return null;
         }
         String userIdStr = tokenString.substring(0, tokenString.indexOf(TOKEN_SPLIT_CHAR));
         if (!ParseUtil.isNumeric(userIdStr)) {
-            LOGGER.warning("Error token userId " + userIdStr);
+            LOGGER.warning("Malformed admin token identity");
             return null;
         }
         int userId = Integer.parseInt(userIdStr);
         try {
+            AccountAccess account = loadAccount(userId);
+            if (!account.isEnabled()) return null;
             String sk = userSecretKeyCacheMap.get(userId);
             if (Objects.isNull(sk)) {
                 sk = (String) new User().set("userId", userId).queryFirst("secretKey");
@@ -126,6 +133,7 @@ public class AdminTokenService implements TokenService {
             byte[] adminTokenEncryptAfter = ByteUtils.hexString2Bytes(tokenString.substring(tokenString.indexOf(TOKEN_SPLIT_CHAR) + 1));
             String base64Encode = new String(decrypt(sk, Base64.getDecoder().decode(adminTokenEncryptAfter)));
             AdminFullTokenVO adminTokenVO = new Gson().fromJson(base64Encode, AdminFullTokenVO.class);
+            if (adminTokenVO.getUserId() != userId || adminTokenVO.getAuthVersion() != account.getAuthVersion()) return null;
             adminTokenVO.setSecretKey(sk);
             if (adminTokenVO.getCreatedDate() + sessionTimeout > System.currentTimeMillis()) {
                 return adminTokenVO;
@@ -168,7 +176,10 @@ public class AdminTokenService implements TokenService {
 
     @Override
     public void setAdminToken(Integer userId, String secretKey, String sessionId, String protocol, HttpRequest request, HttpResponse response) throws Exception {
+        AccountAccess account = loadAccount(userId);
+        if (!account.isEnabled()) throw new IllegalStateException("Account disabled");
         AdminTokenVO adminTokenVO = new AdminTokenVO();
+        adminTokenVO.setAuthVersion(account.getAuthVersion());
         adminTokenVO.setUserId(userId);
         adminTokenVO.setSessionId(sessionId);
         adminTokenVO.setProtocol(protocol);

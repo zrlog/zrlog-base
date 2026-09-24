@@ -4,6 +4,10 @@ public class AdminTokenVO {
 
     private long createdDate;
     private int userId;
+    private int authVersion;
+
+    public int getAuthVersion() { return authVersion; }
+    public void setAuthVersion(int authVersion) { this.authVersion = authVersion; }
     private String sessionId;
     private String protocol;
 

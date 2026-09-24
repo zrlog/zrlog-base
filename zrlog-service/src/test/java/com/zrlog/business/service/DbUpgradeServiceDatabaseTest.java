@@ -18,6 +18,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -356,9 +357,25 @@ public class DbUpgradeServiceDatabaseTest {
         db.update("drop table if exists oauth_credential");
         db.update("drop table if exists oauth_grant");
         db.update("drop table if exists oauth_client");
-        db.update("alter table user drop column role");
-        db.update("alter table user drop column enabled");
-        db.update("alter table user drop column authVersion");
+        // The installer SNAPSHOT may still contain the schema from before migration 27.
+        dropUserColumnIfPresent(db, "role");
+        dropUserColumnIfPresent(db, "enabled");
+        dropUserColumnIfPresent(db, "authVersion");
+    }
+
+    private void dropUserColumnIfPresent(InMemoryZrLogDatabase db, String column) throws SQLException {
+        boolean exists = db.dataSource().getQueryRunner().query("select * from user where 1=0", resultSet -> {
+            ResultSetMetaData metadata = resultSet.getMetaData();
+            for (int i = 1; i <= metadata.getColumnCount(); i++) {
+                if (column.equalsIgnoreCase(metadata.getColumnName(i))) {
+                    return true;
+                }
+            }
+            return false;
+        });
+        if (exists) {
+            db.update("alter table user drop column " + column);
+        }
     }
 
     @Test

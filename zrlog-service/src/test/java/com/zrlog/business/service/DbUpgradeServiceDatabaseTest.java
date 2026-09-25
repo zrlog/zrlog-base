@@ -354,6 +354,7 @@ public class DbUpgradeServiceDatabaseTest {
     }
 
     private void dropAccountSchema(InMemoryZrLogDatabase db) throws SQLException {
+        db.update("drop table if exists user_access_token");
         db.update("drop table if exists oauth_credential");
         db.update("drop table if exists oauth_grant");
         db.update("drop table if exists oauth_client");
@@ -361,6 +362,7 @@ public class DbUpgradeServiceDatabaseTest {
         dropUserColumnIfPresent(db, "role");
         dropUserColumnIfPresent(db, "enabled");
         dropUserColumnIfPresent(db, "authVersion");
+        dropUserColumnIfPresent(db, "preferences");
     }
 
     private void dropUserColumnIfPresent(InMemoryZrLogDatabase db, String column) throws SQLException {
@@ -394,7 +396,50 @@ public class DbUpgradeServiceDatabaseTest {
                 assertEquals(0, ((Number) db.scalar("select authVersion from user where userId=1")).intValue());
                 db.update("insert into oauth_client(clientId,name,redirectUris) values(?,?,?)", "app", "Application", "[]");
                 assertThrows(SQLException.class, () -> db.update("insert into oauth_client(clientId,name,redirectUris) values(?,?,?)", "app", "Duplicate", "[]"));
-                assertEquals("27", db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+                assertEquals(String.valueOf(UpgradeVersionHandler.SQL_VERSION), db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+            }
+        } finally { restoreProperty("sws.conf.path", previous); }
+    }
+
+    @Test
+    public void shouldAddEmptyPreferencesWithoutChangingExistingIdentity() throws Exception {
+        String previous = System.getProperty("sws.conf.path");
+        File folder = writeUpgradeSql("preferences-conf", bundledUpgradeSql(28), 28);
+        try {
+            System.setProperty("sws.conf.path", folder.getAbsolutePath());
+            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+                dropUserColumnIfPresent(db, "preferences");
+                db.update("drop table if exists user_access_token");
+                db.update("insert into user(userId,userName,role,authVersion) values(?,?,?,?)", 1, "existing", "author", 7);
+                new DbUpgradeService(db.dataSource(), 27).tryDoUpgrade();
+                assertNull(db.scalar("select preferences from user where userId=1"));
+                assertEquals("author", db.scalar("select role from user where userId=1"));
+                assertEquals(7, ((Number) db.scalar("select authVersion from user where userId=1")).intValue());
+                db.update("update user set preferences=? where userId=1", "{\"language\":\"en_US\"}");
+                new DbUpgradeService(db.dataSource(), 28).tryDoUpgrade();
+                assertEquals("{\"language\":\"en_US\"}", db.scalar("select preferences from user where userId=1"));
+            }
+        } finally { restoreProperty("sws.conf.path", previous); }
+    }
+
+    @Test
+    public void shouldAddPersonalTokensWithoutChangingAccountsOrOAuthGrants() throws Exception {
+        String previous = System.getProperty("sws.conf.path");
+        File folder = writeUpgradeSql("personal-token-conf", bundledUpgradeSql(29), 29);
+        try {
+            System.setProperty("sws.conf.path", folder.getAbsolutePath());
+            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+                db.update("drop table if exists user_access_token");
+                db.update("insert into user(userId,userName,role,authVersion) values(?,?,?,?)", 1, "existing", "author", 7);
+                new DbUpgradeService(db.dataSource(), 28).tryDoUpgrade();
+                assertEquals("29", db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+                assertEquals(7, ((Number) db.scalar("select authVersion from user where userId=1")).intValue());
+                db.update("insert into user_access_token(id,userId,name,tokenHash,scope,resource,authVersion,createdAt,expiresAt) values(?,?,?,?,?,?,?,?,?)",
+                        "token-id", 1, "Assistant", "hash", "articles:read", "https://example.com/mcp", 7, 1L, 100L);
+                assertThrows(SQLException.class, () -> db.update("insert into user_access_token(id,userId,name,tokenHash,scope,resource,authVersion,createdAt,expiresAt) values(?,?,?,?,?,?,?,?,?)",
+                        "other-id", 1, "Other", "hash", "articles:read", "https://example.com/mcp", 7, 1L, 100L));
+                new DbUpgradeService(db.dataSource(), 29).tryDoUpgrade();
+                assertEquals("Assistant", db.scalar("select name from user_access_token where id=?", "token-id"));
             }
         } finally { restoreProperty("sws.conf.path", previous); }
     }

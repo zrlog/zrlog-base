@@ -11,8 +11,14 @@ public final class AccountAccess {
     private final String role;
     private final boolean enabled;
     private final int authVersion;
+    private final Set<String> actions;
 
     private AccountAccess(int userId, String role, boolean enabled, int authVersion) {
+        this(userId, role, enabled, authVersion, null);
+    }
+
+    private AccountAccess(int userId, String role, boolean enabled, int authVersion, Set<String> actions) {
+        this.actions = actions;
         this.userId = userId;
         this.role = role;
         this.enabled = enabled && ROLES.contains(role);
@@ -29,6 +35,15 @@ public final class AccountAccess {
                 Objects.toString(row.get("role"), ""), truth(row.get("enabled")),
                 row.get("authVersion") instanceof Number ? ((Number) row.get("authVersion")).intValue() : -1);
     }
+
+    /** Immutable delegation bound: restrictions can only narrow existing permissions. */
+    public AccountAccess restrictActions(Collection<String> selected) {
+        Set<String> restricted = new LinkedHashSet<>(selected);
+        if (actions != null) restricted.retainAll(actions);
+        return new AccountAccess(userId, role, enabled, authVersion, Set.copyOf(restricted));
+    }
+
+    boolean permitsAction(String id) { return actions == null || actions.contains(id); }
 
     public static boolean truth(Object value) {
         if (value instanceof Boolean) return (Boolean) value;

@@ -19,6 +19,7 @@ public enum AccountAction {
     ASSET_UPLOAD("asset.upload", "assets:write", "owner", "admin", "editor", "author", "contributor"),
     FILE_MANAGE("file.manage", null, "owner", "admin"),
     DASHBOARD_READ("dashboard.read", null, "owner", "admin"),
+    NOTIFICATION_CREATE("notification.create", null, "owner", "admin"),
     SITE_CONFIGURE("site.configure", null, "owner", "admin"),
     SYSTEM_MANAGE("system.manage", null, "owner", "admin"),
     PLUGIN_MANAGE("plugin.manage", null, "owner", "admin"),
@@ -38,5 +39,5 @@ public enum AccountAction {
     public String getId() { return id; }
     public String getScope() { return scope; }
     public Set<String> getRoles() { return roles; }
-    public boolean allowed(AccountAccess account) { return account.isEnabled() && roles.contains(account.getRole()); }
+    public boolean allowed(AccountAccess account) { return account.isEnabled() && roles.contains(account.getRole()) && account.permitsAction(id); }
 }

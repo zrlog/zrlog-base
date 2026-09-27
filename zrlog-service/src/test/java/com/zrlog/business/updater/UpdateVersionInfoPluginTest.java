@@ -3,8 +3,8 @@ package com.zrlog.business.updater;
 import com.hibegin.common.util.EnvKit;
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
 import com.zrlog.business.service.WebsiteKvService;
-import com.zrlog.business.support.InMemoryZrLogDatabase;
-import com.zrlog.business.support.InMemoryZrLogDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.common.updater.UpdateVersionTimerTask;
 import com.zrlog.common.vo.Version;
 import org.junit.Test;
@@ -62,7 +62,7 @@ public class UpdateVersionInfoPluginTest {
 
     @Theory
     public void shouldStartWithoutSchedulingWhenAutoUpgradeIsDisabled(DatabaseType databaseType) throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
                     String.valueOf(AutoUpgradeVersionType.NEVER.getCycle()), "");
@@ -77,7 +77,7 @@ public class UpdateVersionInfoPluginTest {
 
     @Theory
     public void shouldStartScheduledVersionTaskFromDatabaseConfigWithoutNetwork(DatabaseType databaseType) throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
                     String.valueOf(AutoUpgradeVersionType.ONE_MINUTE.getCycle()), "");

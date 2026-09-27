@@ -10,8 +10,8 @@ import com.zrlog.common.cache.dto.TypeDTO;
 import com.zrlog.common.cache.dto.UserBasicDTO;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
-import com.zrlog.data.support.InMemoryZrLogDatabase;
-import com.zrlog.data.support.InMemoryZrLogDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import org.junit.Test;
@@ -45,7 +45,7 @@ public class CacheServiceImplDatabaseTest {
     @Test
     public void shouldLoadExistingInitCacheFromWebsiteTable() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             Constants.zrLogConfig = testConfig(true);
             BaseDataInitVO cached = cachedInit();
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
@@ -71,7 +71,7 @@ public class CacheServiceImplDatabaseTest {
     @Test
     public void shouldFallbackToDatabaseWhenStoredInitCacheIsInvalid() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             Constants.zrLogConfig = testConfig(false);
             seedLookupTables(db);
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
@@ -97,7 +97,7 @@ public class CacheServiceImplDatabaseTest {
     @Test
     public void shouldReadPublicWebsiteInfoFromDatabaseWhenInstalledAndCacheIsMissing() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             Constants.zrLogConfig = testConfig(true);
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     "base_data_init_cache_v3", "{bad-json", "");
@@ -140,7 +140,7 @@ public class CacheServiceImplDatabaseTest {
         return init;
     }
 
-    private static void seedLookupTables(InMemoryZrLogDatabase db) throws Exception {
+    private static void seedLookupTables(ZrLogTestDatabase db) throws Exception {
         db.update("insert into user(userId, email, password, userName, header) values(?, ?, ?, ?, ?)",
                 1, "db@example.com", "password", "db-user", "/avatar.png");
         db.update("insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",

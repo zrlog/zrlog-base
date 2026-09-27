@@ -17,6 +17,7 @@
 
 | 路径 | 职责 |
 | --- | --- |
+| `zrlog-test-support/` | 仅供测试使用的数据库隔离、日志捕获和内存运行目录工具；不承载功能夹具。 |
 | `zrlog-common/` | 通用工具、常量、响应结构、Web 基础设施、升级处理、插件基础接口和 native-image 注册入口。 |
 | `zrlog-data/` | 数据模型、数据服务、缓存实现、站点数据工具和数据库相关 DTO。 |
 | `zrlog-service/` | 公共业务服务、插件宿主进程/状态、升级业务和跨模块业务 DTO。 |
@@ -66,3 +67,7 @@ mvn -q -DskipTests install
 | 插件宿主侧协议 | `zrlog-service/src/main/java/com/zrlog/business/plugin` 和 `zrlog-common/src/main/java/com/zrlog/plugin` |
 | 模板页面对象 | `zrlog-template/src/main/java/com/zrlog/blog/web/template/vo` |
 | native-image 注册 | `zrlog-common/src/main/java/com/zrlog/util/ZrLogBaseNativeImageUtils.java` |
+
+## 共享测试标准
+
+遵守 [测试支持约定](docs/test-support.md)。data/service 使用 `com.zrlog.test.support.ZrLogTestDatabase`，不要再复制 H2/SQLite 建库、schema 加载和清理代码。共享测试构件必须以 test scope 消费，不得进入生产依赖；schema 来自 install-web，业务种子数据归消费者，安装链路仍由真实 InstallService 验证。

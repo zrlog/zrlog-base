@@ -1,8 +1,8 @@
 package com.zrlog.data.service;
 
 import com.zrlog.common.vo.LockVO;
-import com.zrlog.data.support.InMemoryZrLogDatabase;
-import com.zrlog.data.support.InMemoryZrLogDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.data.util.DistributedLockManager;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -32,7 +32,7 @@ public class DistributedLockDatabaseTest {
 
     @Test
     public void shouldStoreListAndReleaseDistributedLocksUsingWebsiteTable() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             DistributedLock first = new DistributedLock("cache");
             DistributedLock second = new DistributedLock("cache");
 

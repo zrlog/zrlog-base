@@ -2,8 +2,8 @@ package com.zrlog.business.plugin;
 
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.business.service.WebsiteKvService;
-import com.zrlog.business.support.InMemoryZrLogDatabase;
-import com.zrlog.business.support.InMemoryZrLogDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
@@ -284,7 +284,7 @@ public class PluginLifecycleContractTest {
     public void shouldRefreshInitDataWhenCacheTimeoutExpiresUsingDatabaseConfig(DatabaseType databaseType) throws Exception {
         long previousLastAccessTime = Constants.getLastAccessTime();
         AtomicInteger refreshCount = new AtomicInteger();
-        try (InMemoryZrLogDatabase ignored = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
             new WebsiteKvService().putString("cache_timeout_minutes", "0.001");
             CacheManagerPlugin plugin = new CacheManagerPlugin(new TestZrLogConfig(countingCacheService(refreshCount)));
             try {

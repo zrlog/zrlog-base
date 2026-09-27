@@ -1,8 +1,8 @@
 package com.zrlog.business.service;
 
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
-import com.zrlog.business.support.InMemoryZrLogDatabase;
-import com.zrlog.business.support.InMemoryZrLogDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.business.updater.AutoUpgradeVersionType;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -31,7 +31,7 @@ public class WebsiteKvServiceDatabaseTest {
 
     @Test
     public void shouldReadWriteListAndRemoveWebsiteKvUsingInstallSchema() throws Exception {
-        try (InMemoryZrLogDatabase ignored = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
             WebsiteKvService service = new WebsiteKvService();
 
             assertTrue(service.putString("feature.alpha", "one"));
@@ -58,7 +58,7 @@ public class WebsiteKvServiceDatabaseTest {
 
     @Test
     public void shouldBuildUpgradeWebsiteInfoFromRealWebsiteKv() throws Exception {
-        try (InMemoryZrLogDatabase ignored = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
             WebsiteKvService service = new WebsiteKvService();
 
             UpgradeWebSiteInfo defaults = service.upgradeWebSiteInfo();

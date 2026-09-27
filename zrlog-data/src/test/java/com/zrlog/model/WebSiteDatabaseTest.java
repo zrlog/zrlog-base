@@ -2,8 +2,8 @@ package com.zrlog.model;
 
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.dto.FaviconBase64DTO;
-import com.zrlog.data.support.InMemoryZrLogDatabase;
-import com.zrlog.data.support.InMemoryZrLogDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -31,7 +31,7 @@ public class WebSiteDatabaseTest {
 
     @Test
     public void shouldInsertUpdateAndReadWebsiteValuesUsingInstallSchema() throws Exception {
-        try (InMemoryZrLogDatabase ignored = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
             WebSite webSite = new WebSite();
 
             assertTrue(webSite.updateByKV("title", "ZrLog"));
@@ -51,7 +51,7 @@ public class WebSiteDatabaseTest {
     @Test
     @SuppressWarnings("unchecked")
     public void shouldReadPublicInfoTemplateConfigAndFaviconValues() throws Exception {
-        try (InMemoryZrLogDatabase ignored = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
             WebSite webSite = new WebSite();
             webSite.updateByKV("title", "ZrLog");
             webSite.updateByKV("host", "https://example.com");

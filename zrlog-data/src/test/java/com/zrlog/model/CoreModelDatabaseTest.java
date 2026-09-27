@@ -22,8 +22,8 @@ import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
 import com.zrlog.data.dto.CommentDTO;
 import com.zrlog.data.dto.VisitorCommentDTO;
-import com.zrlog.data.support.InMemoryZrLogDatabase;
-import com.zrlog.data.support.InMemoryZrLogDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import org.junit.Test;
@@ -62,7 +62,7 @@ public class CoreModelDatabaseTest {
 
     @Test
     public void shouldQueryArticleModelViewsThroughRealTables() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
             db.update("update log set extensions=? where logId=?",
                     "{\"metadata\":{\"topicIds\":[\"tech\"],\"priority\":3}}", 1);
@@ -108,7 +108,7 @@ public class CoreModelDatabaseTest {
 
     @Test
     public void shouldFilterAdminArticlesByDraftPrivateAndPublishedStatus() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
             insertArticle(db, 4, "private", "Private", "Private content", "secret",
                     "2026-02-02 10:00:00", 1, false, true);
@@ -124,7 +124,7 @@ public class CoreModelDatabaseTest {
 
     @Test
     public void shouldOrderAndPaginatePublicHomeArticlesByStickyPriority() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
             insertArticle(db, 4, "newest", "Newest", "Newest content", "latest",
                     "2026-02-03 10:00:00", 1, false, false);
@@ -160,7 +160,7 @@ public class CoreModelDatabaseTest {
     @Test
     public void shouldQueryArticleDetailThroughRealTables() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
             Constants.zrLogConfig = testConfig();
             Log log = new Log();
@@ -184,7 +184,7 @@ public class CoreModelDatabaseTest {
     @Test
     public void shouldSkipDetailCommentsWhenWebsiteDisablesComments() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
             Constants.zrLogConfig = testConfig(true);
 
@@ -200,7 +200,7 @@ public class CoreModelDatabaseTest {
 
     @Test
     public void shouldQueryCommentsThroughRealTables() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
             Comment comment = new Comment();
 
@@ -226,7 +226,7 @@ public class CoreModelDatabaseTest {
 
     @Test
     public void shouldQueryNavigationLinkTypeUserPluginAndTagModelsThroughRealTables() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
 
             List<LinkDTO> links = new Link().findAll();
@@ -280,7 +280,7 @@ public class CoreModelDatabaseTest {
 
     @Test
     public void shouldRefreshTagsInBatchesForManyUniqueKeywords() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
             insertArticle(db, 4, "many-tags", "Many Tags", "Many tag content",
                     "t01,t02,t03,t04,t05,t06,t07,t08,t09,t10,t11,t12",
@@ -300,7 +300,7 @@ public class CoreModelDatabaseTest {
         return new PageRequestImpl(1L, 10L);
     }
 
-    private static void seedContent(InMemoryZrLogDatabase db) throws Exception {
+    private static void seedContent(ZrLogTestDatabase db) throws Exception {
         db.update("insert into user(userId, email, password, userName, header) values(?, ?, ?, ?, ?)",
                 1, "admin@example.com", "password", "admin", "/avatar.png");
         db.update("insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
@@ -332,7 +332,7 @@ public class CoreModelDatabaseTest {
         return new SimpleDateFormat("yyyy-MM-dd").format(new Date()) + " " + time;
     }
 
-    private static void insertArticle(InMemoryZrLogDatabase db, int id, String alias, String title, String content,
+    private static void insertArticle(ZrLogTestDatabase db, int id, String alias, String title, String content,
                                       String keywords, String releaseTime, int click, boolean rubbish,
                                       boolean privacy) throws Exception {
         db.update("insert into log(logId, alias, canComment, click, version, content, plain_content, markdown,"

@@ -2,8 +2,8 @@ package com.zrlog.business.service;
 
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.SqlConvertUtils;
-import com.zrlog.business.support.InMemoryZrLogDatabase;
-import com.zrlog.business.support.InMemoryZrLogDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.business.version.UpgradeVersionHandler;
 import com.zrlog.common.CacheService;
 import org.junit.Rule;
@@ -48,7 +48,7 @@ public class DbUpgradeServiceDatabaseTest {
 
     @Test
     public void shouldSkipUpgradeWhenDatabaseIsAlreadyAtLatestSqlVersion() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     CacheService.ZRLOG_SQL_VERSION_KEY, String.valueOf(UpgradeVersionHandler.SQL_VERSION), "");
 
@@ -61,7 +61,7 @@ public class DbUpgradeServiceDatabaseTest {
 
     @Test
     public void shouldSkipUpgradeWhenCurrentSqlVersionIsUnknown() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             new DbUpgradeService(db.dataSource(), -1).tryDoUpgrade();
 
             assertNull(db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
@@ -76,7 +76,7 @@ public class DbUpgradeServiceDatabaseTest {
                 UpgradeVersionHandler.SQL_VERSION);
         try {
             System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
-            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 new DbUpgradeService(db.dataSource(), UpgradeVersionHandler.SQL_VERSION - 1).tryDoUpgrade();
 
                 assertEquals("ok", db.scalar("select value from website where name=?", "db.upgrade.marker"));
@@ -97,7 +97,7 @@ public class DbUpgradeServiceDatabaseTest {
         writeUpgradeSql(confFolder, bundledUpgradeSql(26), 26);
         try {
             System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
-            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 db.update("drop table log_extension_index");
                 db.update("alter table log drop column extensions");
                 db.update("alter table log drop column sticky");
@@ -125,7 +125,7 @@ public class DbUpgradeServiceDatabaseTest {
         writeUpgradeSql(confFolder, bundledUpgradeSql(26), 26);
         try {
             System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
-            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 db.update("drop table log_extension_index");
                 db.update("alter table log drop column extensions");
                 db.update("alter table log drop column sticky");
@@ -150,7 +150,7 @@ public class DbUpgradeServiceDatabaseTest {
         File confFolder = writeUpgradeSql("passkey-conf", bundledUpgradeSql(26), 26);
         try {
             System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
-            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 dropPasskeySchema(db);
 
                 new DbUpgradeService(db.dataSource(), 25).tryDoUpgrade();
@@ -208,7 +208,7 @@ public class DbUpgradeServiceDatabaseTest {
         writeUpgradeSql(confFolder, bundledPasskeyReplaySqlWithoutTableCreation(), 26);
         try {
             System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
-            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 db.update("alter table log drop column sticky");
                 dropPasskeySchema(db);
                 preparePartiallyAppliedPasskeySchemaForWebApi(db);
@@ -275,7 +275,7 @@ public class DbUpgradeServiceDatabaseTest {
         writeUpgradeSql(confFolder, bundledUpgradeSql(26), 26);
         try {
             System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
-            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 db.update("drop table log_extension_index");
                 db.update("alter table log drop column extensions");
                 db.update("alter table log drop column sticky");
@@ -305,7 +305,7 @@ public class DbUpgradeServiceDatabaseTest {
         File confFolder = writeUpgradeSql("bad-conf", "bad sql statement;", UpgradeVersionHandler.SQL_VERSION);
         try {
             System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
-            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 new DbUpgradeService(db.dataSource(), UpgradeVersionHandler.SQL_VERSION - 1).tryDoUpgrade();
 
                 assertNull(db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
@@ -345,7 +345,7 @@ public class DbUpgradeServiceDatabaseTest {
                 .collect(Collectors.joining(";\n", "", ";\n"));
     }
 
-    private void dropPasskeySchema(InMemoryZrLogDatabase db) throws SQLException {
+    private void dropPasskeySchema(ZrLogTestDatabase db) throws SQLException {
         dropAccountSchema(db);
         db.update("drop table if exists user_passkey_challenge");
         db.update("drop table if exists user_passkey");
@@ -353,7 +353,7 @@ public class DbUpgradeServiceDatabaseTest {
         db.update("alter table user drop column passkeyUserHandle");
     }
 
-    private void dropAccountSchema(InMemoryZrLogDatabase db) throws SQLException {
+    private void dropAccountSchema(ZrLogTestDatabase db) throws SQLException {
         db.update("drop table if exists user_access_token");
         db.update("drop table if exists oauth_credential");
         db.update("drop table if exists oauth_grant");
@@ -365,7 +365,7 @@ public class DbUpgradeServiceDatabaseTest {
         dropUserColumnIfPresent(db, "preferences");
     }
 
-    private void dropUserColumnIfPresent(InMemoryZrLogDatabase db, String column) throws SQLException {
+    private void dropUserColumnIfPresent(ZrLogTestDatabase db, String column) throws SQLException {
         boolean exists = db.dataSource().getQueryRunner().query("select * from user where 1=0", resultSet -> {
             ResultSetMetaData metadata = resultSet.getMetaData();
             for (int i = 1; i <= metadata.getColumnCount(); i++) {
@@ -386,7 +386,7 @@ public class DbUpgradeServiceDatabaseTest {
         File folder = writeUpgradeSql("accounts-conf", bundledUpgradeSql(27), 27);
         try {
             System.setProperty("sws.conf.path", folder.getAbsolutePath());
-            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 dropAccountSchema(db);
                 db.update("insert into user(userId,userName) values(?,?)", 1, "existing");
                 db.update("insert into user(userId,userName) values(?,?)", 2, "second");
@@ -407,7 +407,7 @@ public class DbUpgradeServiceDatabaseTest {
         File folder = writeUpgradeSql("preferences-conf", bundledUpgradeSql(28), 28);
         try {
             System.setProperty("sws.conf.path", folder.getAbsolutePath());
-            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 dropUserColumnIfPresent(db, "preferences");
                 db.update("drop table if exists user_access_token");
                 db.update("insert into user(userId,userName,role,authVersion) values(?,?,?,?)", 1, "existing", "author", 7);
@@ -428,7 +428,7 @@ public class DbUpgradeServiceDatabaseTest {
         File folder = writeUpgradeSql("personal-token-conf", bundledUpgradeSql(29), 29);
         try {
             System.setProperty("sws.conf.path", folder.getAbsolutePath());
-            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 db.update("drop table if exists user_access_token");
                 db.update("insert into user(userId,userName,role,authVersion) values(?,?,?,?)", 1, "existing", "author", 7);
                 new DbUpgradeService(db.dataSource(), 28).tryDoUpgrade();
@@ -444,7 +444,7 @@ public class DbUpgradeServiceDatabaseTest {
         } finally { restoreProperty("sws.conf.path", previous); }
     }
 
-    private void preparePartiallyAppliedPasskeySchemaForWebApi(InMemoryZrLogDatabase db) throws SQLException {
+    private void preparePartiallyAppliedPasskeySchemaForWebApi(ZrLogTestDatabase db) throws SQLException {
         db.update("alter table user add column passkeyUserHandle varchar(64)");
         db.update("create unique index user_passkey_handle on user(passkeyUserHandle)");
         db.update("create table `user_passkey`("

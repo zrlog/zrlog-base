@@ -4,8 +4,8 @@ import com.zrlog.common.CacheService;
 import com.zrlog.common.cache.dto.TagDTO;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.data.cache.CacheServiceImpl;
-import com.zrlog.data.support.InMemoryZrLogDatabase;
-import com.zrlog.data.support.InMemoryZrLogDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -34,7 +34,7 @@ public class BaseDataDbServiceDatabaseTest {
 
     @Test
     public void shouldBuildBaseDataInitFromRealTables() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
 
             BaseDataInitVO init = new BaseDataDbService().queryCacheInit(Runnable::run);
@@ -58,7 +58,7 @@ public class BaseDataDbServiceDatabaseTest {
 
     @Test
     public void shouldRefreshAndPersistCacheInitDataThroughWebsiteTable() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
 
             CacheServiceImpl cacheService = new CacheServiceImpl();
@@ -83,7 +83,7 @@ public class BaseDataDbServiceDatabaseTest {
 
     @Test
     public void shouldRemoveEmptyDataPluginsFromCacheInit() throws Exception {
-        try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             insertPlugin(db, 1, "tags");
             insertPlugin(db, 2, "archives");
             insertPlugin(db, 3, "types");
@@ -104,7 +104,7 @@ public class BaseDataDbServiceDatabaseTest {
     @Test
     public void shouldReturnPartialInitWhenOptionalTablesFailToLoad() throws Exception {
         for (String table : List.of("link", "type", "lognav", "plugin", "user", "tag", "log")) {
-            try (InMemoryZrLogDatabase db = InMemoryZrLogDatabase.open(databaseType)) {
+            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 db.update("drop table " + table);
 
                 BaseDataInitVO init = new BaseDataDbService().queryCacheInit(Runnable::run);
@@ -115,7 +115,7 @@ public class BaseDataDbServiceDatabaseTest {
         }
     }
 
-    private static void seedContent(InMemoryZrLogDatabase db) throws Exception {
+    private static void seedContent(ZrLogTestDatabase db) throws Exception {
         db.update("insert into user(userId, email, password, userName, header) values(?, ?, ?, ?, ?)",
                 1, "admin@example.com", "password", "admin", "/avatar.png");
         db.update("insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
@@ -143,13 +143,13 @@ public class BaseDataDbServiceDatabaseTest {
                 CacheService.ZRLOG_SQL_VERSION_KEY, "42", "sql version");
     }
 
-    private static void insertPlugin(InMemoryZrLogDatabase db, int id, String pluginName) throws Exception {
+    private static void insertPlugin(ZrLogTestDatabase db, int id, String pluginName) throws Exception {
         db.update("insert into plugin(pluginId, content, isSystem, pTitle, sort, pluginName, level)"
                         + " values(?, ?, ?, ?, ?, ?, ?)",
                 id, "{}", false, pluginName, id, pluginName, 1);
     }
 
-    private static void insertArticle(InMemoryZrLogDatabase db, int id, String alias, String title, String content,
+    private static void insertArticle(ZrLogTestDatabase db, int id, String alias, String title, String content,
                                       String keywords, String releaseTime, int click) throws Exception {
         db.update("insert into log(logId, alias, canComment, click, version, content, plain_content, markdown,"
                         + " digest, keywords, recommended, releaseTime, last_update_date, title, typeId, userId,"

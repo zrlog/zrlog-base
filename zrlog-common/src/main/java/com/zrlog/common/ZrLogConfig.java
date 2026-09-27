@@ -155,6 +155,11 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         return serverConfig;
     }
 
+    /** Find an enabled module's capability without depending on its implementation. */
+    public <T> T getWebSetup(Class<T> capability) {
+        return webSetups.stream().filter(capability::isInstance).map(capability::cast).findFirst().orElse(null);
+    }
+
     public void stop() {
         try {
             plugins.forEach(IPlugin::stop);

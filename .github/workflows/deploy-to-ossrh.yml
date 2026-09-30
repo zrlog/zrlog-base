@@ -40,15 +40,26 @@ jobs:
           </settings>
           EOF
       - name: Import GPG key
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           echo "$GPG_PRIVATE_KEY" | gpg --batch --yes --import
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
 
-      - name: Build and Deploy to Maven Central
-        run: ./mvnw -U clean deploy -s $GITHUB_WORKSPACE/settings.xml -Dmaven.test.skip=false -DskipTests=false -Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }}
+      - name: Build and deploy development snapshots
+        if: github.ref == 'refs/heads/main'
+        run: |
+          ./mvnw -B -ntp -U -Psnapshot clean deploy \
+            -s "$GITHUB_WORKSPACE/settings.xml" -Dmaven.test.skip=false -DskipTests=false
+
+      - name: Build and deploy release bundle
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          ./mvnw -B -ntp -U clean deploy \
+            -s "$GITHUB_WORKSPACE/settings.xml" -Dmaven.test.skip=false -DskipTests=false \
+            -Dgpg.passphrase="$MAVEN_GPG_PASSPHRASE"
         env:
-          GPG_TTY: $(tty)
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Notify zrlog preview build
         if: github.ref == 'refs/heads/main'

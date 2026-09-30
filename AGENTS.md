@@ -37,6 +37,8 @@ mvn -q -DskipTests install
 
 修改共享 API、DTO、模型、插件宿主或模板对象时，至少运行 `mvn -q test`。如果下游工程需要消费本地改动，先在本仓库运行 `mvn -q -DskipTests install`，再到对应消费者仓库验证。
 
+快照、正式版和本地部署验证见 [构建与发布](docs/build.md)。
+
 ## 边界规则
 
 - 共享层只沉淀稳定公共能力，不承载 admin/blog/install 的页面级临时逻辑。

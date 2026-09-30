@@ -7,6 +7,38 @@ import org.junit.Test;
 public class UserAgentUtilsTest {
 
     @Test
+    public void shouldParseNonBrowserClientProductsAndVersions() {
+        for (String product : new String[]{"codex/0.42.0-beta.1", "openai-mcp/1.0.0", "python-httpx/0.28.1"}) {
+            String[] parts = product.split("/", 2);
+            UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(product + " (Linux; x86_64)");
+
+            Assert.assertEquals("Linux", info.getOs());
+            Assert.assertEquals(parts[0], info.getBrowser());
+            Assert.assertEquals(parts[1], info.getBrowserVersion());
+            Assert.assertEquals(parts[0] + " " + parts[1], info.getFullBrowser());
+        }
+    }
+
+    @Test
+    public void shouldKeepClientNameWhenVersionIsNotProvided() {
+        UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse("  node  ");
+
+        Assert.assertEquals("node", info.getBrowser());
+        Assert.assertEquals("Unknown", info.getBrowserVersion());
+        Assert.assertEquals("node", info.getFullBrowser());
+    }
+
+    @Test
+    public void shouldNotInventClientDetailsFromMalformedOrCompatibilityTokens() {
+        for (String value : new String[]{" ", "client/", "client/1.0/extra", "/1.0", "(client/1.0)", "Mozilla/5.0"}) {
+            UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(value);
+
+            Assert.assertEquals(value, "Unknown", info.getBrowser());
+            Assert.assertEquals(value, "Unknown", info.getBrowserVersion());
+        }
+    }
+
+    @Test
     public void shouldParseZrLogCtlProductAndVersion() {
         UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse("zrlogctl/0.1.42-beta.1");
 
@@ -145,6 +177,7 @@ public class UserAgentUtilsTest {
 
         Assert.assertTrue(curl.isCrawler());
         Assert.assertTrue(okhttp.isCrawler());
-        Assert.assertEquals("Unknown", curl.getFullBrowser());
+        Assert.assertEquals("curl 8.6.0", curl.getFullBrowser());
+        Assert.assertEquals("okhttp 4.12.0", okhttp.getFullBrowser());
     }
 }

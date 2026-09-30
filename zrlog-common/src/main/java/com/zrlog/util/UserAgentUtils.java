@@ -7,6 +7,8 @@ public class UserAgentUtils {
 
     private static final Pattern ZRLOGCTL_PATTERN = Pattern.compile(
             "(?:^|\\s)zrlogctl/([-!#$%&'*+.^_`|~0-9A-Za-z]+)(?=\\s|$)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CLIENT_PRODUCT_PATTERN = Pattern.compile(
+            "^([-!#$%&'*+.^_`|~0-9A-Za-z]+)(?:/([-!#$%&'*+.^_`|~0-9A-Za-z]+))?(?=\\s|$)");
     private static final Pattern CRAWLER_PATTERN = Pattern.compile(
             "(bot|spider|crawler|crawl|slurp|curl|wget|python-requests|python-urllib|java/|okhttp|apache-httpclient|httpclient|go-http-client|postmanruntime|headlesschrome|phantomjs|bingpreview|facebookexternalhit|googleweblight|baiduspider|bytespider|petalbot|semrushbot|ahrefsbot|mj12bot|yandexbot)",
             Pattern.CASE_INSENSITIVE);
@@ -89,6 +91,13 @@ public class UserAgentUtils {
         } else if (lowerUa.contains("msie") || lowerUa.contains("trident")) {
             browser = "Internet Explorer";
             version = getVersion(ua, "(?:MSIE |rv:)(\\d+(\\.\\d+)*)");
+        } else {
+            // MCP and other API clients commonly send a product/version instead of a browser UA.
+            Matcher product = CLIENT_PRODUCT_PATTERN.matcher(ua.trim());
+            if (product.find() && !"Mozilla".equalsIgnoreCase(product.group(1))) {
+                browser = product.group(1);
+                if (product.group(2) != null) version = product.group(2);
+            }
         }
 
         return new UserAgentInfo(os, browser, version, crawler);

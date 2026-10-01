@@ -18,6 +18,7 @@ import com.zrlog.business.rest.response.PluginStatusResponse;
 import com.zrlog.common.Constants;
 import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
+import com.zrlog.plugin.PluginAdminAppearance;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.I18nUtil;
 
@@ -67,11 +68,22 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
         map.put("Current-Locale", I18nUtil.getCurrentLocale());
         map.put("Blog-Version", BlogBuildInfoUtil.getVersion());
         PublicWebSiteInfo publicWebSiteInfo = Constants.zrLogConfig.getCacheService().getPublicWebSiteInfo();
-        map.put("Dark-Mode", publicWebSiteInfo.getAdmin_darkMode() + "");
+        PluginAdminAppearance appearance = new PluginAdminAppearance(publicWebSiteInfo.getAdmin_theme(),
+                Boolean.TRUE.equals(publicWebSiteInfo.getAdmin_darkMode()), publicWebSiteInfo.getAdmin_color_primary(),
+                Boolean.TRUE.equals(publicWebSiteInfo.getAdmin_compactMode()));
+        if (adminTokenVO != null && request != null && request.getAttr() != null) {
+            Object personalAppearance = request.getAttr().get(PluginAdminAppearance.REQUEST_ATTRIBUTE);
+            if (personalAppearance instanceof PluginAdminAppearance) {
+                appearance = (PluginAdminAppearance) personalAppearance;
+            }
+        }
+        map.put("Dark-Mode", Boolean.toString(appearance.isDarkMode()));
+        map.put("Admin-Theme", StringUtils.isEmpty(appearance.getTheme()) ? "default" : appearance.getTheme());
+        map.put("Admin-Compact-Mode", Boolean.toString(appearance.isCompactMode()));
         if (EnvKit.isDevMode()) {
             map.put("DEV_MODE", "true");
         }
-        map.put("Admin-Color-Primary", publicWebSiteInfo.getAdmin_color_primary());
+        map.put("Admin-Color-Primary", appearance.getColorPrimary());
         if (Objects.isNull(request)) {
             return map;
         }

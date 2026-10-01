@@ -15,6 +15,7 @@ import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
+import com.zrlog.plugin.PluginAdminAppearance;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import org.junit.Test;
@@ -83,6 +84,8 @@ public class PluginCorePluginImplTest {
             assertEquals("true", headers.get("IsLogin"));
             assertEquals("true", headers.get("Dark-Mode"));
             assertEquals("#1677ff", headers.get("Admin-Color-Primary"));
+            assertEquals("desk", headers.get("Admin-Theme"));
+            assertEquals("true", headers.get("Admin-Compact-Mode"));
             assertEquals("sid=1", headers.get("Cookie"));
             assertEquals("http://127.0.0.1:19080", headers.get("AccessUrl"));
             assertEquals("application/json", headers.get("Content-Type"));
@@ -107,8 +110,34 @@ public class PluginCorePluginImplTest {
             assertEquals("false", headers.get("IsLogin"));
             assertEquals("true", headers.get("Dark-Mode"));
             assertEquals("#1677ff", headers.get("Admin-Color-Primary"));
+            assertEquals("desk", headers.get("Admin-Theme"));
+            assertEquals("true", headers.get("Admin-Compact-Mode"));
             assertFalse(headers.containsKey("Full-Url"));
             assertFalse(headers.containsKey("Cookie"));
+        } finally {
+            Constants.zrLogConfig = previousConfig;
+        }
+    }
+
+    @Test
+    public void shouldForwardTrustedPersonalAppearanceOnlyForAuthenticatedRequests() throws Exception {
+        ZrLogConfig previousConfig = Constants.zrLogConfig;
+        try {
+            Constants.zrLogConfig = testConfig();
+            HttpRequest request = request(Map.of("Admin-Theme", "spoofed", "Dark-Mode", "false"));
+            AdminTokenVO token = new AdminTokenVO();
+            token.setUserId(5);
+            token.setProtocol("https");
+            assertEquals("desk", headerMap(request, token).get("Admin-Theme"));
+            request.getAttr().put(PluginAdminAppearance.REQUEST_ATTRIBUTE,
+                    new PluginAdminAppearance("antd", false, "#00875a", false));
+
+            Map<String, String> headers = headerMap(request, token);
+            assertEquals("antd", headers.get("Admin-Theme"));
+            assertEquals("false", headers.get("Dark-Mode"));
+            assertEquals("#00875a", headers.get("Admin-Color-Primary"));
+            assertEquals("false", headers.get("Admin-Compact-Mode"));
+            assertEquals("desk", headerMap(request, null).get("Admin-Theme"));
         } finally {
             Constants.zrLogConfig = previousConfig;
         }
@@ -584,6 +613,7 @@ public class PluginCorePluginImplTest {
     }
 
     private static HttpRequest request(Map<String, String> headers) {
+        Map<String, Object> attributes = new java.util.HashMap<>();
         ServerConfig serverConfig = new ServerConfig();
         serverConfig.setPort(19080);
         return (HttpRequest) Proxy.newProxyInstance(
@@ -591,6 +621,8 @@ public class PluginCorePluginImplTest {
                 new Class[]{HttpRequest.class},
                 (proxy, method, args) -> {
                     switch (method.getName()) {
+                        case "getAttr":
+                            return attributes;
                         case "getHeader":
                             return headers.get((String) args[0]);
                         case "getHeaderMap":
@@ -695,6 +727,8 @@ public class PluginCorePluginImplTest {
         PublicWebSiteInfo info = new PublicWebSiteInfo();
         info.setAdmin_darkMode(true);
         info.setAdmin_color_primary("#1677ff");
+        info.setAdmin_theme("desk");
+        info.setAdmin_compactMode(true);
         return (CacheService) Proxy.newProxyInstance(
                 PluginCorePluginImplTest.class.getClassLoader(),
                 new Class[]{CacheService.class},

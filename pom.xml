@@ -25,7 +25,7 @@
         <maven.test.skip>false</maven.test.skip>
         <sws.version>4.1.13</sws.version>
         <zrlog-install-web.version>4.0.0-SNAPSHOT</zrlog-install-web.version>
-        <h2.version>2.2.224</h2.version>
+        <h2.version>2.5.252</h2.version>
         <sqlite-jdbc.version>3.53.2.1</sqlite-jdbc.version>
         <project.build.outputTimestamp>2026-07-04T12:50:31Z</project.build.outputTimestamp>
         <gpg.passphrase/>

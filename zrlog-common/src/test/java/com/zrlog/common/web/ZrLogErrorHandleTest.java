@@ -5,7 +5,11 @@ import com.hibegin.http.server.api.HttpResponse;
 import com.hibegin.http.server.execption.NotFindResourceException;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.common.exception.AbstractBusinessException;
+import com.zrlog.common.exception.MissingRequestBodyException;
+import com.zrlog.common.exception.NotImplementException;
 import com.zrlog.common.rest.response.ApiStandardResponse;
+import com.zrlog.common.vo.I18nVO;
+import com.zrlog.util.I18nUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -14,6 +18,8 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.InputStream;
 import java.lang.reflect.Proxy;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashMap;
@@ -22,6 +28,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -33,9 +40,12 @@ public class ZrLogErrorHandleTest {
     private final Logger errorHandleLogger = Logger.getLogger(ZrLogErrorHandle.class.getName());
     private Level previousLevel;
     private boolean previousUseParentHandlers;
+    private I18nVO previousI18n;
 
     @Before
     public void setUp() {
+        previousI18n = I18nUtil.threadLocal.get();
+        useLocale("zh_CN");
         previousLevel = errorHandleLogger.getLevel();
         previousUseParentHandlers = errorHandleLogger.getUseParentHandlers();
         errorHandleLogger.setUseParentHandlers(false);
@@ -44,6 +54,11 @@ public class ZrLogErrorHandleTest {
 
     @After
     public void tearDown() {
+        if (previousI18n == null) {
+            I18nUtil.removeI18n();
+        } else {
+            I18nUtil.threadLocal.set(previousI18n);
+        }
         errorHandleLogger.setLevel(previousLevel);
         errorHandleLogger.setUseParentHandlers(previousUseParentHandlers);
     }
@@ -62,16 +77,61 @@ public class ZrLogErrorHandleTest {
 
     @Test
     public void shouldRenderApiNotFoundAndUnexpectedErrorsAsJson() {
-        ResponseRecorder notFound = new ResponseRecorder();
-        new ZrLogErrorHandle(404).doHandle(request("/api/missing", ""), notFound.response(),
-                new NotFindResourceException("missing"));
-        assertEquals(9404, ((ApiStandardResponse<?>) notFound.json).getError());
+        for (String locale : new String[]{"zh_CN", "en_US"}) {
+            useLocale(locale);
+            ResponseRecorder notFound = new ResponseRecorder();
+            new ZrLogErrorHandle(404).doHandle(request("/api/missing", ""), notFound.response(),
+                    new NotFindResourceException("internal-resource-path"));
+            ApiStandardResponse<?> missingResponse = (ApiStandardResponse<?>) notFound.json;
+            assertEquals(9404, missingResponse.getError());
+            assertEquals(I18nUtil.getBackendStringFromRes("request.error.notFound"), missingResponse.getMessage());
+            assertFalse(missingResponse.getMessage().isBlank());
+            assertFalse(missingResponse.getMessage().contains("internal-resource-path"));
 
-        ResponseRecorder unexpected = new ResponseRecorder();
-        new ZrLogErrorHandle(500).doHandle(request("/api/error", ""), unexpected.response(),
-                new IllegalStateException("boom"));
-        assertEquals(9999, ((ApiStandardResponse<?>) unexpected.json).getError());
-        assertEquals("boom", ((ApiStandardResponse<?>) unexpected.json).getMessage());
+            for (String detail : new String[]{"internal-database-error", null}) {
+                ResponseRecorder unexpected = new ResponseRecorder();
+                new ZrLogErrorHandle(500).doHandle(request("/api/error", ""), unexpected.response(),
+                        new IllegalStateException(detail));
+                ApiStandardResponse<?> errorResponse = (ApiStandardResponse<?>) unexpected.json;
+                assertEquals(9999, errorResponse.getError());
+                assertEquals(I18nUtil.getBackendStringFromRes("unknownError"), errorResponse.getMessage());
+                assertFalse(errorResponse.getMessage().isBlank());
+                assertFalse(errorResponse.getMessage().contains("internal-database-error"));
+            }
+        }
+    }
+
+    @Test
+    public void shouldReturnLocalizedMessagesForPreviouslyEmptyBusinessErrors() {
+        for (String locale : new String[]{"zh_CN", "en_US"}) {
+            useLocale(locale);
+            AbstractBusinessException[] errors = {new MissingRequestBodyException(), new NotImplementException()};
+            String[] keys = {"request.validation.bodyRequired", "request.error.unsupportedOperation"};
+            int[] codes = {9030, 9088};
+            for (int index = 0; index < errors.length; index++) {
+                ResponseRecorder recorder = new ResponseRecorder();
+                new ZrLogErrorHandle(500).doHandle(request("/api/article", ""), recorder.response(), errors[index]);
+                ApiStandardResponse<?> response = (ApiStandardResponse<?>) recorder.json;
+                assertEquals(codes[index], response.getError());
+                assertEquals(I18nUtil.getBackendStringFromRes(keys[index]), response.getMessage());
+                assertFalse(response.getMessage().isBlank());
+            }
+        }
+    }
+
+    @Test
+    public void shouldUseFallbackMessageForEmptyBusinessErrorsWithoutChangingTheirCode() {
+        ResponseRecorder recorder = new ResponseRecorder();
+        new ZrLogErrorHandle(500).doHandle(request("/api/article", ""), recorder.response(),
+                new TestBusinessException() {
+                    @Override
+                    public String getMessage() {
+                        return " ";
+                    }
+                });
+        ApiStandardResponse<?> response = (ApiStandardResponse<?>) recorder.json;
+        assertEquals(9001, response.getError());
+        assertEquals(I18nUtil.getBackendStringFromRes("unknownError"), response.getMessage());
     }
 
     @Test
@@ -80,11 +140,32 @@ public class ZrLogErrorHandleTest {
         new ZrLogErrorHandle(404).doHandle(request("/admin/missing", "q=zrlog"), notFound.response(),
                 new NotFindResourceException("missing"));
         assertTrue(notFound.redirect.startsWith("/admin/404?queryString=q=zrlog&uriPath=/admin/missing"));
+        assertTrue(notFound.redirect.endsWith("&message=" + URLEncoder.encode(
+                I18nUtil.getBackendStringFromRes("request.error.notFound"), StandardCharsets.UTF_8)));
 
         ResponseRecorder serverError = new ResponseRecorder();
         new ZrLogErrorHandle(500).doHandle(request("/admin/error", ""), serverError.response(),
                 new IllegalStateException("boom"));
-        assertEquals("/admin/500?message=boom", serverError.redirect);
+        assertEquals("/admin/500?message=" + URLEncoder.encode(
+                I18nUtil.getBackendStringFromRes("unknownError"), StandardCharsets.UTF_8), serverError.redirect);
+    }
+
+    @Test
+    public void shouldPreserveBusinessMessageAsOneEncodedRedirectParameter() {
+        String message = "输入无效 &next=/example?value=1#section";
+        ResponseRecorder recorder = new ResponseRecorder();
+        new ZrLogErrorHandle(500).doHandle(request("/admin/error", ""), recorder.response(),
+                new TestBusinessException() {
+                    @Override
+                    public String getMessage() {
+                        return message;
+                    }
+                });
+        String prefix = "/admin/500?message=";
+        assertTrue(recorder.redirect.startsWith(prefix));
+        assertFalse(recorder.redirect.contains("&next="));
+        assertFalse(recorder.redirect.contains("#section"));
+        assertEquals(message, URLDecoder.decode(recorder.redirect.substring(prefix.length()), StandardCharsets.UTF_8));
     }
 
     @Test
@@ -167,6 +248,13 @@ public class ZrLogErrorHandleTest {
         } else {
             System.setProperty(key, value);
         }
+    }
+
+    private static void useLocale(String locale) {
+        I18nVO resources = new I18nVO();
+        resources.setBackend(I18nUtil.getI18nVOCache().getBackend());
+        resources.setLocale(locale);
+        I18nUtil.threadLocal.set(resources);
     }
 
     private static HttpRequest request(String uri, String query) {

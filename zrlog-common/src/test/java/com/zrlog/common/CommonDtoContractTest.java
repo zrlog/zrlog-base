@@ -133,7 +133,8 @@ public class CommonDtoContractTest {
 
     private static void assertException(AbstractBusinessException exception, int error) {
         assertEquals(error, exception.getError());
-        exception.getMessage();
+        org.junit.Assert.assertNotNull(exception.getMessage());
+        org.junit.Assert.assertFalse(exception.getMessage().isBlank());
     }
 
     private static void assertBeanProperties(Class<?> type) throws Exception {

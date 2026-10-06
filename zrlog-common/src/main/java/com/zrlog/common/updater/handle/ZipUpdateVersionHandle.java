@@ -74,7 +74,7 @@ public class ZipUpdateVersionHandle implements Serializable, UpdateVersionHandle
                 Process process = Runtime.getRuntime().exec(Arrays.asList("chmod", "a+x", execFile).toArray(new String[0]));
                 process.waitFor();
             } catch (Exception e) {
-                publishStatus(UpgradeProgressEvent.STAGE_ERROR, UpgradeProgressEvent.STATUS_ERROR, "chmod error",
+                publishStatus(UpgradeProgressEvent.STAGE_ERROR, UpgradeProgressEvent.STATUS_ERROR, "upgrade.error.filePermissions",
                         execFile);
             }
         }

@@ -11,12 +11,15 @@ import com.zrlog.common.Constants;
 import com.zrlog.common.exception.AbstractBusinessException;
 import com.zrlog.common.exception.NotFindDbEntryException;
 import com.zrlog.common.rest.response.ApiStandardResponse;
+import com.zrlog.util.I18nUtil;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -51,27 +54,28 @@ public class ZrLogErrorHandle implements HttpErrorHandle {
                 AbstractBusinessException ee = (AbstractBusinessException) e;
                 ApiStandardResponse<Void> error = new ApiStandardResponse<>();
                 error.setError(ee.getError());
-                error.setMessage(ee.getMessage());
+                error.setMessage(getResponseMessage(e));
                 response.renderJson(error);
             } else if (e instanceof NotFindResourceException) {
                 ApiStandardResponse<Void> error = new ApiStandardResponse<>();
                 error.setError(9404);
-                error.setMessage(e.getMessage());
+                error.setMessage(getResponseMessage(e));
                 response.renderJson(error);
             } else {
                 ApiStandardResponse<Void> error = new ApiStandardResponse<>();
                 error.setError(9999);
-                error.setMessage(e.getMessage());
+                error.setMessage(getResponseMessage(e));
                 response.renderJson(error);
             }
             return;
         }
         if (request.getUri().startsWith(Constants.ADMIN_URI_BASE_PATH)) {
+            String message = URLEncoder.encode(getResponseMessage(e), StandardCharsets.UTF_8);
             if (e instanceof NotFindResourceException || e instanceof NotFindDbEntryException) {
-                response.redirect(Constants.ADMIN_URI_BASE_PATH + "/404?queryString=" + request.getQueryStr() + "&uriPath=" + request.getUri() + "&message=" + e.getMessage());
+                response.redirect(Constants.ADMIN_URI_BASE_PATH + "/404?queryString=" + request.getQueryStr() + "&uriPath=" + request.getUri() + "&message=" + message);
                 return;
             }
-            response.redirect(Constants.ADMIN_URI_BASE_PATH + "/500?message=" + e.getMessage());
+            response.redirect(Constants.ADMIN_URI_BASE_PATH + "/500?message=" + message);
             return;
         }
         InputStream errorInputStream = getErrorInputStream(e, httpStatueCode);
@@ -81,6 +85,19 @@ public class ZrLogErrorHandle implements HttpErrorHandle {
             return;
         }
         response.write(errorInputStream, httpStatueCode);
+    }
+
+    private String getResponseMessage(Throwable error) {
+        if (error instanceof AbstractBusinessException) {
+            String message = error.getMessage();
+            if (message != null && !message.isBlank()) {
+                return message;
+            }
+        }
+        if (error instanceof NotFindResourceException) {
+            return I18nUtil.getBackendStringFromRes("request.error.notFound");
+        }
+        return I18nUtil.getBackendStringFromRes("unknownError");
     }
 
     private InputStream getErrorInputStream(Throwable e, int httpStatueCode) {

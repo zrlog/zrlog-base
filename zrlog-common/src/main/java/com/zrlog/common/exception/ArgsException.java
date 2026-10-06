@@ -2,8 +2,6 @@ package com.zrlog.common.exception;
 
 import com.zrlog.util.I18nUtil;
 
-import java.util.Objects;
-
 public class ArgsException extends AbstractBusinessException {
 
     private final String args;
@@ -24,7 +22,10 @@ public class ArgsException extends AbstractBusinessException {
 
     @Override
     public String getMessage() {
-        String namingArgs = "[" + Objects.requireNonNullElse(args, "") + "]";
+        if (args == null || args.isBlank()) {
+            return I18nUtil.getBackendStringFromRes("argsError");
+        }
+        String namingArgs = "[" + args + "]";
         return namingArgs + ":" + I18nUtil.getBackendStringFromRes("argsError");
     }
 }

@@ -3,6 +3,10 @@ package com.zrlog.common.vo;
 public class AdminTokenVO {
 
     private long createdDate;
+    private Long expiresAt;
+
+    public Long getExpiresAt() { return expiresAt; }
+    public void setExpiresAt(Long expiresAt) { this.expiresAt = expiresAt; }
     private int userId;
     private int authVersion;
 

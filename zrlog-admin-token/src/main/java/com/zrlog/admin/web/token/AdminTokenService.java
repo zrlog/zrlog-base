@@ -40,7 +40,7 @@ public class AdminTokenService implements TokenService {
     private static final Logger LOGGER = LoggerUtil.getLogger(AdminTokenService.class);
     private final String TOKEN_SPLIT_CHAR = "#";
     private final IvParameterSpec iv;
-    private long sessionTimeout;
+    private volatile long sessionTimeout;
     private final Map<Integer, String> userSecretKeyCacheMap = new ConcurrentHashMap<>();
 
     public AdminTokenService(long sessionTimeoutInMinutes) {
@@ -58,6 +58,12 @@ public class AdminTokenService implements TokenService {
     public void updateSessionTimeout(long sessionTimeoutInMinutes) {
         this.sessionTimeout = sessionTimeoutInMinutes * 60 * 1000L;
     }
+
+    protected long sessionTimeoutMinutes(int userId) throws SQLException {
+        return new com.zrlog.data.service.UserPreferenceStore().sessionTimeoutMinutes(userId, sessionTimeout / 60000);
+    }
+
+    protected long currentTimeMillis() { return System.currentTimeMillis(); }
 
     private byte[] encrypt(String secretKey, byte[] value) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
@@ -135,7 +141,9 @@ public class AdminTokenService implements TokenService {
             AdminFullTokenVO adminTokenVO = new Gson().fromJson(base64Encode, AdminFullTokenVO.class);
             if (adminTokenVO.getUserId() != userId || adminTokenVO.getAuthVersion() != account.getAuthVersion()) return null;
             adminTokenVO.setSecretKey(sk);
-            if (adminTokenVO.getCreatedDate() + sessionTimeout > System.currentTimeMillis()) {
+            long expiresAt = adminTokenVO.getExpiresAt() == null
+                    ? Math.addExact(adminTokenVO.getCreatedDate(), sessionTimeout) : adminTokenVO.getExpiresAt();
+            if (expiresAt > adminTokenVO.getCreatedDate() && expiresAt > currentTimeMillis()) {
                 return adminTokenVO;
             }
         } catch (BadPaddingException e) {
@@ -176,15 +184,30 @@ public class AdminTokenService implements TokenService {
 
     @Override
     public void setAdminToken(Integer userId, String secretKey, String sessionId, String protocol, HttpRequest request, HttpResponse response) throws Exception {
+        issueAdminToken(userId, secretKey, sessionId, protocol, request, response,
+                Math.multiplyExact(sessionTimeoutMinutes(userId), 60000L));
+    }
+
+    @Override
+    public void refreshAdminToken(AdminFullTokenVO token, HttpRequest request, HttpResponse response) throws Exception {
+        long duration = token.getExpiresAt() == null ? sessionTimeout
+                : Math.subtractExact(token.getExpiresAt(), token.getCreatedDate());
+        issueAdminToken(token.getUserId(), token.getSecretKey(), token.getSessionId(), token.getProtocol(), request, response, duration);
+    }
+
+    private void issueAdminToken(Integer userId, String secretKey, String sessionId, String protocol,
+                                 HttpRequest request, HttpResponse response, long duration) throws Exception {
         AccountAccess account = loadAccount(userId);
         if (!account.isEnabled()) throw new IllegalStateException("Account disabled");
+        if (duration <= 0) throw new IllegalArgumentException("Invalid session lifetime");
         AdminTokenVO adminTokenVO = new AdminTokenVO();
         adminTokenVO.setAuthVersion(account.getAuthVersion());
         adminTokenVO.setUserId(userId);
         adminTokenVO.setSessionId(sessionId);
         adminTokenVO.setProtocol(protocol);
-        long loginTime = System.currentTimeMillis();
+        long loginTime = currentTimeMillis();
         adminTokenVO.setCreatedDate(loginTime);
+        adminTokenVO.setExpiresAt(Math.addExact(loginTime, duration));
         AdminTokenThreadLocal.setAdminToken(adminTokenVO);
         String encryptBeforeString = new Gson().toJson(adminTokenVO);
         byte[] base64Bytes = Base64.getEncoder().encode(encrypt(secretKey, encryptBeforeString.getBytes()));
@@ -193,7 +216,7 @@ public class AdminTokenService implements TokenService {
         Cookie cookie = new Cookie();
         cookie.setName(ADMIN_TOKEN_KEY_IN_COOKIE);
         cookie.setValue(tokenString);
-        cookie.setExpireDate(new Date(System.currentTimeMillis() + sessionTimeout));
+        cookie.setExpireDate(new Date(adminTokenVO.getExpiresAt()));
         if (Objects.equals(protocol, "https")) {
             if (CrossUtils.isEnableOrigin(request) && !EnvKit.isDevMode()) {
                 cookie.setSameSite("None");

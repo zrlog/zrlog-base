@@ -32,8 +32,13 @@ public class AdminTokenServiceTest {
     // The current unit tests intentionally avoid bootstrapping the shared DAO/global config stack.
     private final ZrLogConfig previousConfig = Constants.zrLogConfig;
 
+    private final Map<Integer, Long> personalTimeouts = new HashMap<>();
+    private long now = System.currentTimeMillis();
+
     private AdminTokenService testService(long timeout) {
         return new AdminTokenService(timeout) {
+            @Override protected long sessionTimeoutMinutes(int userId) { return personalTimeouts.getOrDefault(userId, timeout); }
+            @Override protected long currentTimeMillis() { return now; }
             @Override protected com.zrlog.data.security.AccountAccess loadAccount(int userId) {
                 return com.zrlog.data.security.AccountAccess.from(Map.of("userId", userId, "role", "owner", "enabled", true, "authVersion", 0));
             }
@@ -117,8 +122,56 @@ public class AdminTokenServiceTest {
         assertFalse(secretCache(service).containsKey(7));
 
         cacheSecretKey(service, 7, "secret-key");
-        service.updateSessionTimeout(-1);
+        now += 31 * 60000;
         assertNull(service.getAdminTokenVO(request("/admin", header(cookie.getValue()), null, new HashMap<>())));
+    }
+
+    @Test
+    public void accountLifetimeIsPinnedAcrossPreferenceChangesAndRenewals() throws Exception {
+        Constants.zrLogConfig = new TestZrLogConfig(true);
+        personalTimeouts.put(7, 10L);
+        AdminTokenService service = testService(30);
+        Cookie first = createAdminCookie(service, "secret-key");
+        cacheSecretKey(service, 7, "secret-key");
+        AdminFullTokenVO original = service.getAdminTokenVO(request("/admin", header(first.getValue()), null, new HashMap<>()));
+        assertEquals(Long.valueOf(now + 10 * 60000), original.getExpiresAt());
+        personalTimeouts.put(7, 60L);
+        service.updateSessionTimeout(120);
+        now += 2 * 60000;
+        CapturedResponse renewed = new CapturedResponse();
+        service.refreshAdminToken(original, request("/admin", new HashMap<>(), null, new HashMap<>()), renewed.response());
+        AdminFullTokenVO refreshed = service.getAdminTokenVO(request("/admin", header(renewed.cookies.get(0).getValue()), null, new HashMap<>()));
+        assertEquals(Long.valueOf(now + 10 * 60000), refreshed.getExpiresAt());
+        Cookie signedInAgain = createAdminCookie(service, "secret-key");
+        AdminFullTokenVO next = service.getAdminTokenVO(request("/admin", header(signedInAgain.getValue()), null, new HashMap<>()));
+        assertEquals(Long.valueOf(now + 60 * 60000), next.getExpiresAt());
+        now += 10 * 60000;
+        assertNull(service.getAdminTokenVO(request("/admin", header(renewed.cookies.get(0).getValue()), null, new HashMap<>())));
+        assertNotNull(service.getAdminTokenVO(request("/admin", header(signedInAgain.getValue()), null, new HashMap<>())));
+    }
+
+    @Test
+    public void legacyTokensUseSiteTimeoutUntilRenewed() throws Exception {
+        Constants.zrLogConfig = new TestZrLogConfig(true);
+        AdminTokenService service = testService(30);
+        cacheSecretKey(service, 7, "secret-key");
+        com.zrlog.common.vo.AdminTokenVO legacy = new com.zrlog.common.vo.AdminTokenVO();
+        legacy.setUserId(7); legacy.setCreatedDate(now); legacy.setSessionId("legacy"); legacy.setProtocol("http");
+        java.lang.reflect.Method encrypt = AdminTokenService.class.getDeclaredMethod("encrypt", String.class, byte[].class);
+        encrypt.setAccessible(true);
+        byte[] encrypted = (byte[]) encrypt.invoke(service, "secret-key", new com.google.gson.Gson().toJson(legacy).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String token = "7#" + com.zrlog.admin.web.util.ByteUtils.bytesToHexString(java.util.Base64.getEncoder().encode(encrypted));
+        AdminFullTokenVO parsed = service.getAdminTokenVO(request("/admin", header(token), null, new HashMap<>()));
+        assertNotNull(parsed);
+        assertNull(parsed.getExpiresAt());
+        personalTimeouts.put(7, 60L);
+        CapturedResponse renewed = new CapturedResponse();
+        service.refreshAdminToken(parsed, request("/admin", new HashMap<>(), null, new HashMap<>()), renewed.response());
+        AdminFullTokenVO refreshed = service.getAdminTokenVO(request("/admin", header(renewed.cookies.get(0).getValue()), null, new HashMap<>()));
+        assertEquals(Long.valueOf(now + 30 * 60000), refreshed.getExpiresAt());
+        service.updateSessionTimeout(-1);
+        assertNull(service.getAdminTokenVO(request("/admin", header(token), null, new HashMap<>())));
+        assertNotNull(service.getAdminTokenVO(request("/admin", header(renewed.cookies.get(0).getValue()), null, new HashMap<>())));
     }
 
     @Test

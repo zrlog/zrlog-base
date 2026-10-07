@@ -27,14 +27,18 @@ jobs:
       - name: Generate settings.xml
         run: |
           cat > $GITHUB_WORKSPACE/settings.xml <<EOF
-          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.3.0"
                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.3.0 https://maven.apache.org/xsd/settings-1.3.0.xsd">
             <servers>
               <server>
                 <id>central</id>
                 <username>${{ secrets.OSSRH_USERNAME }}</username>
                 <password>${{ secrets.OSSRH_PASSWORD }}</password>
+                <!-- Maven 3.10 scopes central credentials to repo.maven.apache.org by default. -->
+                <repositoryOrigins>
+                  <repositoryOrigin>https://central.sonatype.com</repositoryOrigin>
+                </repositoryOrigins>
               </server>
             </servers>
           </settings>

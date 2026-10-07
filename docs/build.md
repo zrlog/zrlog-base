@@ -10,6 +10,8 @@
 
 该 profile 需要显式启用，发布版号会被 Maven Deploy 跳过。它的配置可被子工程继承，子工程若重新声明插件执行阶段，必须核对合并后的有效 POM，避免重新启用快照 Javadoc 或 Central 发布扩展。
 
+Maven 3.10 起会校验发布凭证适用的仓库 origin（协议、主机和端口）。工作流生成的 `settings.xml` 使用 1.3.0 schema，并在 `central` server 的 `repositoryOrigins` 中显式声明 `https://central.sonatype.com`。否则，`central` 会只关联默认下载仓库 `https://repo.maven.apache.org`，快照上传不会携带凭证并返回 HTTP 401。此时日志会出现 `Not using credentials of server 'central'`，应先检查 origin 配置；仅向文件仓库部署无法覆盖该认证行为。详见 [Maven 3.10.0 发布说明](https://maven.apache.org/docs/3.10.0/release-notes.html#repository-credentials-are-scoped)。
+
 ## 正式版
 
 `v*` tag 使用不带 `snapshot` profile 的 `clean deploy`，保留 Javadoc、源码、GPG 签名和 Central Publishing bundle 流程。仅 tag 构建导入 GPG 私钥。`main` 分支仍只在测试和部署成功后通知预览构建。

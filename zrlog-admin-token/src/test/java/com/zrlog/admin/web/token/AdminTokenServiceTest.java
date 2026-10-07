@@ -33,7 +33,8 @@ public class AdminTokenServiceTest {
     private final ZrLogConfig previousConfig = Constants.zrLogConfig;
 
     private final Map<Integer, Long> personalTimeouts = new HashMap<>();
-    private long now = System.currentTimeMillis();
+    // Keep encrypted fixtures deterministic, including the wrong-key padding failure.
+    private long now = 1_700_000_000_000L;
 
     private AdminTokenService testService(long timeout) {
         return new AdminTokenService(timeout) {

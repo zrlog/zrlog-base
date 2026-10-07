@@ -6,7 +6,7 @@
 
 `main` 的发布工作流使用 `./mvnw -B -ntp -U -Psnapshot clean deploy`，执行完整测试后发布 7 个 Maven 坐标。`-U` 保留，用于刷新安装工程等上游快照。
 
-`snapshot` profile 使用 Maven Deploy 3.1.4 的 `deployAtEnd`，全部模块成功后才开始上传。父 POM、6 个模块 JAR 和 6 个源码包均保留，包括消费者测试需要的 `zrlog-test-support`；快照不生成 Javadoc 或 GPG 签名。每个坐标只更新一次版本 metadata，各附件使用同一时间戳。
+`snapshot` profile 使用 Maven Deploy 3.2.0 的 `deployAtEnd`，全部模块成功后才开始上传。父 POM、6 个模块 JAR 和 6 个源码包均保留，包括消费者测试需要的 `zrlog-test-support`；快照不生成 Javadoc 或 GPG 签名。每个坐标只更新一次版本 metadata，各附件使用同一时间戳。
 
 该 profile 需要显式启用，发布版号会被 Maven Deploy 跳过。它的配置可被子工程继承，子工程若重新声明插件执行阶段，必须核对合并后的有效 POM，避免重新启用快照 Javadoc 或 Central 发布扩展。
 

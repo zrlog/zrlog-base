@@ -261,7 +261,36 @@ public class StaticSitePluginTest {
             assertEquals(StaticSitePlugin.HandleState.HANDLED, plugin.handleStatusPageMap.get(plugin.notFindFile()));
             assertFalse(plugin.handleStatusPageMap.containsKey("/should-not-parse.html"));
             assertFalse(plugin.handleStatusPageMap.containsKey("/also-ignored.html"));
+            assertTrue(plugin.getCacheFiles().stream().anyMatch(file -> file.getPath().endsWith("/error/404.html")));
+            assertTrue(plugin.getCacheFiles().stream().filter(file -> file.getPath().endsWith("/error/404.html"))
+                    .allMatch(File::isFile));
         });
+    }
+
+    @Test
+    public void shouldExportNotFoundDocumentWithAndWithoutContextPath() throws Exception {
+        for (String contextPath : new String[]{"", "/sub"}) {
+            TestStaticSitePlugin plugin = new TestStaticSitePlugin() {
+                @Override public String getContextPath() { return contextPath; }
+            };
+            plugin.handleStatusPageMap.put(plugin.notFindFile(), StaticSitePlugin.HandleState.NEW);
+            StaticFetchInterceptor.pages.put("/error/404.html", "<html><body>Missing page"
+                    + "<a href=\"/must-not-crawl.html\">ignored</a></body></html>");
+            withConfig(true, "blog.example.com", plugin, config -> {
+                ServerConfig serverConfig = config.getServerConfig();
+                serverConfig.setContextPath(contextPath);
+                serverConfig.addInterceptor(StaticFetchInterceptor.class);
+                ApplicationContext applicationContext = new ApplicationContext(serverConfig);
+                applicationContext.init();
+                plugin.doFetch(config, applicationContext);
+                File output = plugin.getCacheFile("/error/404.html");
+                assertTrue(output.isFile());
+                assertTrue(Files.readString(output.toPath()).contains("Missing page"));
+                assertTrue(plugin.getCacheFiles().contains(output));
+                assertEquals(StaticSitePlugin.HandleState.HANDLED, plugin.handleStatusPageMap.get(plugin.notFindFile()));
+                assertFalse(plugin.handleStatusPageMap.containsKey("/must-not-crawl.html"));
+            });
+        }
     }
 
     @Test
@@ -413,7 +442,13 @@ public class StaticSitePluginTest {
 
         @Override
         public boolean doInterceptor(HttpRequest request, HttpResponse response) {
-            response.renderHtmlStr(pages.getOrDefault(request.getUri(), "<html><body></body></html>"));
+            String html = pages.getOrDefault(request.getUri(), "<html><body></body></html>");
+            if (request.getUri().endsWith("/error/404.html")) {
+                response.setContentType("text/html;charset=UTF-8");
+                response.write(input(html), 404);
+            } else {
+                response.renderHtmlStr(html);
+            }
             return false;
         }
     }

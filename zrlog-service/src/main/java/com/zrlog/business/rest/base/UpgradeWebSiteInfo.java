@@ -9,6 +9,10 @@ public class UpgradeWebSiteInfo implements Validator {
 
     private Integer autoUpgradeVersion;
     private Boolean upgradePreview;
+    private String upgradePackageSource;
+
+    public String getUpgradePackageSource() { return upgradePackageSource; }
+    public void setUpgradePackageSource(String value) { upgradePackageSource = value; }
 
     public Integer getAutoUpgradeVersion() {
         return autoUpgradeVersion;
@@ -28,6 +32,9 @@ public class UpgradeWebSiteInfo implements Validator {
 
     @Override
     public void doValid() {
+        if (upgradePackageSource != null && !"dl".equals(upgradePackageSource) && !"github".equals(upgradePackageSource)) {
+            throw new ArgsException("upgradePackageSource");
+        }
         if (Objects.isNull(autoUpgradeVersion)) {
             throw new ArgsException("autoUpgradeVersion");
         }

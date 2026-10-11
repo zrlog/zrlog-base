@@ -44,6 +44,7 @@ public class BlogBuildInfoUtil {
     private static String runtimeType = DEFAULT_RUNTIME_TYPE;
     private static String packageType = DEFAULT_PACKAGE_TYPE;
     private static String updateVersionJsonFilename = DEFAULT_UPDATE_VERSION_JSON_FILENAME;
+    private static String dockerUpdateVersionJsonFilename = "last.docker-image.version.json";
     public static final String BUILD_PROPERTIES_FILE_PATH = "/build.properties";
 
     static {
@@ -56,6 +57,8 @@ public class BlogBuildInfoUtil {
             LOGGER.log(Level.SEVERE, "doRead stream error", e);
         }
         applyBuildInfo(loadBuildInfo(properties));
+        dockerUpdateVersionJsonFilename = propertyOrDefault(properties, "dockerUpdateVersionJsonFilename",
+                "last.docker-image.version.json");
     }
 
     static BuildInfo loadBuildInfo(Properties properties) {
@@ -180,6 +183,11 @@ public class BlogBuildInfoUtil {
 
     public static String getUpdateVersionJsonFilename() {
         return updateVersionJsonFilename;
+    }
+
+    /** Native ZIPs also run inside Docker; keep both manifest names in build.properties. */
+    public static String getDockerUpdateVersionJsonFilename() {
+        return dockerUpdateVersionJsonFilename;
     }
 
     public static String getResourceDownloadUrl() {

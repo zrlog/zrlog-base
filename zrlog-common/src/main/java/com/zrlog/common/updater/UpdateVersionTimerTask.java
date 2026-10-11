@@ -12,7 +12,6 @@ import com.zrlog.util.ZrLogUtil;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -30,6 +29,9 @@ public class UpdateVersionTimerTask extends TimerTask {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(UpdateVersionTimerTask.class);
     private Version version;
+    private volatile boolean lastCheckFailed;
+
+    public boolean isLastCheckFailed() { return lastCheckFailed; }
 
     private final boolean previewAble;
     private final String lang;
@@ -83,6 +85,7 @@ public class UpdateVersionTimerTask extends TimerTask {
     public void run() {
         try {
             UpdateVersionCheckResult checkResult = fetchLastVersion(previewAble);
+            lastCheckFailed = false;
             Version lastVersion = checkResult.getVersion();
             versionConsumer.accept(lastVersion);
             checkResultConsumer.accept(checkResult);
@@ -91,6 +94,7 @@ public class UpdateVersionTimerTask extends TimerTask {
                 this.version = lastVersion;
             }
         } catch (Exception e) {
+            lastCheckFailed = true;
             LOGGER.warning("fetchLastVersion error " + e.getMessage());
         }
     }
@@ -121,20 +125,23 @@ public class UpdateVersionTimerTask extends TimerTask {
     }
 
     private static String getJsonFilename() {
-        return BlogBuildInfoUtil.getUpdateVersionJsonFilename();
+        return ZrLogUtil.isDockerMode() ? BlogBuildInfoUtil.getDockerUpdateVersionJsonFilename()
+                : BlogBuildInfoUtil.getUpdateVersionJsonFilename();
     }
 
     private Version getVersion(boolean preview) throws IOException, URISyntaxException, InterruptedException, ParseException {
-        String versionUrl = BlogBuildInfoUtil.getResourceDownloadUrl() + "/" + (preview ? "preview" : "release") + "/" + getJsonFilename() + "?_" + System.currentTimeMillis() + "&v=" + BlogBuildInfoUtil.getBuildId();
-        String txtContent = HttpUtil.getInstance().getSuccessTextByUrl(versionUrl);
+        String versionUrl = com.zrlog.common.updater.docker.UpdateMetadata.uri(
+                BlogBuildInfoUtil.getResourceDownloadUrl(), getJsonFilename(), preview ? "preview" : "release").toString();
+        String txtContent = com.zrlog.common.updater.docker.UpdateMetadata.fetch(java.net.URI.create(versionUrl));
         if (StringUtils.isEmpty(txtContent)) {
-            LOGGER.warning("Fetch version [" + new URL(versionUrl).getPath() + "] info failed");
-            Version errorVersion = new Version();
-            errorVersion.setBuildDate(new Date(0));
-            errorVersion.setBuildId("000000");
-            return errorVersion;
+            throw new IOException("Configured update metadata source returned an empty document");
         }
         Version versionInfo = new Gson().fromJson(txtContent.trim(), Version.class);
+        if (ZrLogUtil.isDockerMode()) {
+            com.zrlog.common.updater.docker.UpdateMetadata.validateDocker(versionInfo, preview ? "preview" : "release");
+        }
+        versionInfo.setArtifactVersion(versionInfo.getVersion());
+        versionInfo.setChannel(preview ? "preview" : "release");
         Date versionDate = new SimpleDateFormat(Constants.DATE_FORMAT_PATTERN).parse(versionInfo.getReleaseDate());
         versionInfo.setBuildDate(versionDate);
         versionInfo.setReleaseDate(new SimpleDateFormat("yyyy-MM-dd HH:mm").format(versionDate));

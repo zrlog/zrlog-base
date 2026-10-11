@@ -192,7 +192,9 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
                 return;
             }
             String uri = httpRequest.getUri();
-            try (BodySaveResponse bodySaveResponse = new BodySaveResponse(httpRequest, serverConfig.getResponseConfig(), true)) {
+            boolean notFoundDocument = Objects.equals(key, notFindFile());
+            try (BodySaveResponse bodySaveResponse = new BodySaveResponse(httpRequest,
+                    serverConfig.getResponseConfig(), true, notFoundDocument ? 404 : 200)) {
                 new HttpRequestHandlerRunnable(httpRequest, bodySaveResponse).run();
                 File file = bodySaveResponse.getCacheFile();
                 if (Objects.nonNull(file)) {
@@ -201,15 +203,14 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
                 if (httpRequest.getUri().startsWith(Constants.ADMIN_URI_BASE_PATH + "/")) {
                     return;
                 }
-                if (Objects.equals(uri, notFindFile())) {
-                    return;
-                }
                 if (Objects.isNull(file) || !file.exists()) {
                     LOGGER.warning("Generator " + uri + " error: missing static file");
                     error = true;
                     return;
                 }
-                doParseHtml(file);
+                if (!notFoundDocument) {
+                    doParseHtml(file);
+                }
             } catch (Exception ex) {
                 LOGGER.warning("Generator " + uri + " error: " + ex.getMessage());
             } finally {

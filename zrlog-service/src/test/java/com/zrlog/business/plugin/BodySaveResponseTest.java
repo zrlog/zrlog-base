@@ -95,6 +95,22 @@ public class BodySaveResponseTest {
         assertEquals("error", Files.readString(cacheFile.toPath()));
     }
 
+    @Test
+    public void shouldExportNotFoundAndLegacySuccessButRejectOtherErrors() throws Exception {
+        for (int status : new int[]{404, 200, 500, 302}) {
+            File cacheFile = tempFile("error-" + status + ".html");
+            Constants.zrLogConfig = new TestZrLogConfig(new TestStaticSitePlugin(cacheFile));
+            try (BodySaveResponse response = new BodySaveResponse(request("/error/404.html"),
+                    new ResponseConfig(), true, 404)) {
+                response.write(new ByteArrayInputStream("missing page".getBytes(StandardCharsets.UTF_8)), status);
+                if (status == 404 || status == 200) assertEquals(cacheFile, response.getCacheFile());
+                else assertNull(response.getCacheFile());
+            }
+            assertEquals(status == 404 || status == 200, cacheFile.exists());
+            if (status == 404 || status == 200) assertEquals("missing page", Files.readString(cacheFile.toPath()));
+        }
+    }
+
     private static File tempFile(String name) throws Exception {
         File dir = Files.createTempDirectory("zrlog-body-save").toFile();
         File file = new File(dir, name);

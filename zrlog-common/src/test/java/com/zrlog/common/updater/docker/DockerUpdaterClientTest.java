@@ -59,6 +59,42 @@ public class DockerUpdaterClientTest {
     }
 
     @Test
+    public void preservesSafeMetadataErrorsAndBoundsUntrustedBodies() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicReference<String> body = new AtomicReference<>();
+        java.util.concurrent.atomic.AtomicInteger status = new java.util.concurrent.atomic.AtomicInteger(502);
+        server.createContext("/", exchange -> {
+            byte[] bytes = body.get().getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status.get(), bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        server.start();
+        DockerUpdaterClient client = new DockerUpdaterClient("http://127.0.0.1:" + server.getAddress().getPort(),
+                "test_token_123456789012345678901234", "https://dl.example/", "docker.json");
+        try {
+            for (String code : new String[]{"metadata_unavailable", "metadata_not_found"}) {
+                body.set("{\"code\":\"" + code + "\",\"message\":\"private service detail\"}");
+                var error = assertThrows(DockerUpdaterClient.RequestException.class, client::capabilities);
+                assertEquals(code, error.getCode());
+                assertEquals(502, error.getStatus());
+                assertFalse(error.getMessage().contains("private"));
+            }
+            for (String invalid : new String[]{"<html>proxy error</html>", "null", "[]", "{\"code\":\"private detail\"}",
+                    "{\"code\":\"metadata_unavailable\",\"message\":\"" + "x".repeat(4096) + "\"}"}) {
+                body.set(invalid);
+                assertEquals("updater_request_failed", assertThrows(DockerUpdaterClient.RequestException.class,
+                        client::capabilities).getCode());
+            }
+            status.set(401);
+            assertEquals("updater_unauthorized", assertThrows(DockerUpdaterClient.RequestException.class,
+                    client::capabilities).getCode());
+        } finally { server.stop(0); }
+        assertEquals("updater_unavailable", assertThrows(DockerUpdaterClient.RequestException.class,
+                client::capabilities).getCode());
+    }
+
+    @Test
     public void refusesRedirectsWithoutLeakingServiceToken() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicBoolean followed = new AtomicBoolean();

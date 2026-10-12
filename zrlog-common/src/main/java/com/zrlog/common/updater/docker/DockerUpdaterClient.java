@@ -1,6 +1,7 @@
 package com.zrlog.common.updater.docker;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
 import com.zrlog.util.BlogBuildInfoUtil;
 
 import java.io.IOException;
@@ -48,7 +49,7 @@ public class DockerUpdaterClient {
         if (value.protocolVersion != 1 || !value.ready
                 || !Objects.equals(UpdateMetadata.uri(metadataOrigin, manifestFilename, "release"),
                     UpdateMetadata.uri(value.metadataBaseUrl, value.manifestFilename, "release"))) {
-            throw new IllegalStateException("Docker updater is not ready or build.properties metadata configuration differs");
+            throw new RequestException(0, "updater_configuration_mismatch");
         }
         return value;
     }
@@ -109,7 +110,7 @@ public class DockerUpdaterClient {
                 try (java.io.OutputStream output = connection.getOutputStream()) { output.write(bytes); }
             }
             int status = connection.getResponseCode();
-            if (status != 200 && status != 202) { throw new RequestException(status); }
+            if (status != 200 && status != 202) { throw readError(connection, status); }
             try (InputStream input = connection.getInputStream()) {
                 byte[] bytes = input.readNBytes(1024 * 1024 + 1);
                 if (bytes.length > 1024 * 1024) { throw new IOException("Updater response too large"); }
@@ -119,15 +120,46 @@ public class DockerUpdaterClient {
             }
         } catch (IOException error) {
             // Do not expose configured credentials, internal URLs or raw engine output to the admin API.
-            throw new IllegalStateException("Unable to communicate with the Docker updater");
+            throw new RequestException(0, "updater_unavailable");
+        } catch (JsonParseException error) {
+            throw new RequestException(0, "updater_invalid_response");
         } finally {
             if (connection != null) { connection.disconnect(); }
         }
     }
 
+    private RequestException readError(HttpURLConnection connection, int status) {
+        try (InputStream input = connection.getErrorStream()) {
+            if (input != null) {
+                byte[] bytes = input.readNBytes(4097);
+                if (bytes.length <= 4096) {
+                    DockerUpdaterProtocol.ErrorResponse error = GSON.fromJson(
+                            new String(bytes, StandardCharsets.UTF_8), DockerUpdaterProtocol.ErrorResponse.class);
+                    // Only protocol codes are forwarded. Never retain service messages or unknown values.
+                    if (error != null && ("metadata_unavailable".equals(error.code)
+                            || "metadata_not_found".equals(error.code))) {
+                        return new RequestException(status, error.code);
+                    }
+                }
+            }
+        } catch (IOException | JsonParseException ignored) {
+            // Older services and proxies may return an empty or non-JSON error.
+        }
+        return new RequestException(status);
+    }
+
     public static class RequestException extends IllegalStateException {
         private final int status;
-        public RequestException(int status) { super("Docker updater request failed (HTTP " + status + ")"); this.status = status; }
+        private final String code;
+        public RequestException(int status) {
+            this(status, status == 401 || status == 403 ? "updater_unauthorized" : "updater_request_failed");
+        }
+        public RequestException(int status, String code) {
+            super("Docker updater request failed (HTTP " + status + ")");
+            this.status = status;
+            this.code = code;
+        }
         public int getStatus() { return status; }
+        public String getCode() { return code; }
     }
 }

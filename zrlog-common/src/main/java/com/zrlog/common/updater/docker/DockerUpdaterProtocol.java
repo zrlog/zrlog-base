@@ -6,6 +6,10 @@ import java.util.List;
 public final class DockerUpdaterProtocol {
     private DockerUpdaterProtocol() { }
 
+    public static class ErrorResponse {
+        public String code;
+    }
+
     public static class Image {
         public String repository;
         public String tag;

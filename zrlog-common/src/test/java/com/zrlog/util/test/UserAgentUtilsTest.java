@@ -7,6 +7,31 @@ import org.junit.Test;
 public class UserAgentUtilsTest {
 
     @Test
+    public void shouldParseArbitraryCallerProductsWithoutReplacingTheCli() {
+        for (String name : new String[]{"dot", "muse", "custom-agent_42", "my-bot"}) {
+            UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse("zrlogctl/0.1.42-beta.1 " + name + "/2.0-rc.1 (Linux)");
+            Assert.assertEquals("ZrLogCtl 0.1.42-beta.1", info.getFullBrowser());
+            Assert.assertEquals(name, info.getAgentName());
+            Assert.assertEquals("2.0-rc.1", info.getAgentVersion());
+            Assert.assertFalse(info.isCrawler());
+        }
+        UserAgentUtils.UserAgentInfo noVersion = UserAgentUtils.parse("zrlogctl/0.1.42 dot");
+        Assert.assertEquals("dot", noVersion.getAgentName());
+        Assert.assertNull(noVersion.getAgentVersion());
+    }
+
+    @Test
+    public void shouldNotInventCallerIdentityFromCommentsLegacyOrMalformedProducts() {
+        for (String value : new String[]{"zrlogctl/0.1.42", "zrlogctl/0.1.42 (Linux; dot/1.0)",
+                "zrlogctl/0.1.42 dot/", "zrlogctl/0.1.42 dot/1/extra", "zrlogctl/0.1.42 " + "a".repeat(129),
+                "zrlogctl/0.1.42 dot\r\nInjected", "dot/1.0", "Mozilla/5.0 Chrome/146.0.0.0", "", null}) {
+            UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(value);
+            Assert.assertNull(value, info.getAgentName());
+            Assert.assertNull(value, info.getAgentVersion());
+        }
+    }
+
+    @Test
     public void shouldParseNonBrowserClientProductsAndVersions() {
         for (String product : new String[]{"codex/0.42.0-beta.1", "openai-mcp/1.0.0", "python-httpx/0.28.1"}) {
             String[] parts = product.split("/", 2);

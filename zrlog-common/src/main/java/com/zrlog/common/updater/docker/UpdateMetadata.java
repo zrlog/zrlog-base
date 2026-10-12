@@ -19,7 +19,9 @@ public final class UpdateMetadata {
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(20000);
             connection.setRequestProperty("Accept", "application/json");
-            if (connection.getResponseCode() != 200) { throw new java.io.IOException("Update metadata source is unavailable"); }
+            int status = connection.getResponseCode();
+            if (status == 404) { throw new java.io.FileNotFoundException("Update metadata source returned HTTP 404"); }
+            if (status != 200) { throw new java.io.IOException("Update metadata source returned HTTP " + status); }
             try (java.io.InputStream input = connection.getInputStream()) {
                 byte[] bytes = input.readNBytes(1024 * 1024 + 1);
                 if (bytes.length > 1024 * 1024) { throw new java.io.IOException("Update metadata exceeds size limit"); }

@@ -5,6 +5,7 @@ import com.hibegin.common.util.http.HttpUtil;
 import com.hibegin.common.util.http.handle.HttpFileHandle;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.exception.DownloadUpgradeFileException;
+import com.zrlog.business.exception.CheckUpgradeVersionException;
 import com.zrlog.business.rest.response.CheckVersionResponse;
 import com.zrlog.business.rest.response.PreCheckVersionResponse;
 import com.zrlog.business.rest.response.UpgradeProcessResponse;
@@ -50,7 +51,7 @@ public class UpgradeService {
         if (fetchAble) {
             plugin.getLastVersion(true);
             if (plugin.isLastCheckFailed()) {
-                throw new IllegalStateException(I18nUtil.getBackendStringFromRes("upgrade.check.failed"));
+                throw new CheckUpgradeVersionException();
             }
             CheckVersionResponse storedResponse = upgradeNoticeService.getNotice();
             if (Objects.nonNull(storedResponse.getVersion())) {

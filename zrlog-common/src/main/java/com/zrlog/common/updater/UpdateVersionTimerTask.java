@@ -110,7 +110,14 @@ public class UpdateVersionTimerTask extends TimerTask {
             return new UpdateVersionCheckResult(lastVersion, UpdateChannel.PREVIEW, true);
         }
         //如果已是最新预览版，那么尝试检查正式版本
-        Version lastReleaseVersion = getVersion(false);
+        Version lastReleaseVersion;
+        try {
+            lastReleaseVersion = getVersion(false);
+        } catch (java.io.FileNotFoundException unpublishedRelease) {
+            // A verified preview can exist before this package type has its first release manifest.
+            // Only this optional release lookup may be absent; other failures still fail the check.
+            return new UpdateVersionCheckResult(lastVersion, UpdateChannel.PREVIEW, false);
+        }
         if (ZrLogUtil.greatThenCurrentVersion(lastReleaseVersion.getBuildId(), lastReleaseVersion.getBuildDate(), lastReleaseVersion.getVersion())) {
             return new UpdateVersionCheckResult(lastReleaseVersion, UpdateChannel.RELEASE, true);
         }
@@ -129,7 +136,7 @@ public class UpdateVersionTimerTask extends TimerTask {
                 : BlogBuildInfoUtil.getUpdateVersionJsonFilename();
     }
 
-    private Version getVersion(boolean preview) throws IOException, URISyntaxException, InterruptedException, ParseException {
+    protected Version getVersion(boolean preview) throws IOException, URISyntaxException, InterruptedException, ParseException {
         String versionUrl = com.zrlog.common.updater.docker.UpdateMetadata.uri(
                 BlogBuildInfoUtil.getResourceDownloadUrl(), getJsonFilename(), preview ? "preview" : "release").toString();
         String txtContent = com.zrlog.common.updater.docker.UpdateMetadata.fetch(java.net.URI.create(versionUrl));

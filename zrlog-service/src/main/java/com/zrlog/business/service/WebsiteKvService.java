@@ -79,11 +79,14 @@ public class WebsiteKvService {
 
     public UpgradeWebSiteInfo upgradeWebSiteInfo() {
         UpgradeWebSiteInfo upgrade = ResultBeanUtils.convert(
-                getByNames(Arrays.asList(UPGRADE_PREVIEW_KEY, AUTO_UPGRADE_VERSION_KEY)),
+                getByNames(Arrays.asList(UPGRADE_PREVIEW_KEY, AUTO_UPGRADE_VERSION_KEY, "upgradePackageSource")),
                 UpgradeWebSiteInfo.class
         );
         if (Objects.isNull(upgrade.getAutoUpgradeVersion())) {
             upgrade.setAutoUpgradeVersion(AutoUpgradeVersionType.ONE_DAY.getCycle());
+        }
+        if (upgrade.getUpgradePackageSource() == null || upgrade.getUpgradePackageSource().isBlank()) {
+            upgrade.setUpgradePackageSource("dl");
         }
         upgrade.setUpgradePreview(Objects.equals(upgrade.getUpgradePreview(), true));
         return upgrade;

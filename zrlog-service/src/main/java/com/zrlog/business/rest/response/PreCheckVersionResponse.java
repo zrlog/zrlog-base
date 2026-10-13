@@ -2,6 +2,10 @@ package com.zrlog.business.rest.response;
 
 public class PreCheckVersionResponse extends CheckVersionResponse {
 
+    private Boolean dockerUpdaterAvailable = false;
+    public Boolean getDockerUpdaterAvailable() { return dockerUpdaterAvailable; }
+    public void setDockerUpdaterAvailable(Boolean value) { dockerUpdaterAvailable = value; }
+
     private Boolean onlineUpgradable;
     private String disableUpgradeReason;
     private Boolean dockerMode;

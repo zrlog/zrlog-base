@@ -5,6 +5,7 @@ import com.hibegin.common.util.http.HttpUtil;
 import com.hibegin.common.util.http.handle.HttpFileHandle;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.exception.DownloadUpgradeFileException;
+import com.zrlog.business.exception.CheckUpgradeVersionException;
 import com.zrlog.business.rest.response.CheckVersionResponse;
 import com.zrlog.business.rest.response.PreCheckVersionResponse;
 import com.zrlog.business.rest.response.UpgradeProcessResponse;
@@ -49,6 +50,9 @@ public class UpgradeService {
         }
         if (fetchAble) {
             plugin.getLastVersion(true);
+            if (plugin.isLastCheckFailed()) {
+                throw new CheckUpgradeVersionException();
+            }
             CheckVersionResponse storedResponse = upgradeNoticeService.getNotice();
             if (Objects.nonNull(storedResponse.getVersion())) {
                 return storedResponse;
@@ -84,8 +88,19 @@ public class UpgradeService {
         checkVersionResponse.setNativeImageMode(EnvKit.isNativeImage());
         boolean disable = isOnlineUpgradeDisabled();
         checkVersionResponse.setOnlineUpgradable(!disable);
+        if (isDockerMode() && com.zrlog.common.updater.docker.DockerUpdaterClient.isConfigured()) {
+            try {
+                com.zrlog.common.updater.docker.DockerUpdaterClient.fromEnvironment().capabilities();
+                checkVersionResponse.setOnlineUpgradable(true);
+                checkVersionResponse.setDockerUpdaterAvailable(true);
+            } catch (RuntimeException error) {
+                checkVersionResponse.setDisableUpgradeReason(backendString(I18nUtil.getBackend(), "upgrade.docker.updaterUnavailable"));
+            }
+        }
         checkVersionResponse.setBackupProtection(backupProtectionService.getStatus());
-        if (disable && Objects.equals(checkVersionResponse.getUpgrade(), true)) {
+        if (!Boolean.TRUE.equals(checkVersionResponse.getOnlineUpgradable())
+                && checkVersionResponse.getDisableUpgradeReason() == null
+                && Objects.equals(checkVersionResponse.getUpgrade(), true)) {
             UpgradeProcessResponse upgradeProcessResponse = buildManualUpgradeResponse(checkVersionResponse.getVersion(),
                     I18nUtil.getBackend());
             checkVersionResponse.setDisableUpgradeReason(upgradeProcessResponse.getMessage());
@@ -152,7 +167,8 @@ public class UpgradeService {
     }
 
     private String getPackageDownloadUrl(Version version, Updater updater) {
-        return isWarMode(updater) ? version.getWarDownloadUrl() : version.getZipDownloadUrl();
+        return com.zrlog.common.updater.PackageDownloadSource.select(version, isWarMode(updater),
+                new WebsiteKvService().upgradeWebSiteInfo().getUpgradePackageSource());
     }
 
     private long getPackageFileSize(Version version, Updater updater) {

@@ -102,7 +102,14 @@ public class ZrLogBaseNativeImageUtils {
     }
 
     static List<Class<?>> gsonClasses() {
-        return Arrays.asList(LockVO.class, I18nVO.class,
+        return Arrays.asList(LockVO.class, I18nVO.class, Version.DownloadSource.class,
+                com.zrlog.common.updater.docker.DockerUpdaterProtocol.Image.class,
+                com.zrlog.common.updater.docker.DockerUpdaterProtocol.ErrorResponse.class,
+                com.zrlog.common.updater.docker.DockerUpdaterProtocol.Capabilities.class,
+                com.zrlog.common.updater.docker.DockerUpdaterProtocol.Settings.class,
+                com.zrlog.common.updater.docker.DockerUpdaterProtocol.SettingsResponse.class,
+                com.zrlog.common.updater.docker.DockerUpdaterProtocol.UpgradeRequest.class,
+                com.zrlog.common.updater.docker.DockerUpdaterProtocol.Job.class,
                 BaseTemplateVO.class,
                 TemplatePackageJson.class,
                 TemplateVO.class,

@@ -8,6 +8,34 @@ import java.util.Date;
  */
 public class Version implements Serializable {
 
+    public static class DownloadSource {
+        public String id;
+        public String url;
+    }
+    private java.util.List<DownloadSource> zipSources;
+    private java.util.List<DownloadSource> warSources;
+    public java.util.List<DownloadSource> getZipSources() { return zipSources; }
+    public void setZipSources(java.util.List<DownloadSource> value) { zipSources = value; }
+    public java.util.List<DownloadSource> getWarSources() { return warSources; }
+    public void setWarSources(java.util.List<DownloadSource> value) { warSources = value; }
+
+    private String artifactVersion;
+    private String channel;
+    private String packageType;
+    private int schemaVersion;
+    private java.util.List<com.zrlog.common.updater.docker.DockerUpdaterProtocol.Image> images;
+
+    public String getArtifactVersion() { return artifactVersion; }
+    public void setArtifactVersion(String value) { artifactVersion = value; }
+    public String getChannel() { return channel; }
+    public void setChannel(String value) { channel = value; }
+    public String getPackageType() { return packageType; }
+    public void setPackageType(String value) { packageType = value; }
+    public int getSchemaVersion() { return schemaVersion; }
+    public void setSchemaVersion(int value) { schemaVersion = value; }
+    public java.util.List<com.zrlog.common.updater.docker.DockerUpdaterProtocol.Image> getImages() { return images; }
+    public void setImages(java.util.List<com.zrlog.common.updater.docker.DockerUpdaterProtocol.Image> value) { images = value; }
+
     private String buildId;
     private String releaseDate;
     private String version;

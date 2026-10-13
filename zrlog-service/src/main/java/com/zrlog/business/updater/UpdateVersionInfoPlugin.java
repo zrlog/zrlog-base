@@ -144,6 +144,10 @@ public class UpdateVersionInfoPlugin implements IPlugin {
      * @param fetch 是否发起新的请求
      * @return 版本信息
      */
+    public boolean isLastCheckFailed() {
+        return updateVersionTimerTask != null && updateVersionTimerTask.isLastCheckFailed();
+    }
+
     public Version getLastVersion(boolean fetch) {
         if (updateVersionTimerTask == null) {
             UpgradeWebSiteInfo upgradeWebSiteInfo = new WebsiteKvService().upgradeWebSiteInfo();

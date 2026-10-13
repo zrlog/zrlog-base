@@ -9,6 +9,9 @@ public class UserAgentUtils {
             "(?:^|\\s)zrlogctl/([-!#$%&'*+.^_`|~0-9A-Za-z]+)(?=\\s|$)", Pattern.CASE_INSENSITIVE);
     private static final Pattern CLIENT_PRODUCT_PATTERN = Pattern.compile(
             "^([-!#$%&'*+.^_`|~0-9A-Za-z]+)(?:/([-!#$%&'*+.^_`|~0-9A-Za-z]+))?(?=\\s|$)");
+    // zrlogctl/<version> <caller-name>[/<caller-version>]; comments are not caller products.
+    private static final Pattern AGENT_PRODUCT_PATTERN = Pattern.compile(
+            "^[ \\t]+([-!#$%&'*+.^_`|~0-9A-Za-z]{1,128})(?:/([-!#$%&'*+.^_`|~0-9A-Za-z]{1,128}))?(?=[ \\t]|\\z)");
     private static final Pattern CRAWLER_PATTERN = Pattern.compile(
             "(bot|spider|crawler|crawl|slurp|curl|wget|python-requests|python-urllib|java/|okhttp|apache-httpclient|httpclient|go-http-client|postmanruntime|headlesschrome|phantomjs|bingpreview|facebookexternalhit|googleweblight|baiduspider|bytespider|petalbot|semrushbot|ahrefsbot|mj12bot|yandexbot)",
             Pattern.CASE_INSENSITIVE);
@@ -18,18 +21,28 @@ public class UserAgentUtils {
         private final String browser;
         private final String browserVersion;
         private final boolean crawler;
+        private final String agentName;
+        private final String agentVersion;
 
         public UserAgentInfo(String os, String browser, String browserVersion, boolean crawler) {
+            this(os, browser, browserVersion, crawler, null, null);
+        }
+
+        public UserAgentInfo(String os, String browser, String browserVersion, boolean crawler, String agentName, String agentVersion) {
             this.os = os;
             this.browser = browser;
             this.browserVersion = browserVersion;
             this.crawler = crawler;
+            this.agentName = agentName;
+            this.agentVersion = agentVersion;
         }
 
         public String getOs() { return os; }
         public String getBrowser() { return browser; }
         public String getBrowserVersion() { return browserVersion; }
         public boolean isCrawler() { return crawler; }
+        public String getAgentName() { return agentName; }
+        public String getAgentVersion() { return agentVersion; }
 
         public String getFullBrowser() {
             if ("Unknown".equals(browserVersion)) {
@@ -48,6 +61,8 @@ public class UserAgentUtils {
         String browser = "Unknown";
         String version = "Unknown";
         boolean crawler = isCrawlerUserAgent(ua);
+        String agentName = null;
+        String agentVersion = null;
 
         String lowerUa = ua.toLowerCase();
 
@@ -70,6 +85,12 @@ public class UserAgentUtils {
         if (zrlogCtl.find()) {
             browser = "ZrLogCtl";
             version = zrlogCtl.group(1);
+            crawler = false;
+            Matcher agent = AGENT_PRODUCT_PATTERN.matcher(ua.substring(zrlogCtl.end()));
+            if (agent.find()) {
+                agentName = agent.group(1);
+                agentVersion = agent.group(2);
+            }
         } else if (lowerUa.contains("micromessenger")) {
             browser = "WeChat";
             version = getVersion(ua, "MicroMessenger/(\\d+(\\.\\d+)*)");
@@ -100,7 +121,7 @@ public class UserAgentUtils {
             }
         }
 
-        return new UserAgentInfo(os, browser, version, crawler);
+        return new UserAgentInfo(os, browser, version, crawler, agentName, agentVersion);
     }
 
     private static String getVersion(String ua, String regex) {

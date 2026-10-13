@@ -1,33 +1,37 @@
 package com.zrlog.common.updater.docker;
 
+import com.hibegin.common.util.http.HttpUtil;
+import com.hibegin.common.util.http.handle.HttpStringHandle;
 import com.zrlog.common.vo.Version;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.ResolverStyle;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 public final class UpdateMetadata {
     private UpdateMetadata() { }
 
-    public static String fetch(URI uri) throws java.io.IOException {
-        java.net.HttpURLConnection connection = (java.net.HttpURLConnection) uri.toURL().openConnection();
+    public static String fetch(URI uri) throws IOException {
         try {
-            connection.setInstanceFollowRedirects(false);
-            connection.setConnectTimeout(10000);
-            connection.setReadTimeout(20000);
-            connection.setRequestProperty("Accept", "application/json");
-            int status = connection.getResponseCode();
-            if (status == 404) { throw new java.io.FileNotFoundException("Update metadata source returned HTTP 404"); }
-            if (status != 200) { throw new java.io.IOException("Update metadata source returned HTTP " + status); }
-            try (java.io.InputStream input = connection.getInputStream()) {
-                byte[] bytes = input.readNBytes(1024 * 1024 + 1);
-                if (bytes.length > 1024 * 1024) { throw new java.io.IOException("Update metadata exceeds size limit"); }
-                return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-            }
-        } finally { connection.disconnect(); }
+            HttpStringHandle response = new HttpStringHandle();
+            HttpUtil.getInstance().sendGetRequest(uri.toString(), response, Map.of());
+            int status = response.getStatusCode();
+            if (status == 404) { throw new FileNotFoundException("Update metadata source returned HTTP 404"); }
+            if (status != 200) { throw new IOException("Update metadata source returned HTTP " + status); }
+            return response.getT();
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Update metadata request interrupted", error);
+        } catch (URISyntaxException error) {
+            throw new IOException("Invalid update metadata URL", error);
+        }
     }
 
     public static URI uri(String origin, String filename, String channel) {

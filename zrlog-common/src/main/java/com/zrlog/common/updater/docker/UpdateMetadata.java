@@ -1,5 +1,6 @@
 package com.zrlog.common.updater.docker;
 
+import com.hibegin.common.util.http.HttpUtil;
 import com.zrlog.common.vo.Version;
 
 import java.net.URI;
@@ -19,6 +20,7 @@ public final class UpdateMetadata {
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(20000);
             connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("User-Agent", HttpUtil.getUserAgent());
             int status = connection.getResponseCode();
             if (status == 404) { throw new java.io.FileNotFoundException("Update metadata source returned HTTP 404"); }
             if (status != 200) { throw new java.io.IOException("Update metadata source returned HTTP " + status); }

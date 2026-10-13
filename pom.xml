@@ -153,7 +153,7 @@
             <dependency>
                 <groupId>com.hibegin</groupId>
                 <artifactId>common-dao</artifactId>
-                <version>1.1.11</version>
+                <version>1.1.12</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

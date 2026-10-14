@@ -137,21 +137,14 @@ public class UpdateVersionTimerTask extends TimerTask {
     }
 
     protected Version getVersion(boolean preview) throws IOException, URISyntaxException, InterruptedException, ParseException {
-        String versionUrl = com.zrlog.common.updater.docker.UpdateMetadata.uri(
-                BlogBuildInfoUtil.getResourceDownloadUrl(), getJsonFilename(), preview ? "preview" : "release").toString();
-        String txtContent = com.zrlog.common.updater.docker.UpdateMetadata.fetch(java.net.URI.create(versionUrl));
-        if (StringUtils.isEmpty(txtContent)) {
-            throw new IOException("Configured update metadata source returned an empty document");
-        }
-        Version versionInfo = new Gson().fromJson(txtContent.trim(), Version.class);
-        if (ZrLogUtil.isDockerMode()) {
-            com.zrlog.common.updater.docker.UpdateMetadata.validateDocker(versionInfo, preview ? "preview" : "release");
-        }
-        versionInfo.setArtifactVersion(versionInfo.getVersion());
-        versionInfo.setChannel(preview ? "preview" : "release");
-        Date versionDate = new SimpleDateFormat(Constants.DATE_FORMAT_PATTERN).parse(versionInfo.getReleaseDate());
-        versionInfo.setBuildDate(versionDate);
-        versionInfo.setReleaseDate(new SimpleDateFormat("yyyy-MM-dd HH:mm").format(versionDate));
+        Version versionInfo;
+        try {
+            com.zrlog.updater.spi.UpdateContext.Builder b = UpdaterHosts.builder(new String[0], null);
+            b.manifestFilename = getJsonFilename();
+            if (ZrLogUtil.isDockerMode()) b.docker = new com.zrlog.updater.spi.DockerConnection(null, null, b.metadataOrigin, b.manifestFilename);
+            versionInfo = com.zrlog.updater.spi.UpdateCatalogs.getInstance().readVersion(b.build(), preview ? "preview" : "release");
+        } catch (IOException | InterruptedException | ParseException e) { throw e; }
+        catch (Exception e) { throw new IOException("Unable to read update manifest", e); }
         //手动设置对应ChangeLog
         String language;
         if (Objects.nonNull(Constants.zrLogConfig)) {

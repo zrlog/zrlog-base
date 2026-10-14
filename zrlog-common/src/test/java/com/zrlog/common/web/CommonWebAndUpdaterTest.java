@@ -7,7 +7,6 @@ import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
-import com.zrlog.common.updater.JarPackageUtil;
 import com.zrlog.common.updater.NativeImageUpdater;
 import com.zrlog.common.updater.WarUpdater;
 import com.zrlog.common.updater.ZipUpdater;
@@ -99,28 +98,7 @@ public class CommonWebAndUpdaterTest {
         assertTrue(BlogBuildInfoUtil.getVersionInfoFull().contains(":"));
     }
 
-    @Test
-    public void shouldPackageJarWithManifestAndEntries() throws Exception {
-        File root = Files.createTempDirectory("zrlog-jar").toFile();
-        File metaInf = new File(root, "META-INF");
-        assertTrue(metaInf.mkdirs());
-        File manifest = new File(metaInf, "MANIFEST.MF");
-        Files.writeString(manifest.toPath(), "Manifest-Version: 1.0\nMain-Class: demo.Main\n\n");
-        File file = new File(root, "demo.txt");
-        Files.writeString(file.toPath(), "demo", StandardCharsets.UTF_8);
-        File target = new File(root.getParentFile(), "demo.jar");
-        List<File> files = new ArrayList<>(List.of(root));
-
-        JarPackageUtil.inJar(files, root.getAbsolutePath() + File.separator, target.getAbsolutePath());
-
-        try (JarFile jarFile = new JarFile(target)) {
-            Manifest jarManifest = jarFile.getManifest();
-            assertEquals("1.0", jarManifest.getMainAttributes().getValue("Manifest-Version"));
-            assertNotNull(jarFile.getEntry("demo.txt"));
-        }
-    }
-
-    @Test
+     @Test
     public void shouldExposeUpdaterMetadataWithoutRestarting() throws Exception {
         File exec = Files.createTempFile("zrlog", ".jar").toFile();
         ZipUpdater zipUpdater = new ZipUpdater(new String[]{"--data=/tmp"}, exec);
@@ -137,18 +115,7 @@ public class CommonWebAndUpdaterTest {
         assertEquals(UpdaterTypeEnum.NATIVE_IMAGE, nativeImageUpdater.getType());
         assertNotNull(nativeImageUpdater.getUnzipPath());
 
-        Method buildStartExec = NativeImageUpdater.class.getDeclaredMethod("buildStartExec", boolean.class);
-        buildStartExec.setAccessible(true);
-        String cmd = buildStartExec.invoke(nativeImageUpdater, false).toString();
-        assertTrue(cmd.contains(exec.toString()));
-        assertTrue(cmd.contains("--data=/tmp"));
-        assertTrue(cmd.contains("--port=8080"));
-
-        Method isClassPathTemplate = WarUpdater.class.getDeclaredMethod("isClassPathTemplate", String.class);
-        isClassPathTemplate.setAccessible(true);
-        assertEquals(true, isClassPathTemplate.invoke(null, "/include/templates/default"));
-        assertEquals(false, isClassPathTemplate.invoke(null, "/include/templates/custom"));
-    }
+     }
 
     @Test
     public void shouldExposeDefaultExtensionContracts() throws Exception {

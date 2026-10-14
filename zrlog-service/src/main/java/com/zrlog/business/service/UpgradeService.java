@@ -29,7 +29,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
+import com.zrlog.updater.spi.*;
 
 public class UpgradeService {
 
@@ -88,6 +88,11 @@ public class UpgradeService {
         checkVersionResponse.setNativeImageMode(EnvKit.isNativeImage());
         boolean disable = isOnlineUpgradeDisabled();
         checkVersionResponse.setOnlineUpgradable(!disable);
+        Updater currentUpdater = Constants.zrLogConfig == null ? null : Constants.zrLogConfig.getUpdater();
+        if (currentUpdater != null && UpdaterHosts.unwrap(currentUpdater) instanceof SystemPackageUpdater) {
+            try { checkVersionResponse.setSystemPackageUpgrade(((SystemPackageUpdater) UpdaterHosts.unwrap(currentUpdater)).status()); }
+            catch (Exception e) { throw new IllegalStateException("Unable to read system package upgrade status", e); }
+        }
         if (isDockerMode() && com.zrlog.common.updater.docker.DockerUpdaterClient.isConfigured()) {
             try {
                 com.zrlog.common.updater.docker.DockerUpdaterClient.fromEnvironment().capabilities();
@@ -113,40 +118,13 @@ public class UpgradeService {
     }
 
     static boolean isErrorFile(File file, long length, String sha256, String md5sum) {
-        try {
-            if (Objects.isNull(file) || !file.exists()) {
-                return true;
-            }
-            //先比较文件大小
-            if (length > 0 && length != file.length()) {
-                return true;
-            }
-            if (StringUtils.isNotEmpty(sha256)) {
-                return !sha256ByFile(file).equalsIgnoreCase(sha256);
-            }
-            if (StringUtils.isNotEmpty(md5sum)) {
-                return !SecurityUtils.md5ByFile(file).equals(md5sum);
-            }
-            return file.length() <= 0;
-        } catch (Exception e) {
-            return true;
-        }
+        return UpdateProviders.get(UpdaterTypeEnum.ZIP).invalidPackage(file, length, sha256, md5sum);
     }
 
     static String sha256ByFile(File file) throws IOException, NoSuchAlgorithmException {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        try (FileInputStream inputStream = new FileInputStream(file)) {
-            byte[] buffer = new byte[8192];
-            int length;
-            while ((length = inputStream.read(buffer)) >= 0) {
-                digest.update(buffer, 0, length);
-            }
-        }
-        StringBuilder hex = new StringBuilder();
-        for (byte value : digest.digest()) {
-            hex.append(String.format("%02x", value & 0xff));
-        }
-        return hex.toString();
+        try { return UpdateProviders.get(UpdaterTypeEnum.ZIP).checksum(file, "SHA-256"); }
+        catch (IOException | NoSuchAlgorithmException e) { throw e; }
+        catch (Exception e) { throw new IOException(e); }
     }
 
     static int getDownloadProcess(File file, long totalLength) {
@@ -156,79 +134,13 @@ public class UpgradeService {
         return (int) Math.min(file.length() * 100 / totalLength, 100);
     }
 
-    private HttpFileHandle createFileHandle(Updater updater) {
-        File updateTempPath = Objects.nonNull(updater) ? updater.getUpdateTempPath() : new File(PathUtil.getTempPath());
-        File file = new File(updateTempPath, "zrlog-" + System.currentTimeMillis() + "-" +
-                Math.abs(System.nanoTime()) + ".zip");
-        file.getParentFile().mkdirs();
-        HttpFileHandle handle = new HttpFileHandle(file.getParentFile().toString(), file.getName());
-        handle.setT(file);
-        return handle;
-    }
-
-    private String getPackageDownloadUrl(Version version, Updater updater) {
-        return com.zrlog.common.updater.PackageDownloadSource.select(version, isWarMode(updater),
-                new WebsiteKvService().upgradeWebSiteInfo().getUpgradePackageSource());
-    }
-
-    private long getPackageFileSize(Version version, Updater updater) {
-        return isWarMode(updater) ? version.getWarFileSize() : version.getZipFileSize();
-    }
-
-    private String getPackageMd5sum(Version version, Updater updater) {
-        return isWarMode(updater) ? version.getWarMd5sum() : version.getZipMd5sum();
-    }
-
-    private String getPackageSha256(Version version, Updater updater) {
-        return isWarMode(updater) ? version.getWarSha256() : version.getZipSha256();
-    }
-
-    private File downloadUpgradePackage(Version version, UpgradeProgressListener progressListener,
-                                        Map<String, Object> backend, Updater updater) {
-        HttpFileHandle fileHandle = createFileHandle(updater);
-        File file = fileHandle.getT();
-        String downloadUrl = getPackageDownloadUrl(version, updater);
-        long fileSize = getPackageFileSize(version, updater);
-        String sha256 = getPackageSha256(version, updater);
-        String md5sum = getPackageMd5sum(version, updater);
-        publishProgress(progressListener, UpgradeProgressEvent.STAGE_DOWNLOAD, UpgradeProgressEvent.STATUS_RUNNING,
-                getDownloadMessage(backend, null), null);
-        AtomicReference<Exception> downloadException = new AtomicReference<>();
-        Thread downloadThread = ThreadUtils.start(() -> {
-            try {
-                HttpUtil.getInstance().sendGetRequest(downloadUrl, fileHandle, new HashMap<>());
-            } catch (IOException | InterruptedException | URISyntaxException e) {
-                downloadException.set(e);
-                if (e instanceof InterruptedException) {
-                    Thread.currentThread().interrupt();
-                }
-                LoggerUtil.getLogger(UpgradeService.class).severe("Download file error " + e.getMessage());
-            }
-        });
-        int lastPercent = 0;
-        while (downloadThread.isAlive()) {
-            int percent = getDownloadProcess(file, fileSize);
-            if (percent > lastPercent) {
-                publishProgress(progressListener, UpgradeProgressEvent.STAGE_DOWNLOAD,
-                        UpgradeProgressEvent.STATUS_RUNNING,
-                        getDownloadMessage(backend, percent), null);
-                lastPercent = percent;
-            }
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                downloadThread.interrupt();
-                Thread.currentThread().interrupt();
-                throw new DownloadUpgradeFileException(e);
-            }
-        }
-        if (Objects.nonNull(downloadException.get()) || fileHandle.getStatusCode() != 200 ||
-                isErrorFile(file, fileSize, sha256, md5sum)) {
-            throw new DownloadUpgradeFileException(downloadException.get());
-        }
-        publishProgress(progressListener, UpgradeProgressEvent.STAGE_DOWNLOAD, UpgradeProgressEvent.STATUS_COMPLETE,
-                backendString(backend, "upgrade.status.downloaded"), file.getName());
-        return file;
+    private File downloadUpgradePackage(Version version, UpgradeProgressListener progressListener, Map<String,Object> backend, Updater updater) {
+        try {
+            UpdateContext.Builder b = new UpdateContext.Builder(UpdaterHosts.context(updater));
+            b.packageSource = new WebsiteKvService().upgradeWebSiteInfo().getUpgradePackageSource();
+            UpdaterTypeEnum type = isFaaSMode() ? UpdaterTypeEnum.FAAS : updater == null ? UpdaterTypeEnum.ZIP : updater.getType();
+            return UpdateProviders.get(type).download(b.build(), new UpdateRequest(null, version, buildUpgradeKey(version), UpdaterHosts.unwrap(updater), progressListener, UpdaterHosts.text(backend)));
+        } catch (Exception e) { throw new DownloadUpgradeFileException(e); }
     }
 
     public UpgradeProcessResponse doUpgrade(UpdateVersionInfoPlugin plugin) {
@@ -291,6 +203,9 @@ public class UpgradeService {
     UpdateVersionHandler newOnlineUpdateVersionHandler(Version version, File upgradePackage,
                                                        UpgradeProgressListener progressListener,
                                                        Map<String, Object> backend, Updater updater) {
+        if (updater != null && updater.getType() == UpdaterTypeEnum.DEB) {
+            return UpdaterHosts.handler(UpdaterTypeEnum.DEB, updater, null, version, buildUpgradeKey(version), progressListener, backend);
+        }
         if (isFaaSMode()) {
             return new FaasUpdateVersionHandler(backend, version, upgradePackage,
                     progressListener);
@@ -304,7 +219,7 @@ public class UpgradeService {
     }
 
     private boolean isOnlineUpgradeDisabled() {
-        return isDockerMode() || isSystemServiceMode() ||
+        return isDockerMode() || (isSystemServiceMode() && !isDebOnlineUpgradeSupported()) ||
                 (isFaaSMode() && !isFaaSOnlineUpgradeSupported());
     }
 
@@ -321,6 +236,11 @@ public class UpgradeService {
         }
         updateVersionHandler.doHandle();
         return new UpgradeProcessResponse(updateVersionHandler.isFinish(), updateVersionHandler.getMessage());
+    }
+
+    boolean isDebOnlineUpgradeSupported() {
+        Updater updater = Constants.zrLogConfig == null ? null : Constants.zrLogConfig.getUpdater();
+        return updater != null && UpdaterHosts.unwrap(updater) instanceof SystemPackageUpdater && ((SystemPackageUpdater) UpdaterHosts.unwrap(updater)).available();
     }
 
     boolean isDockerMode() {

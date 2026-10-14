@@ -1,6 +1,5 @@
 package com.zrlog.common.updater;
 
-import com.google.gson.Gson;
 import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.StringUtils;
 import com.hibegin.common.util.http.HttpUtil;
@@ -99,70 +98,29 @@ public class UpdateVersionTimerTask extends TimerTask {
         }
     }
 
-    protected UpdateVersionCheckResult fetchLastVersion(boolean ckPreview) throws IOException, ParseException,
+    protected UpdateVersionCheckResult fetchLastVersion(boolean preview) throws IOException, ParseException,
             URISyntaxException, InterruptedException {
-        Version lastVersion = getVersion(ckPreview);
-        if (!ckPreview) {
-            return checkResult(lastVersion, UpdateChannel.RELEASE);
-        }
-        //存在预览版本
-        if (ZrLogUtil.greatThenCurrentVersion(lastVersion.getBuildId(), lastVersion.getBuildDate(), lastVersion.getVersion())) {
-            return new UpdateVersionCheckResult(lastVersion, UpdateChannel.PREVIEW, true);
-        }
-        //如果已是最新预览版，那么尝试检查正式版本
-        Version lastReleaseVersion;
+        com.zrlog.updater.spi.UpdateContext.Builder context = UpdaterHosts.builder(new String[0], null);
+        context.manifestFilename = getJsonFilename();
+        context.docker = ZrLogUtil.isDockerMode()
+                ? new com.zrlog.updater.spi.DockerConnection(null, null, context.metadataOrigin, context.manifestFilename)
+                : null;
+        UpdateVersionCheckResult result;
         try {
-            lastReleaseVersion = getVersion(false);
-        } catch (java.io.FileNotFoundException unpublishedRelease) {
-            // A verified preview can exist before this package type has its first release manifest.
-            // Only this optional release lookup may be absent; other failures still fail the check.
-            return new UpdateVersionCheckResult(lastVersion, UpdateChannel.PREVIEW, false);
-        }
-        if (ZrLogUtil.greatThenCurrentVersion(lastReleaseVersion.getBuildId(), lastReleaseVersion.getBuildDate(), lastReleaseVersion.getVersion())) {
-            return new UpdateVersionCheckResult(lastReleaseVersion, UpdateChannel.RELEASE, true);
-        }
-        return lastVersion.getBuildDate().after(lastReleaseVersion.getBuildDate()) ?
-                new UpdateVersionCheckResult(lastVersion, UpdateChannel.PREVIEW, false) :
-                new UpdateVersionCheckResult(lastReleaseVersion, UpdateChannel.RELEASE, false);
-    }
-
-    private static UpdateVersionCheckResult checkResult(Version version, UpdateChannel channel) {
-        return new UpdateVersionCheckResult(version, channel,
-                ZrLogUtil.greatThenCurrentVersion(version.getBuildId(), version.getBuildDate(), version.getVersion()));
+            result = com.zrlog.updater.spi.UpdateCatalogs.getInstance().checkVersion(context.build(), preview,
+                    value -> ZrLogUtil.greatThenCurrentVersion(value.getBuildId(), value.getBuildDate(), value.getVersion()));
+        } catch (IOException | InterruptedException | ParseException e) { throw e; }
+        catch (Exception e) { throw new IOException("Unable to check update manifest", e); }
+        Version selected = result.getVersion();
+        Map<String, Object> resources = I18nUtil.getBackend();
+        selected.setChangeLog(Constants.getLanguage() == null || resources == null ? ""
+                : getChangeLog(selected.getVersion(), selected.getBuildDate(), selected.getBuildId(), resources));
+        return result;
     }
 
     private static String getJsonFilename() {
         return ZrLogUtil.isDockerMode() ? BlogBuildInfoUtil.getDockerUpdateVersionJsonFilename()
                 : BlogBuildInfoUtil.getUpdateVersionJsonFilename();
-    }
-
-    protected Version getVersion(boolean preview) throws IOException, URISyntaxException, InterruptedException, ParseException {
-        Version versionInfo;
-        try {
-            com.zrlog.updater.spi.UpdateContext.Builder b = UpdaterHosts.builder(new String[0], null);
-            b.manifestFilename = getJsonFilename();
-            if (ZrLogUtil.isDockerMode()) b.docker = new com.zrlog.updater.spi.DockerConnection(null, null, b.metadataOrigin, b.manifestFilename);
-            versionInfo = com.zrlog.updater.spi.UpdateCatalogs.getInstance().readVersion(b.build(), preview ? "preview" : "release");
-        } catch (IOException | InterruptedException | ParseException e) { throw e; }
-        catch (Exception e) { throw new IOException("Unable to read update manifest", e); }
-        //手动设置对应ChangeLog
-        String language;
-        if (Objects.nonNull(Constants.zrLogConfig)) {
-            language = Constants.getLanguage();
-        } else {
-            language = "zh_CN";
-        }
-        if (Objects.isNull(language)) {
-            versionInfo.setChangeLog("");
-        } else {
-            Map<String, Object> langRes = I18nUtil.getBackend();
-            if (Objects.isNull(langRes)) {
-                versionInfo.setChangeLog("");
-            } else {
-                versionInfo.setChangeLog(getChangeLog(versionInfo.getVersion(), versionInfo.getBuildDate(), versionInfo.getBuildId(), langRes));
-            }
-        }
-        return versionInfo;
     }
 
     public Version getVersion() {

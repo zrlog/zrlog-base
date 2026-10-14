@@ -42,7 +42,7 @@ mvn -q -DskipTests install
 ## 边界规则
 
 - 共享层只沉淀稳定公共能力，不承载 admin/blog/install 的页面级临时逻辑。
-- 升级执行与升级文案归 zrlog-updater；base 只依赖 SPI 并提供路径、现有 HTTP/UA 和应用生命周期适配。迁移期旧入口保留委托，不复制实现或语言资源。
+- 升级执行、清单检查规则与升级文案归 zrlog-updater；base 只依赖 SPI 并提供路径、现有 HTTP/UA、应用生命周期、调度与通知适配。不保留分部署类型的 updater/handler 包装或具体 Docker 客户端壳。
 - 固定结构请求、响应、缓存对象和页面对象优先使用 typed DTO，不要用 `Map` 扩散协议。
 - 修改 JSON 响应、DTO 字段、异常码或页面对象时，先检查下游引用和兼容语义。
 - 新增会被 Gson/native-image 访问的类型时，检查 `ZrLogBaseNativeImageUtils` 等注册入口。

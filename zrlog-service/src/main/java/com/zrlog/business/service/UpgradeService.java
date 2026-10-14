@@ -1,9 +1,6 @@
 package com.zrlog.business.service;
 
 import com.hibegin.common.util.*;
-import com.hibegin.common.util.http.HttpUtil;
-import com.hibegin.common.util.http.handle.HttpFileHandle;
-import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.exception.DownloadUpgradeFileException;
 import com.zrlog.business.exception.CheckUpgradeVersionException;
 import com.zrlog.business.rest.response.CheckVersionResponse;
@@ -11,22 +8,14 @@ import com.zrlog.business.rest.response.PreCheckVersionResponse;
 import com.zrlog.business.rest.response.UpgradeProcessResponse;
 import com.zrlog.business.updater.UpdateVersionInfoPlugin;
 import com.zrlog.common.updater.*;
-import com.zrlog.common.updater.handle.*;
 import com.zrlog.common.Constants;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
 import com.zrlog.common.vo.Version;
 import com.zrlog.util.I18nUtil;
-import com.zrlog.util.ThreadUtils;
 import com.zrlog.util.ZrLogUtil;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import com.zrlog.updater.spi.*;
@@ -93,9 +82,9 @@ public class UpgradeService {
             try { checkVersionResponse.setSystemPackageUpgrade(((SystemPackageUpdater) UpdaterHosts.unwrap(currentUpdater)).status()); }
             catch (Exception e) { throw new IllegalStateException("Unable to read system package upgrade status", e); }
         }
-        if (isDockerMode() && com.zrlog.common.updater.docker.DockerUpdaterClient.isConfigured()) {
+        if (isDockerMode() && UpdaterHosts.dockerConfigured()) {
             try {
-                com.zrlog.common.updater.docker.DockerUpdaterClient.fromEnvironment().capabilities();
+                UpdaterHosts.dockerControl().capabilities();
                 checkVersionResponse.setOnlineUpgradable(true);
                 checkVersionResponse.setDockerUpdaterAvailable(true);
             } catch (RuntimeException error) {
@@ -111,27 +100,6 @@ public class UpgradeService {
             checkVersionResponse.setDisableUpgradeReason(upgradeProcessResponse.getMessage());
         }
         return checkVersionResponse;
-    }
-
-    static boolean isErrorFile(File file, long length, String md5sum) {
-        return isErrorFile(file, length, null, md5sum);
-    }
-
-    static boolean isErrorFile(File file, long length, String sha256, String md5sum) {
-        return UpdateProviders.get(UpdaterTypeEnum.ZIP).invalidPackage(file, length, sha256, md5sum);
-    }
-
-    static String sha256ByFile(File file) throws IOException, NoSuchAlgorithmException {
-        try { return UpdateProviders.get(UpdaterTypeEnum.ZIP).checksum(file, "SHA-256"); }
-        catch (IOException | NoSuchAlgorithmException e) { throw e; }
-        catch (Exception e) { throw new IOException(e); }
-    }
-
-    static int getDownloadProcess(File file, long totalLength) {
-        if (totalLength <= 0 || Objects.isNull(file) || !file.exists()) {
-            return 0;
-        }
-        return (int) Math.min(file.length() * 100 / totalLength, 100);
     }
 
     private File downloadUpgradePackage(Version version, UpgradeProgressListener progressListener, Map<String,Object> backend, Updater updater) {
@@ -203,19 +171,10 @@ public class UpgradeService {
     UpdateVersionHandler newOnlineUpdateVersionHandler(Version version, File upgradePackage,
                                                        UpgradeProgressListener progressListener,
                                                        Map<String, Object> backend, Updater updater) {
-        if (updater != null && updater.getType() == UpdaterTypeEnum.DEB) {
-            return UpdaterHosts.handler(UpdaterTypeEnum.DEB, updater, null, version, buildUpgradeKey(version), progressListener, backend);
-        }
-        if (isFaaSMode()) {
-            return new FaasUpdateVersionHandler(backend, version, upgradePackage,
-                    progressListener);
-        }
-        if (isWarMode(updater)) {
-            return new WarUpdateVersionHandle(upgradePackage, backend,
-                    buildUpgradeKey(version), version, progressListener, updater);
-        }
-        return new ZipUpdateVersionHandle(upgradePackage, backend, version,
-                progressListener, updater);
+        UpdaterTypeEnum type = updater != null ? updater.getType()
+                : isFaaSMode() ? UpdaterTypeEnum.FAAS : isWarMode() ? UpdaterTypeEnum.WAR : UpdaterTypeEnum.ZIP;
+        File file = type == UpdaterTypeEnum.DEB ? null : upgradePackage;
+        return UpdaterHosts.handler(type, updater, file, version, buildUpgradeKey(version), progressListener, backend);
     }
 
     private boolean isOnlineUpgradeDisabled() {
@@ -226,11 +185,11 @@ public class UpgradeService {
     private UpgradeProcessResponse buildManualUpgradeResponse(Version version, Map<String, Object> backend) {
         UpdateVersionHandler updateVersionHandler;
         if (isDockerMode()) {
-            updateVersionHandler = new DockerUpdateVersionHandle(backend);
+            updateVersionHandler = UpdaterHosts.manualHandler(UpdaterTypeEnum.DOCKER, null, version, backend);
         } else if (isSystemServiceMode()) {
-            updateVersionHandler = new SystemServiceUpdateVersionHandle(backend, version);
+            updateVersionHandler = UpdaterHosts.manualHandler(UpdaterTypeEnum.DEB, null, version, backend);
         } else if (isFaaSMode()) {
-            updateVersionHandler = new FaasUpdateVersionHandler(backend, version);
+            updateVersionHandler = UpdaterHosts.manualHandler(UpdaterTypeEnum.FAAS, null, version, backend);
         } else {
             return new UpgradeProcessResponse(false, "");
         }
@@ -264,7 +223,7 @@ public class UpgradeService {
     }
 
     boolean isFaaSOnlineUpgradeSupported() {
-        return FaasUpdateVersionHandler.isOnlineUpgradeSupported();
+        return UpdaterHosts.onlineUpgradeSupported(UpdaterTypeEnum.FAAS);
     }
 
     static String buildUpgradeKey(Version version) {
@@ -282,21 +241,4 @@ public class UpgradeService {
         return Objects.toString(backend.get(key), key);
     }
 
-    static String getDownloadMessage(Map<String, Object> backend, Integer percent) {
-        String message = backendString(backend, "upgrade.status.downloading");
-        if (Objects.nonNull(percent) && percent > 0) {
-            return message + " " + percent + "%";
-        }
-        return message;
-    }
-
-    static void publishProgress(UpgradeProgressListener progressListener, String stage, String status,
-                                String message, String detail) {
-        try {
-            progressListener.onProgress(UpgradeProgressEvent.EVENT,
-                    UpgradeProgressEvent.data(stage, status, message, detail));
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
 }

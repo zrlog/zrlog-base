@@ -1,9 +1,11 @@
-package com.zrlog.common.updater;
+package com.zrlog.business.updater;
 
 import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.StringUtils;
 import com.hibegin.common.util.http.HttpUtil;
 import com.zrlog.common.Constants;
+import com.zrlog.common.adapter.UpdaterHosts;
+import com.zrlog.common.updater.UpdateVersionCheckResult;
 import com.zrlog.common.vo.Version;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.I18nUtil;

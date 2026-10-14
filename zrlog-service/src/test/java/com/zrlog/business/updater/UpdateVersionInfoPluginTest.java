@@ -5,7 +5,6 @@ import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
 import com.zrlog.business.service.WebsiteKvService;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
-import com.zrlog.common.updater.UpdateVersionTimerTask;
 import com.zrlog.common.vo.Version;
 import org.junit.Test;
 import org.junit.experimental.theories.DataPoints;

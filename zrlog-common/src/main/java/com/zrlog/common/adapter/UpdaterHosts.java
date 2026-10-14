@@ -1,10 +1,12 @@
-package com.zrlog.common.updater;
+package com.zrlog.common.adapter;
 
 import com.hibegin.common.util.EnvKit;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.common.Constants;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
+import com.zrlog.common.updater.UpdateVersionHandler;
+import com.zrlog.common.updater.UpgradeProgressListener;
 import com.zrlog.common.vo.Version;
 import com.zrlog.theme.spi.BundledThemes;
 import com.zrlog.updater.spi.*;

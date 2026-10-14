@@ -8,6 +8,7 @@ import com.zrlog.business.rest.response.PreCheckVersionResponse;
 import com.zrlog.business.rest.response.UpgradeProcessResponse;
 import com.zrlog.business.updater.UpdateVersionInfoPlugin;
 import com.zrlog.common.updater.*;
+import com.zrlog.common.adapter.UpdaterHosts;
 import com.zrlog.common.Constants;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;

@@ -9,7 +9,6 @@ import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
 import com.zrlog.business.service.UpgradeNoticeService;
 import com.zrlog.business.service.WebsiteKvService;
 import com.zrlog.common.Constants;
-import com.zrlog.common.updater.UpdateVersionTimerTask;
 import com.zrlog.common.vo.Version;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.util.BlogBuildInfoUtil;

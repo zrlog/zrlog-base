@@ -1,4 +1,4 @@
-package com.zrlog.common.updater;
+package com.zrlog.common.adapter;
 
 import org.junit.Test;
 import static org.junit.Assert.*;

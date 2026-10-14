@@ -48,6 +48,9 @@ public final class UpdaterHosts {
         b.lambda = EnvKit.isLambda(); b.http = HTTP;
         b.bundledTheme = path -> BundledThemes.getInstance().containsResource(path);
         b.stop = () -> { if (Constants.zrLogConfig != null) Constants.zrLogConfig.stop(); };
+        b.releaseJdbcDrivers = UpdaterHosts::releaseJdbcDrivers;
+        b.docker = new DockerConnection(System.getenv("ZRLOG_UPDATER_URL"), System.getenv("ZRLOG_UPDATER_TOKEN"),
+                b.metadataOrigin, BlogBuildInfoUtil.getDockerUpdateVersionJsonFilename());
         return b;
     }
     public static UpdateContext context(Updater updater) {
@@ -55,26 +58,23 @@ public final class UpdaterHosts {
     }
     public static Updater create(UpdaterTypeEnum type, String[] args, File executable) {
         UpdateContext.Builder b = builder(args, executable);
-        if (type == UpdaterTypeEnum.WAR) {
-            Runnable stop = b.stop;
-            b.stop = () -> {
-                java.util.Enumeration<Driver> drivers = DriverManager.getDrivers();
-                while (drivers.hasMoreElements()) {
-                    Driver driver = drivers.nextElement();
-                    if (driver.getClass().getClassLoader() == UpdaterHosts.class.getClassLoader()) {
-                        try { DriverManager.deregisterDriver(driver); }
-                        catch (SQLException e) { java.util.logging.Logger.getLogger(UpdaterHosts.class.getName()).warning(e.getMessage()); }
-                    }
-                }
-                stop.run();
-            };
-        }
         if (type == UpdaterTypeEnum.DOCKER) {
-            b.manifestFilename = BlogBuildInfoUtil.getDockerUpdateVersionJsonFilename();
-            b.docker = new DockerConnection(System.getenv("ZRLOG_UPDATER_URL"), System.getenv("ZRLOG_UPDATER_TOKEN"), b.metadataOrigin, b.manifestFilename);
+            b.manifestFilename = b.docker.manifestFilename;
         }
-        UpdateContext context = b.build();
-        return new DelegatingUpdater(context, UpdateProviders.get(type).create(context));
+        return adapt(UpdateProviders.create(type, b.build()));
+    }
+    public static Updater adapt(UpdateSession session) {
+        return session == null ? null : new DelegatingUpdater(session.context, session.updater);
+    }
+    private static void releaseJdbcDrivers() {
+        java.util.Enumeration<Driver> drivers = DriverManager.getDrivers();
+        while (drivers.hasMoreElements()) {
+            Driver driver = drivers.nextElement();
+            if (driver.getClass().getClassLoader() == UpdaterHosts.class.getClassLoader()) {
+                try { DriverManager.deregisterDriver(driver); }
+                catch (SQLException e) { java.util.logging.Logger.getLogger(UpdaterHosts.class.getName()).warning(e.getMessage()); }
+            }
+        }
     }
     public static ApplicationUpdater unwrap(Updater updater) {
         return updater instanceof DelegatingUpdater ? ((DelegatingUpdater) updater).delegate : updater;

@@ -16,7 +16,7 @@
             <groupId>com.hibegin</groupId><artifactId>zrlog-updater-spi</artifactId>
             <version>${zrlog-updater.version}</version>
         </dependency>
-        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-template-default</artifactId><version>1.0</version><scope>test</scope></dependency>
+        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-template-default</artifactId><version>1.0.1</version><scope>test</scope></dependency>
         <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-template-spi</artifactId><version>1.0.0</version></dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>

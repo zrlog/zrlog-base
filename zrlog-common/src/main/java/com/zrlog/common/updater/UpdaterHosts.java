@@ -1,13 +1,10 @@
 package com.zrlog.common.updater;
 
 import com.hibegin.common.util.EnvKit;
-import com.hibegin.common.util.http.HttpUtil;
-import com.hibegin.common.util.http.handle.HttpFileHandle;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.common.Constants;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
-import com.zrlog.common.updater.docker.UpdateMetadata;
 import com.zrlog.common.vo.Version;
 import com.zrlog.theme.spi.BundledThemes;
 import com.zrlog.updater.spi.*;
@@ -15,9 +12,6 @@ import com.zrlog.util.ArgsParser;
 import com.zrlog.util.BlogBuildInfoUtil;
 import java.io.File;
 import java.lang.management.ManagementFactory;
-import java.net.URI;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -27,15 +21,7 @@ import java.util.function.Function;
 /** Adapts application paths, HTTP and lifecycle to the standalone updater contracts. */
 public final class UpdaterHosts {
     private UpdaterHosts() { }
-    public static final UpdateHttp HTTP = new UpdateHttp() {
-        public String read(URI uri) throws Exception { return UpdateMetadata.fetch(uri); }
-        public int download(URI uri, File file) throws Exception {
-            HttpFileHandle handle = new HttpFileHandle(file.getParent(), file.getName()); handle.setT(file);
-            HttpUtil.getInstance().sendGetRequest(uri.toString(), handle, Map.of());
-            return handle.getStatusCode();
-        }
-        public HttpResponse<String> send(HttpRequest request) throws Exception { return HttpUtil.getInstance().sendRequest(request); }
-    };
+    public static final UpdateHttp HTTP = UpdaterHttp.INSTANCE;
     public static UpdateContext.Builder builder(String[] args, File executable) {
         UpdateContext.Builder b = new UpdateContext.Builder();
         b.root = new File(PathUtil.getRootPath()); b.temp = new File(PathUtil.getTempPath());
@@ -54,17 +40,10 @@ public final class UpdaterHosts {
         return b;
     }
     public static UpdateContext context(Updater updater) {
-        return updater instanceof DelegatingUpdater ? ((DelegatingUpdater) updater).context : builder(new String[0], updater == null ? null : updater.execFile()).build();
-    }
-    public static Updater create(UpdaterTypeEnum type, String[] args, File executable) {
-        UpdateContext.Builder b = builder(args, executable);
-        if (type == UpdaterTypeEnum.DOCKER) {
-            b.manifestFilename = b.docker.manifestFilename;
-        }
-        return adapt(UpdateProviders.create(type, b.build()));
+        return updater instanceof HostedUpdaterAdapter ? ((HostedUpdaterAdapter) updater).context : builder(new String[0], updater == null ? null : updater.execFile()).build();
     }
     public static Updater adapt(UpdateSession session) {
-        return session == null ? null : new DelegatingUpdater(session.context, session.updater);
+        return session == null ? null : new HostedUpdaterAdapter(session.context, session.updater);
     }
     private static void releaseJdbcDrivers() {
         java.util.Enumeration<Driver> drivers = DriverManager.getDrivers();
@@ -77,7 +56,22 @@ public final class UpdaterHosts {
         }
     }
     public static ApplicationUpdater unwrap(Updater updater) {
-        return updater instanceof DelegatingUpdater ? ((DelegatingUpdater) updater).delegate : updater;
+        return updater instanceof HostedUpdaterAdapter ? ((HostedUpdaterAdapter) updater).delegate : updater;
+    }
+    public static boolean dockerConfigured() {
+        return System.getenv("ZRLOG_UPDATER_URL") != null && System.getenv("ZRLOG_UPDATER_TOKEN") != null;
+    }
+    public static DockerControl dockerControl() {
+        Updater updater = Constants.zrLogConfig == null ? null : Constants.zrLogConfig.getUpdater();
+        ApplicationUpdater implementation = unwrap(updater);
+        if (!(implementation instanceof DockerControl)) {
+            throw new IllegalStateException("Docker updater is not assembled");
+        }
+        return (DockerControl) implementation;
+    }
+    public static boolean onlineUpgradeSupported(UpdaterTypeEnum type) {
+        Updater updater = Constants.zrLogConfig == null ? null : Constants.zrLogConfig.getUpdater();
+        return UpdateProviders.find(type).map(provider -> provider.onlineUpgradeSupported(context(updater))).orElse(false);
     }
     public static Function<String, String> text(Map<String, Object> backend) {
         return key -> java.util.Objects.toString(backend.get(key), key);
@@ -86,10 +80,15 @@ public final class UpdaterHosts {
                                                String key, UpgradeProgressListener progress, Map<String, Object> backend) {
         return UpdateProviders.get(type).handler(context(updater), new UpdateRequest(file, version, key, unwrap(updater), progress, text(backend)));
     }
-    public static class DelegatingUpdater implements Updater {
+    public static UpdateVersionHandler manualHandler(UpdaterTypeEnum type, Updater updater, Version version,
+                                                     Map<String, Object> backend) {
+        return UpdateProviders.get(type).manualHandler(context(updater),
+                new UpdateRequest(null, version, null, unwrap(updater), UpgradeProgressListener.NONE, text(backend)));
+    }
+    private static final class HostedUpdaterAdapter implements Updater {
         public final UpdateContext context;
         public final ApplicationUpdater delegate;
-        public DelegatingUpdater(UpdateContext context, ApplicationUpdater delegate) { this.context = context; this.delegate = delegate; }
+        private HostedUpdaterAdapter(UpdateContext context, ApplicationUpdater delegate) { this.context = context; this.delegate = delegate; }
         public void restartProcessAsync(Version version) { delegate.restartProcessAsync(version); }
         public File getUpdateTempPath() { return delegate.getUpdateTempPath(); }
         public String buildUpgradeFile(String file, String key) throws Exception { return delegate.buildUpgradeFile(file, key); }

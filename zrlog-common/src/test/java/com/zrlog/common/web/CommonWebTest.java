@@ -7,9 +7,6 @@ import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
-import com.zrlog.common.updater.NativeImageUpdater;
-import com.zrlog.common.updater.WarUpdater;
-import com.zrlog.common.updater.ZipUpdater;
 import com.zrlog.common.vo.Version;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.util.BlogBuildInfoUtil;
@@ -36,7 +33,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-public class CommonWebAndUpdaterTest {
+public class CommonWebTest {
 
     @Test
     public void shouldSerializeLocalDateTimeWithAdapterAndConverter() throws Exception {
@@ -98,25 +95,6 @@ public class CommonWebAndUpdaterTest {
         assertTrue(BlogBuildInfoUtil.getVersionInfoFull().contains(":"));
     }
 
-     @Test
-    public void shouldExposeUpdaterMetadataWithoutRestarting() throws Exception {
-        File exec = Files.createTempFile("zrlog", ".jar").toFile();
-        ZipUpdater zipUpdater = new ZipUpdater(new String[]{"--data=/tmp"}, exec);
-        WarUpdater warUpdater = new WarUpdater(exec);
-        NativeImageUpdater nativeImageUpdater = new NativeImageUpdater(new String[]{"--port=8080", "--data=/tmp"}, exec);
-
-        assertEquals(exec, zipUpdater.execFile());
-        assertEquals(UpdaterTypeEnum.ZIP, zipUpdater.getType());
-        assertNotNull(zipUpdater.getUnzipPath());
-        assertEquals(exec, warUpdater.execFile());
-        assertEquals(UpdaterTypeEnum.WAR, warUpdater.getType());
-        assertEquals("", warUpdater.getUnzipPath());
-        assertEquals(exec, nativeImageUpdater.execFile());
-        assertEquals(UpdaterTypeEnum.NATIVE_IMAGE, nativeImageUpdater.getType());
-        assertNotNull(nativeImageUpdater.getUnzipPath());
-
-     }
-
     @Test
     public void shouldExposeDefaultExtensionContracts() throws Exception {
         Updater updater = new Updater() {
@@ -175,7 +153,7 @@ public class CommonWebAndUpdaterTest {
 
     private static HttpRequest request(long createTime) {
         return (HttpRequest) Proxy.newProxyInstance(
-                CommonWebAndUpdaterTest.class.getClassLoader(),
+                CommonWebTest.class.getClassLoader(),
                 new Class[]{HttpRequest.class},
                 (proxy, method, args) -> {
                     if ("getCreateTime".equals(method.getName())) {
@@ -196,7 +174,7 @@ public class CommonWebAndUpdaterTest {
 
     private static HttpResponse response() {
         return (HttpResponse) Proxy.newProxyInstance(
-                CommonWebAndUpdaterTest.class.getClassLoader(),
+                CommonWebTest.class.getClassLoader(),
                 new Class[]{HttpResponse.class},
                 (proxy, method, args) -> null);
     }

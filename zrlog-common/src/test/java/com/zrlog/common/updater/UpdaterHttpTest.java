@@ -1,11 +1,9 @@
-package com.zrlog.common.updater.docker;
+package com.zrlog.common.updater;
 
-import com.google.gson.Gson;
-import com.zrlog.common.vo.Version;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
-public class UpdateMetadataTest {
+public class UpdaterHttpTest {
     @Test
     public void preservesApplicationIdentityWhenReadingMetadata() throws Exception {
         String document = "{\"version\":\"4.0.0-SNAPSHOT\",\"buildId\":\"preview\"}";
@@ -29,7 +27,7 @@ public class UpdateMetadataTest {
         try {
             java.net.URI uri = java.net.URI.create("http://127.0.0.1:"
                     + server.getAddress().getPort() + "/metadata.json");
-            assertEquals(document, UpdateMetadata.fetch(uri));
+            assertEquals(document, UpdaterHttp.INSTANCE.read(uri));
         } finally {
             server.stop(0);
         }
@@ -47,10 +45,10 @@ public class UpdateMetadataTest {
         server.start();
         try {
             java.net.URI uri = java.net.URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/metadata.json");
-            assertThrows(java.io.FileNotFoundException.class, () -> UpdateMetadata.fetch(uri));
+            assertThrows(java.io.FileNotFoundException.class, () -> UpdaterHttp.INSTANCE.read(uri));
             for (int code : new int[]{403, 500, 503}) {
                 status.set(code);
-                java.io.IOException error = assertThrows(java.io.IOException.class, () -> UpdateMetadata.fetch(uri));
+                java.io.IOException error = assertThrows(java.io.IOException.class, () -> UpdaterHttp.INSTANCE.read(uri));
                 assertFalse(error instanceof java.io.FileNotFoundException);
                 assertTrue(error.getMessage().contains(Integer.toString(code)));
             }
@@ -59,29 +57,4 @@ public class UpdateMetadataTest {
         }
     }
 
-    @Test
-    public void usesConfiguredOriginPathAndFilename() {
-        assertEquals("https://mirror.example/packages/preview/docker.json",
-                UpdateMetadata.uri("https://mirror.example/packages", "docker.json", "preview").toString());
-        for (String origin : new String[]{"http://dl.example", "//dl.example", "file:///tmp", "https://user@dl.example",
-                "https://dl.example/?next=evil", "https://dl.example/a/../b", "https://dl.example/#x"}) {
-            assertThrows(IllegalArgumentException.class, () -> UpdateMetadata.uri(origin, "docker.json", "release"));
-        }
-        assertThrows(IllegalArgumentException.class, () -> UpdateMetadata.uri("https://dl.example", "../evil.json", "release"));
-        assertThrows(IllegalArgumentException.class, () -> UpdateMetadata.uri("https://dl.example", "docker.json", "../preview"));
-    }
-
-    @Test
-    public void validatesIdentityChannelAndAmbiguousPlatforms() {
-        String image = "{\"repository\":\"zrlog/zrlog\",\"tag\":\"4.0.0\",\"digest\":\"sha256:" + "a".repeat(64)
-                + "\",\"platforms\":[\"linux/arm64\"]}";
-        String json = "{\"schemaVersion\":1,\"packageType\":\"docker-image\",\"channel\":\"release\","
-                + "\"version\":\"4.0.0\",\"buildId\":\"1234567\",\"sourceCommit\":\"1234567" + "a".repeat(33)
-                + "\",\"releaseDate\":\"2026-10-11 12:00:00Z\",\"images\":[" + image + "]}";
-        Version version = new Gson().fromJson(json, Version.class);
-        UpdateMetadata.validateDocker(version, "release");
-        assertThrows(IllegalArgumentException.class, () -> UpdateMetadata.validateDocker(version, "preview"));
-        version.setImages(java.util.List.of(version.getImages().get(0), version.getImages().get(0)));
-        assertThrows(IllegalArgumentException.class, () -> UpdateMetadata.validateDocker(version, "release"));
-    }
 }

@@ -11,9 +11,6 @@ import com.zrlog.common.updater.UpdateVersionHandler;
 import com.zrlog.business.updater.UpdateVersionInfoPlugin;
 import com.zrlog.common.updater.UpgradeProgressListener;
 import com.zrlog.common.Updater;
-import com.zrlog.common.updater.handle.FaasUpdateVersionHandler;
-import com.zrlog.common.updater.handle.WarUpdateVersionHandle;
-import com.zrlog.common.updater.handle.ZipUpdateVersionHandle;
 import com.zrlog.common.vo.Version;
 import com.zrlog.util.BlogBuildInfoUtil;
 import org.junit.Test;
@@ -217,22 +214,6 @@ public class UpgradeServicePublicFlowTest {
         } finally {
             server.stop(0);
         }
-    }
-
-    @Test
-    public void shouldCreateOnlineUpdateHandlerForCurrentRuntimeMode() throws Exception {
-        File packageFile = File.createTempFile("zrlog-upgrade-handler", ".zip");
-        Version version = futureVersion("99.0.3");
-
-        assertTrue(new TestableUpgradeService(false, false, false, true)
-                .newOnlineUpdateVersionHandler(version, packageFile, UpgradeProgressListener.NONE, backend())
-                instanceof ZipUpdateVersionHandle);
-        assertTrue(new TestableUpgradeService(false, false, false, true, true)
-                .newOnlineUpdateVersionHandler(version, packageFile, UpgradeProgressListener.NONE, backend())
-                instanceof WarUpdateVersionHandle);
-        assertTrue(new TestableUpgradeService(false, false, true, true)
-                .newOnlineUpdateVersionHandler(version, packageFile, UpgradeProgressListener.NONE, backend())
-                instanceof FaasUpdateVersionHandler);
     }
 
     @Test

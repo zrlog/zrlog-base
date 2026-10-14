@@ -76,9 +76,14 @@
     <dependencies>
         <!-- Implementation is supplied by the application; base uses it only in integration tests. -->
         <dependency>
-            <groupId>com.hibegin</groupId><artifactId>zrlog-updater-core</artifactId>
+            <groupId>com.hibegin</groupId><artifactId>zrlog-updater-zip</artifactId>
             <version>${zrlog-updater.version}</version><scope>test</scope>
         </dependency>
+        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-updater-native</artifactId><version>${zrlog-updater.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-updater-war</artifactId><version>${zrlog-updater.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-updater-faas</artifactId><version>${zrlog-updater.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-updater-docker</artifactId><version>${zrlog-updater.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-updater-deb</artifactId><version>${zrlog-updater.version}</version><scope>test</scope></dependency>
         <dependency>
             <groupId>com.hibegin</groupId>
             <artifactId>simplewebserver</artifactId>

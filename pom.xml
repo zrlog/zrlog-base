@@ -24,6 +24,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.test.skip>false</maven.test.skip>
         <sws.version>4.1.13</sws.version>
+        <zrlog-updater.version>1.0.0-SNAPSHOT</zrlog-updater.version>
         <zrlog-install-web.version>4.0.0-SNAPSHOT</zrlog-install-web.version>
         <h2.version>2.5.252</h2.version>
         <sqlite-jdbc.version>3.53.4.0</sqlite-jdbc.version>
@@ -73,6 +74,11 @@
     </issueManagement>
 
     <dependencies>
+        <!-- Implementation is supplied by the application; base uses it only in integration tests. -->
+        <dependency>
+            <groupId>com.hibegin</groupId><artifactId>zrlog-updater-core</artifactId>
+            <version>${zrlog-updater.version}</version><scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.hibegin</groupId>
             <artifactId>simplewebserver</artifactId>

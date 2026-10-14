@@ -89,6 +89,7 @@ public class UpgradeServicePublicFlowTest {
         FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(null);
         Map<String, Object> backend = new HashMap<>();
         backend.put("upgrade.result.noChange", "No change");
+        backend.put("upgrade.lambda.download", "download upgrade file");
 
         UpgradeProcessResponse response = new UpgradeService().doUpgrade(plugin, UpgradeProgressListener.NONE,
                 backend);
@@ -284,6 +285,7 @@ public class UpgradeServicePublicFlowTest {
 
     private static Map<String, Object> backend() {
         Map<String, Object> backend = new HashMap<>();
+        backend.put("upgrade.lambda.download", "download upgrade file");
         backend.put("upgrade.result.noChange", "No change");
         backend.put("upgrade.tips.docker", "Use docker image");
         backend.put("upgrade.tips.systemService", "/etc/init.d/zrlog upgrade");

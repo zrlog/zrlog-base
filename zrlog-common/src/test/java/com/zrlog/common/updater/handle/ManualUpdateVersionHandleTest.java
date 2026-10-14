@@ -77,26 +77,7 @@ public class ManualUpdateVersionHandleTest {
         assertEquals(UpgradeProgressEvent.STATUS_MANUAL, lastData.get().getStatus());
     }
 
-    @Test
-    public void shouldBuildS3UpdateShellWithExplicitBucket() throws Exception {
-        Method method = FaasUpdateVersionHandler.class.getDeclaredMethod(
-                "getS3UpdateShell", String.class, String.class, String.class);
-        method.setAccessible(true);
-
-        String shell = method.invoke(null,
-                "https://example.com/zrlog.zip", "zrlog-fn", "custom-bucket").toString();
-
-        assertTrue(shell.contains("export LAMBDA_S3_REPO_NAME=\"custom-bucket\""));
-        assertTrue(shell.contains("export AWS_LAMBDA_FUNCTION_NAME=\"zrlog-fn\""));
-        assertTrue(shell.contains("wget --user-agent"));
-        assertTrue(shell.contains("\"https://example.com/zrlog.zip\""));
-        assertTrue(shell.contains("aws s3 cp"));
-        assertTrue(shell.contains("aws lambda update-function-code"));
-        assertTrue(shell.contains("--s3-key zrlog-"));
-        assertTrue(shell.contains("-latest.zip"));
-    }
-
-    private static Map<String, Object> backend() {
+     private static Map<String, Object> backend() {
         Map<String, Object> backend = new HashMap<>();
         backend.put("upgrade.tips.docker", "Run sh upgrade.sh");
         backend.put("upgrade.tips.systemService", "Use /etc/init.d/zrlog upgrade");

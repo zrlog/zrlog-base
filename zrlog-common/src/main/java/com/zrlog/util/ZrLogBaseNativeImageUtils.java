@@ -14,7 +14,6 @@ import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.common.cache.vo.HotLogBasicInfoEntry;
 import com.zrlog.common.cache.vo.HotTypeLogInfo;
 import com.zrlog.common.updater.UpgradeProgressEvent;
-import com.zrlog.common.updater.aws.AwsLambdaUpdateCodeRequest;
 import com.zrlog.common.vo.*;
 import com.zrlog.common.json.JsonObjectMapAdapter;
 import org.apache.commons.dbutils.BasicRowProcessor;
@@ -93,7 +92,7 @@ public class ZrLogBaseNativeImageUtils {
                 HotLogBasicInfoEntry.class, PageData.class, HotTypeLogInfo.class,
                 Version.class, Archive.class, Outline.class,
                 PublicWebSiteInfo.class, UserBasicDTO.class, SocialPreviewDTO.class,
-                UpgradeProgressEvent.Data.class, AwsLambdaUpdateCodeRequest.class);
+                UpgradeProgressEvent.Data.class);
 
         //register version update
         for (int i = 1; i <= UpgradeVersionHandler.SQL_VERSION; i++) {

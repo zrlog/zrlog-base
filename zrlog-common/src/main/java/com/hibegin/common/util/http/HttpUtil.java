@@ -37,6 +37,20 @@ public class HttpUtil {
         return instance;
     }
 
+    /** Reuse the existing client for signed and service-to-service requests. Redirects remain disabled. */
+    public HttpResponse<String> sendRequest(HttpRequest request) throws IOException, InterruptedException {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(request.uri())
+                .method(request.method(), request.bodyPublisher().orElse(HttpRequest.BodyPublishers.noBody()))
+                .expectContinue(request.expectContinue());
+        request.timeout().ifPresent(builder::timeout);
+        request.version().ifPresent(builder::version);
+        request.headers().map().forEach((name, values) -> {
+            if (!"User-Agent".equalsIgnoreCase(name)) values.forEach(value -> builder.header(name, value));
+        });
+        HttpRequest adapted = builder.setHeader("User-Agent", getUserAgent()).build();
+        return httpClient.send(adapted, HttpResponse.BodyHandlers.ofString());
+    }
+
     public static String buildUserAgent(String appName, String appVersion, String buildId) {
         String osName = System.getProperty("os.name", "UnknownOS").replaceAll("\\s+", "");
         String osArch = System.getProperty("os.arch", "UnknownArch").replaceAll("\\s+", "");

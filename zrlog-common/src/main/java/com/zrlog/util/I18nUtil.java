@@ -42,6 +42,11 @@ public class I18nUtil {
         loadI18N(I18nUtil.class.getResourceAsStream("/i18n/blog_zh_CN.properties"), "blog_zh_CN.properties", I18N_BLOG_KEY);
         loadI18N(I18nUtil.class.getResourceAsStream("/i18n/backend_en_US.properties"), "backend_en_US.properties", I18N_BACKEND_KEY);
         loadI18N(I18nUtil.class.getResourceAsStream("/i18n/backend_zh_CN.properties"), "backend_zh_CN.properties", I18N_BACKEND_KEY);
+        for (String locale : java.util.List.of("en_US", "zh_CN")) {
+            for (String resource : com.zrlog.updater.spi.UpdateProviders.messageResources(locale)) {
+                loadI18N(I18nUtil.class.getResourceAsStream(resource), "backend_" + locale + ".properties", I18N_BACKEND_KEY);
+            }
+        }
     }
 
     public static I18nVO getI18nVOCache() {

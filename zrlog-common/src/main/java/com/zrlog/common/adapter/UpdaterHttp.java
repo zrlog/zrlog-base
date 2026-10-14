@@ -1,4 +1,4 @@
-package com.zrlog.common.updater;
+package com.zrlog.common.adapter;
 
 import com.hibegin.common.util.http.HttpUtil;
 import com.hibegin.common.util.http.handle.HttpFileHandle;
@@ -15,7 +15,7 @@ import java.net.http.HttpResponse;
 import java.util.Map;
 
 /** Supplies the application's existing HTTP client and user agent to updater modules. */
-public final class UpdaterHttp implements UpdateHttp {
+final class UpdaterHttp implements UpdateHttp {
     public static final UpdaterHttp INSTANCE = new UpdaterHttp();
     private UpdaterHttp() { }
 

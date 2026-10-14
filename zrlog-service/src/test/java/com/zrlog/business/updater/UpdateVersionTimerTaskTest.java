@@ -1,6 +1,8 @@
-package com.zrlog.common.updater;
+package com.zrlog.business.updater;
 
 import com.zrlog.common.vo.Version;
+import com.zrlog.common.updater.UpdateChannel;
+import com.zrlog.common.updater.UpdateVersionCheckResult;
 import org.junit.Test;
 
 import java.util.Date;

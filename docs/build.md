@@ -18,6 +18,10 @@ Maven 3.10 起会校验发布凭证适用的仓库 origin（协议、主机和�
 
 `v*` tag 使用不带 `snapshot` profile 的 `clean deploy`，保留 Javadoc、源码、GPG 签名和 Central Publishing bundle 流程。仅 tag 构建导入 GPG 私钥。`main` 分支仍只在测试和部署成功后通知预览构建。
 
+Central Publishing 使用 0.12.0，生成 bundle 前会清理新版 Maven 写入 staging 的 `maven-metadata-local.xml`、`_remote.repositories` 和 `.locks`。旧插件会把这些本地仓库文件混入正式包，导致 Central 报 `Bundle has content that does NOT have a .pom file`，即使各版本目录内已有正确 POM。
+
+PR 和 main 通过 `python3 scripts/check-release-bundle.py` 检查完整 reactor：复制源码到临时目录、转换为专用检查版号，再使用 `-DskipUpload=true` 执行真实 deploy 流程。检查七个坐标的 POM、模块 JAR、源码、Javadoc 内容和校验和，拒绝本地 metadata 混入。此检查使用空 settings、不读取发布凭证、不签名、不上传，且不修改工作区 POM；正式 tag 构建仍执行 GPG 签名和 Central 发布。
+
 ## 本地部署验证
 
 使用临时文件仓库检查实际发布内容，无需发布凭证：

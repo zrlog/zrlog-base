@@ -30,6 +30,9 @@ jobs:
       - name: Run tests and generate coverage
         run: ./mvnw -q org.jacoco:jacoco-maven-plugin:0.8.15:prepare-agent test org.jacoco:jacoco-maven-plugin:0.8.15:report
 
+      - name: Build release Javadocs
+        run: ./mvnw -B -ntp -DskipTests package javadoc:jar
+
       - name: Summarize JaCoCo coverage
         shell: bash
         run: |

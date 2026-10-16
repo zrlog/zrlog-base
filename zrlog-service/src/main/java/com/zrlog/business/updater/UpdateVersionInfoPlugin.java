@@ -138,15 +138,20 @@ public class UpdateVersionInfoPlugin implements IPlugin {
     }
 
     /**
-     * 获取最新的版本信息。
+     * 查询最近一次版本检查是否失败。
      *
-     * @param fetch 是否发起新的请求
-     * @return 版本信息
+     * @return 最近一次版本检查是否失败
      */
     public boolean isLastCheckFailed() {
         return updateVersionTimerTask != null && updateVersionTimerTask.isLastCheckFailed();
     }
 
+    /**
+     * 获取最新的版本信息。
+     *
+     * @param fetch 是否发起新的请求
+     * @return 版本信息
+     */
     public Version getLastVersion(boolean fetch) {
         if (updateVersionTimerTask == null) {
             UpgradeWebSiteInfo upgradeWebSiteInfo = new WebsiteKvService().upgradeWebSiteInfo();

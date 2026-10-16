@@ -2,6 +2,8 @@
 
 日常验证使用 `./mvnw test`；构建多版本 JAR 需要 JDK 21 或更新版本，CI 使用 JDK 21。需要供下游验证时运行 `./mvnw install`。
 
+PR 和 main 的覆盖率工作流在测试后执行 `./mvnw -B -ntp -DskipTests package javadoc:jar`，提前验证正式发布所需的 Javadoc 附件。该检查不执行 deploy，不导入发布凭证。
+
 ## 开发快照
 
 `main` 的发布工作流使用 `./mvnw -B -ntp -U -Psnapshot clean deploy`，执行完整测试后发布 7 个 Maven 坐标。`-U` 保留，用于刷新安装工程等上游快照。

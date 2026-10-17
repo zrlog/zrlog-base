@@ -122,6 +122,7 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
         if (EnvKit.isNativeImage()) {
             args.add("-XX:MaxHeapSize=" + nativeMaxHeapSize());
             args.add("-XX:+ExitOnOutOfMemoryError");
+            args.addAll(com.zrlog.util.NetworkProxy.initialize().launchArguments());
         } else {
             args.addAll(jvmLaunchArguments(pluginCoreFile, dbProperties, pluginJvmArgs));
         }
@@ -163,6 +164,7 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
     static List<String> jvmLaunchArguments(File pluginCoreFile, String dbProperties, String pluginJvmArgs,
                                            int runtimeFeatureVersion) {
         List<String> args = new ArrayList<>(Arrays.asList(pluginJvmArgs.split(" ")));
+        args.addAll(com.zrlog.util.NetworkProxy.initialize().launchArguments());
         if (runtimeFeatureVersion >= 22 && !args.contains(ENABLE_NATIVE_ACCESS_ARGUMENT)) {
             args.add(ENABLE_NATIVE_ACCESS_ARGUMENT);
         }

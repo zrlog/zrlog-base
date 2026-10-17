@@ -30,6 +30,7 @@ public class HttpUtil {
     private final ExecutorService executorService = ThreadUtils.newFixedThreadPool(20);
 
     private HttpUtil() {
+        com.zrlog.util.NetworkProxy.initialize();
         this.httpClient = HttpClient.newBuilder().executor(executorService).build();
     }
 

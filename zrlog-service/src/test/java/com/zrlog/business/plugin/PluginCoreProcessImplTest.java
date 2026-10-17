@@ -9,6 +9,7 @@ import com.zrlog.common.ZrLogConfig;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.util.BlogBuildInfoUtil;
+import com.zrlog.util.NetworkProxy;
 import org.graalvm.nativeimage.ImageInfo;
 import org.junit.Test;
 
@@ -155,6 +156,54 @@ public class PluginCoreProcessImplTest {
             assertEquals(pluginCore.toString(), process.programName(pluginCore));
         } finally {
             ImageInfo.setInImageRuntimeCode(false);
+        }
+    }
+
+    @Test
+    public void activeProxyOptionsPrecedeJvmEntryPointAndNativePositionalArguments() throws Exception {
+        Path root = Files.createTempDirectory("zrlog-plugin-proxy");
+        String previousRoot = System.getProperty("sws.root.path");
+        Field effective = NetworkProxy.class.getDeclaredField("effective");
+        effective.setAccessible(true);
+        Object previousPolicy = effective.get(null);
+        ZrLogConfig previousConfig = Constants.zrLogConfig;
+        try {
+            System.setProperty("sws.root.path", root.toString());
+            NetworkProxy.Settings active = NetworkProxy.preview("http://proxy.example:3128", ".internal.example");
+            effective.set(null, active);
+            NetworkProxy.save("http://pending.example:8080", "");
+            Path sqlite = root.resolve("sqlite.properties");
+            Files.writeString(sqlite, "jdbcUrl=jdbc:sqlite:/tmp/zrlog-proxy-test.db\n");
+            for (String database : List.of("webapi.properties", sqlite.toString())) {
+                List<String> args = PluginCoreProcessImpl.jvmLaunchArguments(new File("plugin-core.jar"), database, "-Xmx64m", 25);
+                int entryPoint = args.contains("-jar") ? args.indexOf("-jar") : args.indexOf("-cp");
+                assertTrue(args.indexOf("-Dhttps.proxyHost=proxy.example") < entryPoint);
+                assertTrue(args.contains("-Dhttp.proxyPort=3128"));
+                assertFalse(args.toString().contains("pending.example"));
+                assertEquals("-Xmx64m", args.get(0));
+            }
+            Path argsFile = root.resolve("args.txt");
+            Path nativeProgram = root.resolve("conf/plugins/plugin-core-test.bin");
+            Files.createDirectories(nativeProgram.getParent());
+            Files.writeString(nativeProgram, "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsFile + "\n");
+            assertTrue(nativeProgram.toFile().setExecutable(true));
+            Constants.zrLogConfig = new TestZrLogConfig();
+            ImageInfo.setInImageRuntimeCode(true);
+            Process process = new PluginCoreProcessImpl(null, "/blog").startPluginCore(nativeProgram.toFile(),
+                    "db=ok", "-Xmx64m", root.toString(), "4.0.1", "test-token", 21000, 41000, 51000);
+            assertNotNull(process);
+            assertTrue(process.waitFor(5, TimeUnit.SECONDS));
+            assertEquals(0, process.exitValue());
+            List<String> args = Files.readAllLines(argsFile);
+            assertTrue(args.indexOf("-Dhttps.proxyHost=proxy.example") < args.indexOf("21000"));
+            assertTrue(args.contains("-Dhttp.proxyPort=3128"));
+            assertFalse(args.toString().contains("pending.example"));
+        } finally {
+            ImageInfo.setInImageRuntimeCode(false);
+            Constants.zrLogConfig = previousConfig;
+            effective.set(null, previousPolicy);
+            restoreProperty("sws.root.path", previousRoot);
+            delete(root);
         }
     }
 

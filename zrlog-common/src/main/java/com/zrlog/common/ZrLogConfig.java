@@ -56,6 +56,7 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
     }
 
     protected ZrLogConfig(Integer port, Updater updater, String contextPath) {
+        NetworkProxy.initialize();
         this.createdDate = ManagementFactory.getRuntimeMXBean().getStartTime();
         this.plugins = new Plugins();
         this.webSetups = new ArrayList<>();

@@ -5,6 +5,8 @@ import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
 import com.zrlog.common.Constants;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 /**
@@ -25,7 +27,7 @@ public class InstallStatusInterceptor implements HandleAbleInterceptor {
 
     @Override
     public boolean doInterceptor(HttpRequest request, HttpResponse response) {
-        String target = request.getUri();
+        String target = URLEncoder.encode(request.getUri(), StandardCharsets.UTF_8);
         if (!Constants.zrLogConfig.isInstalled()) {
             response.redirect("/install?ref=" + target);
             return false;

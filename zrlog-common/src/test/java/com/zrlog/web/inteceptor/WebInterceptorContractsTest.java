@@ -17,12 +17,16 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.lang.reflect.Proxy;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class WebInterceptorContractsTest {
@@ -57,17 +61,35 @@ public class WebInterceptorContractsTest {
         withConfig(false, false, () -> {
             ResponseRecorder recorder = new ResponseRecorder();
             assertFalse(interceptor.doInterceptor(request("/admin/index"), recorder.response()));
-            assertEquals("/install?ref=/admin/index", recorder.redirect);
+            assertEquals("/install?ref=%2Fadmin%2Findex", recorder.redirect);
         });
 
         withConfig(true, true, () -> {
             ResponseRecorder recorder = new ResponseRecorder();
             assertFalse(interceptor.doInterceptor(request("/admin/index"), recorder.response()));
-            assertEquals("/install?ref=/admin/index&missingConfig=true", recorder.redirect);
+            assertEquals("/install?ref=%2Fadmin%2Findex&missingConfig=true", recorder.redirect);
         });
 
         withConfig(true, false, () -> assertTrue(
                 interceptor.doInterceptor(request("/admin/index"), new ResponseRecorder().response())));
+    }
+
+    @Test
+    public void shouldKeepTheOriginalPathInsideTheInstallRefParameter() throws Exception {
+        String path = "/文章/50% &next=1#内容";
+        for (boolean missingConfig : new boolean[]{false, true}) {
+            withConfig(missingConfig, missingConfig, () -> {
+                ResponseRecorder recorder = new ResponseRecorder();
+                assertFalse(new InstallStatusInterceptor().doInterceptor(request(path), recorder.response()));
+                URI target = URI.create(recorder.redirect);
+                assertEquals("/install", target.getPath());
+                assertNull(target.getRawFragment());
+                String[] parameters = target.getRawQuery().split("&");
+                assertEquals(missingConfig ? 2 : 1, parameters.length);
+                assertEquals(path, URLDecoder.decode(parameters[0].substring("ref=".length()), StandardCharsets.UTF_8));
+                if (missingConfig) assertEquals("missingConfig=true", parameters[1]);
+            });
+        }
     }
 
     @Test

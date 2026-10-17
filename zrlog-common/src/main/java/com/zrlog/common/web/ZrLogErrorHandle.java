@@ -71,11 +71,16 @@ public class ZrLogErrorHandle implements HttpErrorHandle {
         }
         if (request.getUri().startsWith(Constants.ADMIN_URI_BASE_PATH)) {
             String message = URLEncoder.encode(getResponseMessage(e), StandardCharsets.UTF_8);
+            String destination;
             if (e instanceof NotFindResourceException || e instanceof NotFindDbEntryException) {
-                response.redirect(Constants.ADMIN_URI_BASE_PATH + "/404?queryString=" + request.getQueryStr() + "&uriPath=" + request.getUri() + "&message=" + message);
-                return;
+                destination = Constants.ADMIN_URI_BASE_PATH + "/404?queryString="
+                        + URLEncoder.encode(Objects.requireNonNullElse(request.getQueryStr(), ""), StandardCharsets.UTF_8)
+                        + "&uriPath=" + URLEncoder.encode(request.getUri(), StandardCharsets.UTF_8)
+                        + "&message=" + message;
+            } else {
+                destination = Constants.ADMIN_URI_BASE_PATH + "/500?message=" + message;
             }
-            response.redirect(Constants.ADMIN_URI_BASE_PATH + "/500?message=" + message);
+            response.redirect(destination);
             return;
         }
         InputStream errorInputStream = getErrorInputStream(e, httpStatueCode);

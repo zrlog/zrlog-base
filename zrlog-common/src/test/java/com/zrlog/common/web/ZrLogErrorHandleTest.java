@@ -1,8 +1,13 @@
 package com.zrlog.common.web;
 
+import com.hibegin.http.HttpMethod;
+import com.hibegin.http.HttpVersion;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
+import com.hibegin.http.server.config.ResponseConfig;
+import com.hibegin.http.server.config.ServerConfig;
 import com.hibegin.http.server.execption.NotFindResourceException;
+import com.hibegin.http.server.impl.SimpleHttpResponse;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.common.exception.AbstractBusinessException;
 import com.zrlog.common.exception.MissingRequestBodyException;
@@ -16,8 +21,10 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.lang.reflect.Proxy;
+import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -139,7 +146,7 @@ public class ZrLogErrorHandleTest {
         ResponseRecorder notFound = new ResponseRecorder();
         new ZrLogErrorHandle(404).doHandle(request("/admin/missing", "q=zrlog"), notFound.response(),
                 new NotFindResourceException("missing"));
-        assertTrue(notFound.redirect.startsWith("/admin/404?queryString=q=zrlog&uriPath=/admin/missing"));
+        assertTrue(notFound.redirect.startsWith("/admin/404?queryString=q%3Dzrlog&uriPath=%2Fadmin%2Fmissing"));
         assertTrue(notFound.redirect.endsWith("&message=" + URLEncoder.encode(
                 I18nUtil.getBackendStringFromRes("request.error.notFound"), StandardCharsets.UTF_8)));
 
@@ -166,6 +173,54 @@ public class ZrLogErrorHandleTest {
         assertFalse(recorder.redirect.contains("&next="));
         assertFalse(recorder.redirect.contains("#section"));
         assertEquals(message, URLDecoder.decode(recorder.redirect.substring(prefix.length()), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void shouldEncodeAdminErrorMessagesOnceInTheActualLocationHeader() {
+        for (String locale : new String[]{"zh_CN", "en_US"}) {
+            useLocale(locale);
+            for (String contextPath : new String[]{"", "/", "/blog"}) {
+                for (String detail : new String[]{null, "输入无效 &next=/example?value=1#section + 50% 😀\r\nLocation: /else"}) {
+                    Throwable failure = detail == null ? new IllegalStateException("private-details") : new TestBusinessException() {
+                        @Override public String getMessage() { return detail; }
+                    };
+                    HttpRequest request = request("/admin/system/proxy", "", contextPath);
+                    ByteArrayOutputStream wire = new ByteArrayOutputStream();
+                    HttpResponse response = response(request, wire);
+                    new ZrLogErrorHandle(500).doHandle(request, response, failure);
+                    String location = response.getHeader().get("Location");
+                    URI target = URI.create(location);
+                    assertEquals(("/".equals(contextPath) ? "" : contextPath) + "/admin/500", target.getPath());
+                    assertNull(target.getRawFragment());
+                    assertEquals(1, target.getRawQuery().split("&").length);
+                    assertEquals(detail == null ? I18nUtil.getBackendStringFromRes("unknownError") : detail,
+                            URLDecoder.decode(target.getRawQuery().substring("message=".length()), StandardCharsets.UTF_8));
+                    assertTrue(wire.toString(StandardCharsets.UTF_8).startsWith("HTTP/1.1 302 "));
+                    assertTrue(wire.toString(StandardCharsets.UTF_8).contains("\r\nLocation: " + location + "\r\n"));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void shouldKeepMissingPageDetailsInsideTheirOwnRedirectParameters() {
+        String query = "q=中文&message=custom%20text&next=/example?x=1#fragment";
+        String path = "/admin/缺失页面";
+        ByteArrayOutputStream wire = new ByteArrayOutputStream();
+        HttpResponse response = response(request(path, query, "/blog"), wire);
+        new ZrLogErrorHandle(404).doHandle(request(path, query, "/blog"), response,
+                new NotFindResourceException("private-path"));
+        URI target = URI.create(response.getHeader().get("Location"));
+        Map<String, String> parameters = new HashMap<>();
+        for (String parameter : target.getRawQuery().split("&")) {
+            String[] parts = parameter.split("=", 2);
+            parameters.put(parts[0], URLDecoder.decode(parts[1], StandardCharsets.UTF_8));
+        }
+        assertEquals("/blog/admin/404", target.getPath());
+        assertNull(target.getRawFragment());
+        assertEquals(Map.of("queryString", query, "uriPath", path,
+                "message", I18nUtil.getBackendStringFromRes("request.error.notFound")), parameters);
+        assertTrue(wire.toString(StandardCharsets.UTF_8).startsWith("HTTP/1.1 302 "));
     }
 
     @Test
@@ -258,6 +313,20 @@ public class ZrLogErrorHandleTest {
     }
 
     private static HttpRequest request(String uri, String query) {
+        return request(uri, query, "");
+    }
+
+    private static HttpResponse response(HttpRequest request, ByteArrayOutputStream wire) {
+        return new SimpleHttpResponse(request, new ResponseConfig()) {
+            @Override
+            protected void send(byte[] bytes, boolean body, boolean close) {
+                wire.write(bytes, 0, bytes.length);
+            }
+        };
+    }
+
+    private static HttpRequest request(String uri, String query, String contextPath) {
+        ServerConfig serverConfig = new ServerConfig();
         return (HttpRequest) Proxy.newProxyInstance(
                 ZrLogErrorHandleTest.class.getClassLoader(),
                 new Class[]{HttpRequest.class},
@@ -268,6 +337,10 @@ public class ZrLogErrorHandleTest {
                     if ("getQueryStr".equals(method.getName())) {
                         return query;
                     }
+                    if ("getContextPath".equals(method.getName())) return contextPath;
+                    if ("getServerConfig".equals(method.getName())) return serverConfig;
+                    if ("getHttpVersion".equals(method.getName())) return HttpVersion.HTTP_1_1;
+                    if ("getMethod".equals(method.getName())) return HttpMethod.GET;
                     if ("toString".equals(method.getName())) {
                         return "HttpRequestProxy";
                     }

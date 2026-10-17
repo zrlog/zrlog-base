@@ -46,3 +46,4 @@ bootstrap
 conf/*.sql
 conf/sqlite-db.properties
 .codex-write-check
+/.codex/

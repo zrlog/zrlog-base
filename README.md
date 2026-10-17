@@ -1,13 +1,14 @@
 # ZrLog-Base
 
-`zrlog-base` 是 ZrLog 多仓库体系里的共享基础库，提供通用响应结构、异常、工具、数据模型、公共服务、模板对象、插件宿主侧协议和后台 token 基础能力。
-
-面向 AI Agent 和跨仓库开发的入口见 [AGENTS.md](AGENTS.md)。修改 public API、DTO、model、插件宿主协议或 native/Gson 注册时，先确认下游消费者，再运行对应验证。
+`zrlog-base` 是 ZrLog 的共享基础库，提供通用响应、异常、工具、数据模型、公共服务、模板对象、插件宿主接口和后台 token 能力。
 
 ## 模块
 
-- data
-- service
-- common
-- admin-token
-- template
+- `zrlog-common`：通用能力与宿主适配。
+- `zrlog-data`：数据模型、服务和缓存。
+- `zrlog-service`：公共业务服务。
+- `zrlog-template`：模板对象与辅助能力。
+- `zrlog-admin-token`：后台 token 服务。
+- `zrlog-test-support`：测试隔离工具，仅以 test scope 使用。
+
+[CLI 调用来源](docs/user-agent.md)介绍 HTTP User-Agent 的接入格式。仓库职责和最小验证命令见 [AGENTS.md](AGENTS.md)。

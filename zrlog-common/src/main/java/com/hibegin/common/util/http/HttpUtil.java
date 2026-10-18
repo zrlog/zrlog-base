@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 public class HttpUtil {
     private static final Logger LOGGER = LoggerUtil.getLogger(HttpUtil.class);
     private final HttpClient httpClient;
+    private HttpClient directHttpClient;
 
     private static final HttpUtil instance = new HttpUtil();
     private final ExecutorService executorService = ThreadUtils.newFixedThreadPool(20);
@@ -40,6 +41,23 @@ public class HttpUtil {
 
     /** Reuse the existing client for signed and service-to-service requests. Redirects remain disabled. */
     public HttpResponse<String> sendRequest(HttpRequest request) throws IOException, InterruptedException {
+        return sendRequest(request, httpClient);
+    }
+
+    /** Deployment-internal control requests bypass application and JVM proxies. */
+    public HttpResponse<String> sendDirectRequest(HttpRequest request) throws IOException, InterruptedException {
+        return sendRequest(request, directHttpClient());
+    }
+
+    private synchronized HttpClient directHttpClient() {
+        if (directHttpClient == null) {
+            directHttpClient = HttpClient.newBuilder().executor(executorService)
+                    .proxy(HttpClient.Builder.NO_PROXY).followRedirects(HttpClient.Redirect.NEVER).build();
+        }
+        return directHttpClient;
+    }
+
+    private HttpResponse<String> sendRequest(HttpRequest request, HttpClient client) throws IOException, InterruptedException {
         HttpRequest.Builder builder = HttpRequest.newBuilder(request.uri())
                 .method(request.method(), request.bodyPublisher().orElse(HttpRequest.BodyPublishers.noBody()))
                 .expectContinue(request.expectContinue());
@@ -49,7 +67,7 @@ public class HttpUtil {
             if (!"User-Agent".equalsIgnoreCase(name)) values.forEach(value -> builder.header(name, value));
         });
         HttpRequest adapted = builder.setHeader("User-Agent", getUserAgent()).build();
-        return httpClient.send(adapted, HttpResponse.BodyHandlers.ofString());
+        return client.send(adapted, HttpResponse.BodyHandlers.ofString());
     }
 
     public static String buildUserAgent(String appName, String appVersion, String buildId) {

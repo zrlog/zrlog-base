@@ -18,16 +18,15 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.common.vo.Version;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
-import org.junit.After;
-import org.junit.Test;
-
-import java.lang.reflect.Proxy;
+import com.zrlog.web.WebSiteInfoProvider;
 import java.lang.reflect.Field;
+import java.lang.reflect.Proxy;
 import java.sql.SQLException;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-
+import org.junit.After;
+import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -244,6 +243,16 @@ public class ServiceWebAndNoticeTest {
     }
 
     private static class TestZrLogConfig extends ZrLogConfig {
+        private CacheService cacheService;
+
+        @Override
+        public <T> T getWebSetup(Class<T> capability) {
+            if (capability == WebSiteInfoProvider.class) {
+                return capability.cast((WebSiteInfoProvider) cacheService::getPublicWebSiteInfo);
+            }
+            return super.getWebSetup(capability);
+        }
+
 
         private final boolean installed;
 

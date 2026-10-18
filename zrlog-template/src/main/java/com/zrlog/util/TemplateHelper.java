@@ -5,7 +5,6 @@ import com.hibegin.http.server.web.cookie.Cookie;
 import com.zrlog.blog.web.plugin.TemplateDownloadPlugin;
 import com.zrlog.business.service.TemplateInfoHelper;
 import com.zrlog.common.Constants;
-
 import java.util.Objects;
 
 public class TemplateHelper {
@@ -29,7 +28,7 @@ public class TemplateHelper {
     public static String getTemplatePath(HttpRequest request) {
         String templatePath = TemplateHelper.getTemplatePathByCookie(request.getCookies());
         if (Objects.isNull(templatePath)) {
-            templatePath = Constants.zrLogConfig.getCacheService().getPublicWebSiteInfo().getTemplate();
+            templatePath = Constants.getPublicWebSiteInfo().getTemplate();
         }
         TemplateDownloadPlugin templateDownloadPlugin = Constants.zrLogConfig.getPlugin(TemplateDownloadPlugin.class);
         if (Objects.nonNull(templateDownloadPlugin)) {
@@ -40,6 +39,5 @@ public class TemplateHelper {
         }
         return templatePath;
     }
-
 
 }

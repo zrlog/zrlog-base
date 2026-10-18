@@ -7,7 +7,6 @@ import com.zrlog.business.service.TemplateInfoHelper;
 import com.zrlog.business.template.util.TemplateDownloadUtils;
 import com.zrlog.common.Constants;
 import com.zrlog.plugin.IPlugin;
-
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.logging.Logger;
@@ -24,7 +23,7 @@ public class TemplateDownloadPlugin extends BaseLockObject implements IPlugin {
             return true;
         }
         started = true;
-        precheckTemplate(Constants.zrLogConfig.getCacheService().getPublicWebSiteInfo().getTemplate());
+        precheckTemplate(Constants.getPublicWebSiteInfo().getTemplate());
         return true;
     }
 

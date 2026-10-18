@@ -6,13 +6,11 @@ import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.data.cache.CacheServiceImpl;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
+import java.util.List;
+import java.util.Map;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-
-import java.util.List;
-import java.util.Map;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -61,7 +59,7 @@ public class BaseDataDbServiceDatabaseTest {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
 
-            CacheServiceImpl cacheService = new CacheServiceImpl();
+            CacheServiceImpl cacheService = new CacheServiceImpl(() -> true);
             BaseDataInitVO init = cacheService.getInitData();
             Long firstVersion = init.getVersion();
             BaseDataInitVO refreshed = cacheService.refreshInitData();

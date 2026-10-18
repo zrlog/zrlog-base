@@ -2,19 +2,18 @@ package com.zrlog.business.service;
 
 import com.sun.net.httpserver.HttpServer;
 import com.zrlog.business.exception.DownloadUpgradeFileException;
-import com.zrlog.business.rest.response.CheckVersionResponse;
 import com.zrlog.business.rest.response.BackupProtectionStatus;
+import com.zrlog.business.rest.response.CheckVersionResponse;
 import com.zrlog.business.rest.response.PreCheckVersionResponse;
 import com.zrlog.business.rest.response.UpgradeProcessResponse;
-import com.zrlog.common.updater.UpgradeProgressEvent;
-import com.zrlog.common.updater.UpdateVersionHandler;
 import com.zrlog.business.updater.UpdateVersionInfoPlugin;
-import com.zrlog.common.updater.UpgradeProgressListener;
 import com.zrlog.common.Updater;
+import com.zrlog.common.UpdaterTypeEnum;
+import com.zrlog.common.updater.UpdateVersionHandler;
+import com.zrlog.common.updater.UpgradeProgressEvent;
+import com.zrlog.common.updater.UpgradeProgressListener;
 import com.zrlog.common.vo.Version;
 import com.zrlog.util.BlogBuildInfoUtil;
-import org.junit.Test;
-
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -23,7 +22,9 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -32,6 +33,9 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 public class UpgradeServicePublicFlowTest {
+
+    @Rule
+    public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     @Test
     public void shouldReturnNoUpgradeWhenPluginIsMissing() {
@@ -187,11 +191,13 @@ public class UpgradeServicePublicFlowTest {
         }
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void shouldUseWarPackageMetadataWhenRunningInWarMode() throws Exception {
         byte[] packageBytes = "war-bytes".getBytes(StandardCharsets.UTF_8);
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        java.util.concurrent.atomic.AtomicBoolean warRequested = new java.util.concurrent.atomic.AtomicBoolean();
         server.createContext("/zrlog.war", exchange -> {
+            warRequested.set(true);
             exchange.sendResponseHeaders(200, packageBytes.length);
             exchange.getResponseBody().write(packageBytes);
             exchange.close();
@@ -203,14 +209,20 @@ public class UpgradeServicePublicFlowTest {
             version.setWarDownloadUrl("http://127.0.0.1:" + server.getAddress().getPort() + "/zrlog.war");
             version.setWarFileSize(packageBytes.length);
             version.setWarMd5sum("bad-md5");
-            FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(version);
+            File updateTemp = temporaryFolder.newFolder("war-download");
+            Updater updater = new Updater() {
+                @Override public void restartProcessAsync(Version ignored) { }
+                @Override public File getUpdateTempPath() { return updateTemp; }
+                @Override public String getUnzipPath() { return updateTemp.getAbsolutePath(); }
+                @Override public File execFile() { return null; }
+                @Override public UpdaterTypeEnum getType() { return UpdaterTypeEnum.WAR; }
+            };
 
             assertThrows(DownloadUpgradeFileException.class, () ->
                     new TestableUpgradeService(false, false, false, true, true)
-                            .doUpgrade(plugin, UpgradeProgressListener.NONE, backend()));
+                            .doUpgrade(version, updater, UpgradeProgressListener.NONE, backend()));
 
-            assertEquals(1, plugin.fetchTrueCount);
-            assertEquals(1, plugin.fetchFalseCount);
+            assertTrue(warRequested.get());
         } finally {
             server.stop(0);
         }

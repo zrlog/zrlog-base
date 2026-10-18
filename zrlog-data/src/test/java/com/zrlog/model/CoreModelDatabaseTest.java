@@ -1,11 +1,11 @@
 package com.zrlog.model;
 
+import com.hibegin.common.dao.DataSourceWrapper;
+import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.hibegin.common.dao.dto.Direction;
 import com.hibegin.common.dao.dto.OrderBy;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequestImpl;
-import com.hibegin.common.dao.DataSourceWrapper;
-import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
@@ -22,15 +22,11 @@ import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
 import com.zrlog.data.dto.CommentDTO;
 import com.zrlog.data.dto.VisitorCommentDTO;
-import com.zrlog.test.support.ZrLogTestDatabase;
-import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import sun.misc.Unsafe;
-
+import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
+import com.zrlog.web.WebSiteInfoProvider;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
@@ -40,7 +36,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import sun.misc.Unsafe;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -349,9 +348,7 @@ public class CoreModelDatabaseTest {
 
     private static ZrLogConfig testConfig(boolean disableComment) throws Exception {
         TestZrLogConfig config = allocate(TestZrLogConfig.class);
-        Field cacheServiceField = ZrLogConfig.class.getDeclaredField("cacheService");
-        cacheServiceField.setAccessible(true);
-        cacheServiceField.set(config, new TestCacheService(disableComment));
+        config.cacheService = new TestCacheService(disableComment);
         return config;
     }
 
@@ -363,6 +360,16 @@ public class CoreModelDatabaseTest {
     }
 
     private static class TestZrLogConfig extends ZrLogConfig {
+        private CacheService cacheService;
+
+        @Override
+        public <T> T getWebSetup(Class<T> capability) {
+            if (capability == WebSiteInfoProvider.class) {
+                return capability.cast((WebSiteInfoProvider) cacheService::getPublicWebSiteInfo);
+            }
+            return super.getWebSetup(capability);
+        }
+
 
         private TestZrLogConfig() {
             super(0, null, "");

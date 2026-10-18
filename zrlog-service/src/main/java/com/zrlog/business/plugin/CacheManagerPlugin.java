@@ -2,12 +2,11 @@ package com.zrlog.business.plugin;
 
 import com.hibegin.common.util.EnvKit;
 import com.hibegin.common.util.StringUtils;
+import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
-import com.zrlog.common.ZrLogConfig;
 import com.zrlog.model.WebSite;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.util.ThreadUtils;
-
 import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -22,10 +21,10 @@ public class CacheManagerPlugin implements IPlugin {
 
     private boolean started = false;
 
-    private final ZrLogConfig zrLogConfig;
+    private final CacheService cacheService;
 
-    public CacheManagerPlugin(ZrLogConfig zrLogConfig) {
-        this.zrLogConfig = zrLogConfig;
+    public CacheManagerPlugin(CacheService cacheService) {
+        this.cacheService = cacheService;
     }
 
     @Override
@@ -41,7 +40,7 @@ public class CacheManagerPlugin implements IPlugin {
         scheduledThreadPoolExecutor = new ScheduledThreadPoolExecutor(1, ThreadUtils.getThreadFactory());
         scheduledThreadPoolExecutor.scheduleAtFixedRate(() -> {
             if (System.currentTimeMillis() - Constants.getLastAccessTime() > getInitDataMaxCacheTimeout()) {
-                zrLogConfig.getCacheService().refreshInitData();
+                cacheService.refreshInitData();
             }
         }, 0, getInitDataMaxCacheTimeout(), TimeUnit.SECONDS);
         this.started = true;

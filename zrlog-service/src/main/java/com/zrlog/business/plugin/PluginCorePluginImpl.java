@@ -2,7 +2,6 @@ package com.zrlog.business.plugin;
 
 import com.google.gson.Gson;
 import com.hibegin.common.BaseLockObject;
-import com.hibegin.common.util.*;
 import com.hibegin.common.util.http.HttpUtil;
 import com.hibegin.common.util.http.handle.CloseResponseHandle;
 import com.hibegin.common.util.http.handle.HttpHandle;
@@ -21,15 +20,16 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.plugin.PluginAdminAppearance;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.I18nUtil;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
-import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import com.hibegin.common.util.*;
+
+import java.util.*;
 
 public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePlugin {
 
@@ -67,7 +67,7 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
         map.put("IsLogin", (adminTokenVO != null) + "");
         map.put("Current-Locale", I18nUtil.getCurrentLocale());
         map.put("Blog-Version", BlogBuildInfoUtil.getVersion());
-        PublicWebSiteInfo publicWebSiteInfo = Constants.zrLogConfig.getCacheService().getPublicWebSiteInfo();
+        PublicWebSiteInfo publicWebSiteInfo = Constants.getPublicWebSiteInfo();
         PluginAdminAppearance appearance = new PluginAdminAppearance(publicWebSiteInfo.getAdmin_theme(),
                 Boolean.TRUE.equals(publicWebSiteInfo.getAdmin_darkMode()), publicWebSiteInfo.getAdmin_color_primary(),
                 Boolean.TRUE.equals(publicWebSiteInfo.getAdmin_compactMode()));
@@ -157,7 +157,6 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
         String serverBaseUrl = requirePluginServerBaseUrl();
         return HttpUtil.getInstance().sendPostRequest(serverBaseUrl + "/service", body, new HttpResponseJsonHandle<>(clazz), genHeaderMapByRequest(inputRequest, adminTokenVO)).getT();
     }
-
 
     @Override
     public boolean accessPlugin(String uri, HttpRequest request, HttpResponse response, AdminTokenVO adminTokenVO) throws IOException, URISyntaxException, InterruptedException {
@@ -279,7 +278,6 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
         refreshCacheWithRetry(EnvKit.isFaaSMode() ? Integer.MAX_VALUE : 5, cacheVersion);
         return true;
     }
-
 
     private void refreshCacheWithRetry(int retryCount, String cacheVersion) {
         try {

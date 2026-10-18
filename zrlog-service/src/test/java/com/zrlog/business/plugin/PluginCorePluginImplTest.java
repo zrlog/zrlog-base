@@ -7,6 +7,7 @@ import com.hibegin.http.HttpMethod;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
 import com.hibegin.http.server.config.ServerConfig;
+import com.sun.net.httpserver.HttpServer;
 import com.zrlog.business.rest.response.PluginCoreStatus;
 import com.zrlog.business.rest.response.PluginStatusResponse;
 import com.zrlog.common.CacheService;
@@ -15,22 +16,19 @@ import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
-import com.zrlog.plugin.PluginAdminAppearance;
 import com.zrlog.plugin.IPlugin;
+import com.zrlog.plugin.PluginAdminAppearance;
 import com.zrlog.plugin.Plugins;
-import org.junit.Test;
-import sun.misc.Unsafe;
-
-import com.sun.net.httpserver.HttpServer;
+import com.zrlog.web.WebSiteInfoProvider;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,7 +40,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
+import org.junit.Test;
+import sun.misc.Unsafe;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -710,9 +709,7 @@ public class PluginCorePluginImplTest {
 
     private static ZrLogConfig testConfig() throws Exception {
         TestZrLogConfig config = allocate(TestZrLogConfig.class);
-        Field cacheServiceField = TestZrLogConfig.class.getDeclaredField("cacheService");
-        cacheServiceField.setAccessible(true);
-        cacheServiceField.set(config, cacheService());
+        config.cacheService = cacheService();
         return config;
     }
 
@@ -755,7 +752,16 @@ public class PluginCorePluginImplTest {
         }
 
         @Override
-        public CacheService getCacheService() {
+        public <T> T getWebSetup(Class<T> capability) {
+            if (capability == WebSiteInfoProvider.class) {
+                CacheService cache = cacheForTest();
+                return cache == null ? null : capability.cast(
+                        (WebSiteInfoProvider) cache::getPublicWebSiteInfo);
+            }
+            return super.getWebSetup(capability);
+        }
+
+        private CacheService cacheForTest() {
             return cacheService;
         }
 

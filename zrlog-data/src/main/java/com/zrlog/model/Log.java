@@ -10,20 +10,19 @@ import com.hibegin.common.dao.dto.PageRequestImpl;
 import com.hibegin.common.util.BeanUtil;
 import com.hibegin.common.util.StringUtils;
 import com.zrlog.common.Constants;
-import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
+import com.zrlog.data.exception.DAOException;
 import com.zrlog.util.ParseUtil;
 import com.zrlog.util.ThreadUtils;
-
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.*;
 
 /**
  * 存放文章数据，对应数据的 log 表。
@@ -75,7 +74,7 @@ public class Log extends BasePageableDAO implements Serializable {
             return null;
         }
         try {
-            if (ResultValueConvertUtils.toBoolean(detail.getCanComment()) && !Constants.zrLogConfig.getCacheService().getPublicWebSiteInfo().getDisable_comment_status()) {
+            if (ResultValueConvertUtils.toBoolean(detail.getCanComment()) && !Constants.getPublicWebSiteInfo().getDisable_comment_status()) {
                 futures.add(CompletableFuture.runAsync(() -> {
                     try {
                         detail.setComments(new Comment().visitorFindAllByLogId(detail.getId().intValue()));
@@ -251,7 +250,6 @@ public class Log extends BasePageableDAO implements Serializable {
         sortKeyMap.put("lastUpdateDate", "l.last_update_date");
     }
 
-
     private static String getPageSort(PageRequest pageRequest) {
         List<OrderBy> orders = pageRequest.getSorts();
         if (orders == null || orders.isEmpty()) {
@@ -307,7 +305,6 @@ public class Log extends BasePageableDAO implements Serializable {
         }
         return archives;
     }
-
 
     public PageData<ArticleBasicDTO> findByTag(long page, long pageSize, String tag) {
         String sql =

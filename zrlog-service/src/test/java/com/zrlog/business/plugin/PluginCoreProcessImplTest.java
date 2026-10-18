@@ -1,7 +1,7 @@
 package com.zrlog.business.plugin;
 
-import com.hibegin.http.server.util.PathUtil;
 import com.hibegin.common.dao.DataSourceWrapper;
+import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
@@ -10,9 +10,7 @@ import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.NetworkProxy;
-import org.graalvm.nativeimage.ImageInfo;
-import org.junit.Test;
-
+import com.zrlog.web.WebSiteInfoProvider;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,7 +31,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
-
+import org.graalvm.nativeimage.ImageInfo;
+import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -1287,7 +1286,16 @@ public class PluginCoreProcessImplTest {
         }
 
         @Override
-        public CacheService getCacheService() {
+        public <T> T getWebSetup(Class<T> capability) {
+            if (capability == WebSiteInfoProvider.class) {
+                CacheService cache = cacheForTest();
+                return cache == null ? null : capability.cast(
+                        (WebSiteInfoProvider) cache::getPublicWebSiteInfo);
+            }
+            return super.getWebSetup(capability);
+        }
+
+        private CacheService cacheForTest() {
             return null;
         }
 

@@ -12,6 +12,7 @@ import com.zrlog.blog.web.template.vo.BasePageInfo;
 import com.zrlog.blog.web.template.vo.NotFindPageVO;
 import com.zrlog.blog.web.util.WebTools;
 import com.zrlog.business.plugin.StaticSitePlugin;
+import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
 import com.zrlog.common.cache.dto.LogNavDTO;
 import com.zrlog.common.cache.dto.TagDTO;
@@ -20,27 +21,25 @@ import com.zrlog.common.cache.vo.Archive;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.common.vo.I18nVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
+import com.zrlog.common.vo.SocialPreviewDTO;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
-import com.zrlog.common.vo.SocialPreviewDTO;
 import com.zrlog.data.util.ContentProtectorUtils;
 import com.zrlog.data.util.SocialPreviewUtils;
 import com.zrlog.plugin.BaseStaticSitePlugin;
 import com.zrlog.util.I18nUtil;
 import com.zrlog.util.TemplateHelper;
 import com.zrlog.util.ZrLogUtil;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.*;
 
 public class TemplateRenderUtils {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(TemplateHelper.class);
-
 
     /**
      * 转换导航条数据
@@ -68,9 +67,9 @@ public class TemplateRenderUtils {
         return url;
     }
 
-    private static BasePageInfo buildBasePageInfo(HttpRequest request) {
+    private static BasePageInfo buildBasePageInfo(HttpRequest request, CacheService cacheService) {
         ArticleDetailDTO log = (ArticleDetailDTO) request.getAttr().get("log");
-        BaseDataInitVO baseDataInitVO = BeanUtil.convert(Constants.zrLogConfig.getCacheService().getInitData(), BaseDataInitVO.class);
+        BaseDataInitVO baseDataInitVO = BeanUtil.convert(cacheService.getInitData(), BaseDataInitVO.class);
         if (Objects.nonNull(log)) {
             return new ArticleDetailPageVO(log, baseDataInitVO);
         }
@@ -81,16 +80,16 @@ public class TemplateRenderUtils {
         return new NotFindPageVO(baseDataInitVO);
     }
 
-    public static BasePageInfo fullTemplateInfo(HttpRequest request) {
+    public static BasePageInfo fullTemplateInfo(HttpRequest request, CacheService cacheService) {
         String templatePath = TemplateHelper.getTemplatePath(request);
         I18nVO i18nInfo = I18nUtil.addToRequestWithTemplatePath(templatePath, request);
-        BasePageInfo basePageInfo = buildBasePageInfo(request);
+        BasePageInfo basePageInfo = buildBasePageInfo(request, cacheService);
         basePageInfo.setTemplate(templatePath);
         basePageInfo.setLang(i18nInfo.getLang());
         basePageInfo.setLocal(i18nInfo.getLocale());
         Map<String, Object> res = i18nInfo.getBlog().get(i18nInfo.getLocale());
         if (Objects.nonNull(res)) {
-            res.putAll(Constants.zrLogConfig.getCacheService().getTemplateConfigMapWithCache(templatePath));
+            res.putAll(cacheService.getTemplateConfigMapWithCache(templatePath));
             basePageInfo.set_res(res);
         }
         fillInfo(request, basePageInfo);

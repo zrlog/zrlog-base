@@ -1,5 +1,6 @@
 package com.zrlog.web;
 
+import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.plugin.Plugins;
 
 /**
@@ -9,6 +10,10 @@ import com.zrlog.plugin.Plugins;
 public interface WebSetup {
 
     void setup();
+
+    /** Runs after all modules have registered and the database is available, including after installation. */
+    default void onDatabaseReady(DataSourceWrapper dataSource) throws Exception {
+    }
 
     default Plugins getPlugins() {
         return new Plugins();

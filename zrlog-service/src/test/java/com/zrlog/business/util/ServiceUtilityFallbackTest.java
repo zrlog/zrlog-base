@@ -1,14 +1,15 @@
 package com.zrlog.business.util;
 
 import com.hibegin.common.dao.DAO;
-import com.hibegin.common.dao.DatabaseConnectPoolInfo;
 import com.hibegin.common.dao.DataSourceWrapper;
+import com.hibegin.common.dao.DatabaseConnectPoolInfo;
 import com.hibegin.common.util.SystemType;
 import com.hibegin.common.util.http.handle.CloseResponseHandle;
 import com.hibegin.http.HttpMethod;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
 import com.hibegin.http.server.util.PathUtil;
+import com.sun.net.httpserver.HttpServer;
 import com.zrlog.business.plugin.PluginCorePlugin;
 import com.zrlog.business.plugin.StaticSitePlugin;
 import com.zrlog.business.plugin.type.StaticSiteType;
@@ -28,32 +29,23 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.util.BlogBuildInfoUtil;
-import org.apache.commons.dbutils.QueryRunner;
-import org.apache.commons.dbutils.ResultSetHandler;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-
-import com.sun.net.httpserver.HttpServer;
+import com.zrlog.web.WebSiteInfoProvider;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import java.sql.SQLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -62,15 +54,21 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BooleanSupplier;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.function.BooleanSupplier;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.zip.CRC32;
-
+import org.apache.commons.dbutils.QueryRunner;
+import org.apache.commons.dbutils.ResultSetHandler;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
@@ -768,7 +766,7 @@ public class ServiceUtilityFallbackTest {
             PathUtil.setRootPath(temporaryFolder.newFolder("zrlog-update-cache").getAbsolutePath());
             Constants.zrLogConfig = new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
 
-            CacheUtils.updateCache(false, request("http"), Collections.singletonList(StaticSiteType.BLOG));
+            CacheUtils.updateCache(cacheService, false, request("http"), Collections.singletonList(StaticSiteType.BLOG));
 
             assertEquals(1, cacheService.refreshInitDataCount);
             assertEquals(1, pluginCorePlugin.startCount);
@@ -788,7 +786,7 @@ public class ServiceUtilityFallbackTest {
             PathUtil.setRootPath(temporaryFolder.newFolder("zrlog-update-cache-strict").getAbsolutePath());
             Constants.zrLogConfig = new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
 
-            CacheUtils.updateCacheSynchronouslyOrThrow(
+            CacheUtils.updateCacheSynchronouslyOrThrow(cacheService,
                     request("http"), Collections.singletonList(StaticSiteType.BLOG));
 
             assertEquals(1, cacheService.refreshInitDataCount);
@@ -804,10 +802,10 @@ public class ServiceUtilityFallbackTest {
     public void shouldSwallowCacheRefreshFailureDuringUpdateCache() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
-            Constants.zrLogConfig = new CacheTestConfig(new FakePluginCorePlugin(), new FakeStaticSitePlugin(),
-                    new ThrowingCacheService());
+            CacheService cacheService = new ThrowingCacheService();
+            Constants.zrLogConfig = new CacheTestConfig(new FakePluginCorePlugin(), new FakeStaticSitePlugin(), cacheService);
 
-            CacheUtils.updateCache(false, request("http"), Collections.singletonList(StaticSiteType.BLOG));
+            CacheUtils.updateCache(cacheService, false, request("http"), Collections.singletonList(StaticSiteType.BLOG));
         } finally {
             Constants.zrLogConfig = previousConfig;
         }
@@ -817,11 +815,11 @@ public class ServiceUtilityFallbackTest {
     public void shouldPropagateCacheRefreshFailureDuringSynchronousStrictUpdate() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
-            Constants.zrLogConfig = new CacheTestConfig(new FakePluginCorePlugin(), new FakeStaticSitePlugin(),
-                    new ThrowingCacheService());
+            CacheService cacheService = new ThrowingCacheService();
+            Constants.zrLogConfig = new CacheTestConfig(new FakePluginCorePlugin(), new FakeStaticSitePlugin(), cacheService);
 
             IllegalStateException error = assertThrows(IllegalStateException.class,
-                    () -> CacheUtils.updateCacheSynchronouslyOrThrow(
+                    () -> CacheUtils.updateCacheSynchronouslyOrThrow(cacheService,
                             request("http"), Collections.singletonList(StaticSiteType.BLOG)));
 
             assertEquals("refresh failed", error.getMessage());
@@ -863,7 +861,7 @@ public class ServiceUtilityFallbackTest {
             setDefaultDataSource(dataSource(new FakeQueryRunner()));
             Constants.zrLogConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin, cacheService);
 
-            CacheUtils.updateCache(false, request("https"), Collections.singletonList(StaticSiteType.BLOG));
+            CacheUtils.updateCache(cacheService, false, request("https"), Collections.singletonList(StaticSiteType.BLOG));
 
             assertEquals(1, cacheService.refreshInitDataCount);
             assertEquals(1, staticSitePlugin.startCount);
@@ -883,7 +881,7 @@ public class ServiceUtilityFallbackTest {
         try {
             Constants.zrLogConfig = new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
 
-            CacheUtils.updateCache(true, request("http"), Collections.singletonList(StaticSiteType.BLOG));
+            CacheUtils.updateCache(cacheService, true, request("http"), Collections.singletonList(StaticSiteType.BLOG));
             waitUntil(() -> pluginCorePlugin.refreshCacheCount == 1);
 
             assertEquals(1, cacheService.refreshInitDataCount);
@@ -1182,7 +1180,16 @@ public class ServiceUtilityFallbackTest {
         }
 
         @Override
-        public CacheService getCacheService() {
+        public <T> T getWebSetup(Class<T> capability) {
+            if (capability == WebSiteInfoProvider.class) {
+                CacheService cache = cacheForTest();
+                return cache == null ? null : capability.cast(
+                        (WebSiteInfoProvider) cache::getPublicWebSiteInfo);
+            }
+            return super.getWebSetup(capability);
+        }
+
+        private CacheService cacheForTest() {
             return cacheService;
         }
 

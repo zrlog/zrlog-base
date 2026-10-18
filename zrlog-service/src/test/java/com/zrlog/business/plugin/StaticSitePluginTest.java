@@ -7,6 +7,7 @@ import com.hibegin.http.server.api.HttpResponse;
 import com.hibegin.http.server.api.Interceptor;
 import com.hibegin.http.server.config.ServerConfig;
 import com.hibegin.http.server.util.PathUtil;
+import com.sun.net.httpserver.HttpServer;
 import com.zrlog.business.plugin.type.StaticSiteType;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
@@ -20,14 +21,10 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.plugin.BaseStaticSitePlugin;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
-import com.sun.net.httpserver.HttpServer;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-
+import com.zrlog.web.WebSiteInfoProvider;
 import java.io.File;
-import java.net.InetSocketAddress;
 import java.lang.reflect.Proxy;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -37,10 +34,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.atomic.AtomicReference;
-
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -556,7 +555,16 @@ public class StaticSitePluginTest {
         }
 
         @Override
-        public CacheService getCacheService() {
+        public <T> T getWebSetup(Class<T> capability) {
+            if (capability == WebSiteInfoProvider.class) {
+                CacheService cache = cacheForTest();
+                return cache == null ? null : capability.cast(
+                        (WebSiteInfoProvider) cache::getPublicWebSiteInfo);
+            }
+            return super.getWebSetup(capability);
+        }
+
+        private CacheService cacheForTest() {
             return new TestCacheService(publicWebSiteInfo);
         }
 

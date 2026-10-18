@@ -6,18 +6,18 @@ import com.hibegin.http.server.api.HttpRequest;
 import com.zrlog.business.plugin.PluginCorePlugin;
 import com.zrlog.business.plugin.StaticSitePlugin;
 import com.zrlog.business.plugin.type.StaticSiteType;
+import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.model.WebSite;
 import com.zrlog.util.ThreadUtils;
-
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.concurrent.*;
 
 /**
  * 缓存工具，便于处理程序缓存和插件缓存
@@ -26,15 +26,15 @@ public class CacheUtils {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(CacheUtils.class);
 
-    public static void updateCache(boolean async, HttpRequest request, List<StaticSiteType> staticSiteTypeList) {
+    public static void updateCache(CacheService cacheService, boolean async, HttpRequest request, List<StaticSiteType> staticSiteTypeList) {
         try {
             if (async) {
-                BaseDataInitVO initVO = Constants.zrLogConfig.getCacheService().refreshInitData();
+                BaseDataInitVO initVO = cacheService.refreshInitData();
                 ThreadUtils.start(() -> {
                     refreshPluginCacheData(initVO.getVersion() + "", request, staticSiteTypeList);
                 });
             } else {
-                updateCacheSynchronouslyOrThrow(request, staticSiteTypeList);
+                updateCacheSynchronouslyOrThrow(cacheService, request, staticSiteTypeList);
             }
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Refresh cache error ", e);
@@ -44,12 +44,11 @@ public class CacheUtils {
     /**
      * Refreshes cache data synchronously for callers that need to report the actual completion result.
      */
-    public static void updateCacheSynchronouslyOrThrow(HttpRequest request,
+    public static void updateCacheSynchronouslyOrThrow(CacheService cacheService, HttpRequest request,
                                                        List<StaticSiteType> staticSiteTypeList) {
-        BaseDataInitVO initVO = Constants.zrLogConfig.getCacheService().refreshInitData();
+        BaseDataInitVO initVO = cacheService.refreshInitData();
         refreshPluginCacheData(initVO.getVersion() + "", request, staticSiteTypeList);
     }
-
 
     private static int getSyncTimeout() {
         if (EnvKit.isFaaSMode()) {

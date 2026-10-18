@@ -1,10 +1,9 @@
 package com.zrlog.common;
 
-import com.zrlog.theme.spi.BundledThemes;
-
 import com.hibegin.common.util.EnvKit;
 import com.zrlog.common.vo.PublicWebSiteInfo;
-
+import com.zrlog.theme.spi.BundledThemes;
+import com.zrlog.web.WebSiteInfoProvider;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -55,16 +54,15 @@ public class Constants {
         }
     }
 
+    public static PublicWebSiteInfo getPublicWebSiteInfo() {
+        WebSiteInfoProvider provider = zrLogConfig == null ? null
+                : zrLogConfig.getWebSetup(WebSiteInfoProvider.class);
+        return provider == null ? null : provider.getPublicWebSiteInfo();
+    }
+
     public static boolean isStaticHtmlStatus() {
-        CacheService cacheService = zrLogConfig.getCacheService();
-        if (Objects.isNull(cacheService)) {
-            return false;
-        }
-        PublicWebSiteInfo publicWebSiteInfo = cacheService.getPublicWebSiteInfo();
-        if (Objects.isNull(publicWebSiteInfo)) {
-            return false;
-        }
-        return publicWebSiteInfo.getGenerator_html_status();
+        PublicWebSiteInfo info = getPublicWebSiteInfo();
+        return info != null && Boolean.TRUE.equals(info.getGenerator_html_status());
     }
 
     public static String getArticleUri() {
@@ -72,11 +70,8 @@ public class Constants {
     }
 
     public static String getHost() {
-        CacheService cacheService = zrLogConfig.getCacheService();
-        if (Objects.isNull(cacheService)) {
-            return "";
-        }
-        return cacheService.getPublicWebSiteInfo().getHost();
+        PublicWebSiteInfo info = getPublicWebSiteInfo();
+        return info == null ? "" : Objects.requireNonNullElse(info.getHost(), "");
     }
 
     public static List<String> articleRouterList() {
@@ -88,13 +83,7 @@ public class Constants {
     }
 
     public static String getLanguage() {
-        if (Objects.isNull(zrLogConfig)) {
-            return DEFAULT_LANGUAGE;
-        }
-        CacheService cacheService = zrLogConfig.getCacheService();
-        if (Objects.isNull(cacheService)) {
-            return DEFAULT_LANGUAGE;
-        }
-        return cacheService.getPublicWebSiteInfo().getLanguage();
+        PublicWebSiteInfo info = getPublicWebSiteInfo();
+        return info == null ? DEFAULT_LANGUAGE : info.getLanguage();
     }
 }

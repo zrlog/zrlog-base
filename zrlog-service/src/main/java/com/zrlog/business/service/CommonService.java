@@ -10,7 +10,7 @@ import com.zrlog.util.ZrLogUtil;
 public class CommonService {
 
     public PublicInfoVO getPublicInfo(HttpRequest request) {
-        PublicWebSiteInfo publicWebSiteInfo = Constants.zrLogConfig.getCacheService().getPublicWebSiteInfo();
+        PublicWebSiteInfo publicWebSiteInfo = Constants.getPublicWebSiteInfo();
         boolean darkMode = publicWebSiteInfo.getAdmin_darkMode();
         String themeColor;
         String adminColor = publicWebSiteInfo.getAdmin_color_primary();
@@ -22,6 +22,5 @@ public class CommonService {
         String appId = publicWebSiteInfo.getAppId();
         return new PublicInfoVO(BlogBuildInfoUtil.getVersion(), publicWebSiteInfo.getTitle(), ZrLogUtil.getHomeUrlWithHost(request), darkMode, adminColor, themeColor, appId);
     }
-
 
 }

@@ -2,7 +2,6 @@ package com.zrlog.blog.web.plugin;
 
 import com.hibegin.common.BaseLockObject;
 import com.hibegin.common.dao.ResultValueConvertUtils;
-import com.hibegin.common.util.*;
 import com.hibegin.http.server.ApplicationContext;
 import com.hibegin.http.server.config.AbstractServerConfig;
 import com.hibegin.http.server.util.PathUtil;
@@ -15,7 +14,6 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.common.vo.TemplateVO;
 import com.zrlog.data.dto.FaviconBase64DTO;
 import com.zrlog.model.WebSite;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -23,10 +21,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.*;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import com.hibegin.common.util.*;
+
+import java.util.concurrent.*;
 
 public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSitePlugin {
 
@@ -69,7 +69,6 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
         FaviconBase64DTO faviconBase64DTO = new WebSite().faviconBase64DTO();
         faviconHandle(faviconBase64DTO.getFavicon_ico_base64(), favicon, ResultValueConvertUtils.toBoolean(faviconBase64DTO.getGenerator_html_status()));
     }
-
 
     private void handleRobotsTxt(PublicWebSiteInfo webSite) {
         String robotTxt = webSite.getRobotRuleContent();
@@ -126,7 +125,6 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
         copyResourceToCacheFolder(favicon);
     }
 
-
     private void copyTemplateAssets(String templatePath) {
         TemplateVO templateVO = TemplateInfoHelper.loadTemplateVO(templatePath);
         if (Objects.isNull(templateVO)) {
@@ -152,12 +150,10 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
         }
     }
 
-
     @Override
     public String getVersionFileName() {
         return "version.txt";
     }
-
 
     @Override
     public String getDbCacheKey() {
@@ -168,7 +164,7 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
         if (StaticSitePlugin.isDisabled()) {
             return;
         }
-        PublicWebSiteInfo webSite = Constants.zrLogConfig.getCacheService().getPublicWebSiteInfo();
+        PublicWebSiteInfo webSite = Constants.getPublicWebSiteInfo();
         refreshFavicon();
         handleRobotsTxt(webSite);
         copyAssetsFiles();

@@ -17,18 +17,18 @@ import com.zrlog.common.web.ZrLogHttpJsonMessageConverter;
 import com.zrlog.common.web.ZrLogHttpRequestListener;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
-import com.zrlog.util.*;
 import com.zrlog.web.BaseWebSetup;
 import com.zrlog.web.WebSetup;
-import sun.misc.Signal;
-
-import javax.sql.DataSource;
 import java.io.File;
 import java.lang.management.ManagementFactory;
-import java.util.*;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.sql.DataSource;
+import sun.misc.Signal;
+import com.zrlog.util.*;
+
+import java.util.*;
 
 /**
  * 全局服务配置，包含 数据库，插件，更新的实现者等
@@ -45,11 +45,11 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
     protected DataSourceWrapper dataSource;
     protected final File dbPropertiesFile;
     protected final ServerConfig serverConfig;
-    protected CacheService cacheService;
+    private boolean webSetupsInitialized;
+    private volatile boolean databaseInitialized;
     protected TokenService tokenService;
     protected ZrLogHttpRequestListener zrLogHttpRequestListener = new ZrLogHttpRequestListener();
     private static final String TERM_SIGNAL = "TERM";
-
 
     static {
         disableHikariLogging();
@@ -80,26 +80,40 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         return ParseUtil.toNamingDurationString(System.currentTimeMillis() - createdDate, I18nUtil.getCurrentLocale().contains("en"));
     }
 
-
     private static void disableHikariLogging() {
         System.setProperty("org.slf4j.simpleLogger.log.com.zaxxer.hikari", "off");
     }
-
 
     public boolean isTest() {
         return "junit-test".equals(System.getProperties().getProperty("env"));
     }
 
-    public DataSourceWrapper configDatabase() throws Exception {
+    public synchronized DataSourceWrapper configDatabase() throws Exception {
         // 如果没有安装的情况下不初始化数据
         if (!isInstalled()) {
             return null;
         }
-        Properties dbProperties = DbUtils.getDbProp(dbPropertiesFile);
-        //启动时候进行数据库连接
-        dataSource = DataSourceUtil.buildDataSource(dbProperties);
-        DAO.setDs(dataSource);
+        if (dataSource == null) {
+            Properties dbProperties = DbUtils.getDbProp(dbPropertiesFile);
+            dataSource = DataSourceUtil.buildDataSource(dbProperties);
+            DAO.setDs(dataSource);
+        }
+        if (webSetupsInitialized && !databaseInitialized) {
+            for (WebSetup webSetup : webSetups) {
+                webSetup.onDatabaseReady(dataSource);
+            }
+            databaseInitialized = true;
+        }
         return dataSource;
+    }
+
+    /** Complete module registration before any database-backed service is resolved. */
+    protected final synchronized void initializeWebSetups() {
+        if (!webSetupsInitialized) {
+            webSetups.forEach(WebSetup::setup);
+            webSetupsInitialized = true;
+        }
+        DbUtils.configDatabaseWithRetry(30, this);
     }
 
     public Plugins getAllPlugins() {
@@ -129,10 +143,6 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         return updater;
     }
 
-    public CacheService getCacheService() {
-        return cacheService;
-    }
-
     public TokenService getTokenService() {
         if (tokenService == null) {
             this.tokenService = initTokenService();
@@ -145,7 +155,6 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
     public DataSource getDataSource() {
         return dataSource;
     }
-
 
     /**
      * 配置的常用参数，这里可以看出来推崇使用代码进行配置的，而不是像Spring这样的通过预定配置方式。代码控制的好处在于高度可控制性，
@@ -220,7 +229,6 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         Signal.handle(signalTerm, new TermSignalHandler(this));
         return serverConfig;
     }
-
 
     @Override
     public RequestConfig getRequestConfig() {

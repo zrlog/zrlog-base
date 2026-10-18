@@ -219,7 +219,7 @@ public final class NetworkProxy {
                     && "default".equals(httpsSource) == "default".equals(other.httpsSource);
         }
 
-        /** A private client tests pending settings without changing the global proxy selector. */
+        /** Builds a client selector for these settings without replacing the global proxy selector. */
         public ProxySelector proxySelector() {
             ProxySelector inherited = ProxySelector.getDefault();
             return new ProxySelector() {

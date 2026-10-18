@@ -17,7 +17,8 @@ public class DataSourceUtil {
                     dbProperties.getProperty("user"),
                     dbProperties.getProperty("password"));
         } else {*/
-        DataSourceWrapperImpl dataSource = new DataSourceWrapperImpl(dbProperties, Constants.debugLoggerPrintAble());
+        DataSourceWrapperImpl dataSource = new DataSourceWrapperImpl(dbProperties, Constants.debugLoggerPrintAble(),
+                NetworkProxy.initialize().proxySelector());
         if (!dataSource.isWebApi()) {
             dataSource.setDriverClassName(dbProperties.getProperty("driverClass"));
             dataSource.setJdbcUrl(dbProperties.getProperty("jdbcUrl"));

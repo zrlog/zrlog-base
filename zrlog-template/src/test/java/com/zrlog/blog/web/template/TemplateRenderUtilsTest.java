@@ -1,8 +1,6 @@
 package com.zrlog.blog.web.template;
 
 import com.hibegin.http.server.api.HttpRequest;
-import com.zrlog.common.Constants;
-import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.cache.dto.LogNavDTO;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import org.junit.Test;
@@ -47,13 +45,8 @@ public class TemplateRenderUtilsTest {
         home.setUrl("/");
         BaseDataInitVO init = new BaseDataInitVO();
         init.setLogNavs(List.of(home));
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
-
-        try {
-            Constants.zrLogConfig = null;
+        {
             TemplateRenderUtils.fullNavBar(request("/blog", "example.com", "/"), "", init);
-        } finally {
-            Constants.zrLogConfig = previousConfig;
         }
 
         assertEquals("//example.com/blog/", home.getUrl());

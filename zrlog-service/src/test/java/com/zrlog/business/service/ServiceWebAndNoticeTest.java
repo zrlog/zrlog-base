@@ -7,7 +7,6 @@ import com.zrlog.business.dto.StoredUpgradeNotice;
 import com.zrlog.business.rest.response.CheckVersionResponse;
 import com.zrlog.business.rest.response.PublicInfoVO;
 import com.zrlog.common.CacheService;
-import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.cache.dto.TagDTO;
@@ -19,7 +18,6 @@ import com.zrlog.common.vo.Version;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.web.WebSiteInfoProvider;
-import org.junit.After;
 import org.junit.Test;
 
 import java.lang.reflect.Proxy;
@@ -36,17 +34,11 @@ import static org.junit.Assert.assertTrue;
 
 public class ServiceWebAndNoticeTest {
 
-    private final ZrLogConfig previousConfig = Constants.zrLogConfig;
-
-    @After
-    public void tearDown() {
-        Constants.zrLogConfig = previousConfig;
-    }
+    private com.zrlog.common.ZrLogConfig applicationConfig;
 
     @Test
     public void shouldBuildPublicInfoWithLightThemeColor() throws Exception {
         PublicWebSiteInfo info = siteInfo(false);
-        Constants.zrLogConfig = null;
 
         PublicInfoVO publicInfo = new CommonService(() -> info).getPublicInfo(request("/blog", "fallback.example.com"));
 
@@ -62,7 +54,6 @@ public class ServiceWebAndNoticeTest {
     @Test
     public void shouldBuildPublicInfoWithDarkThemeColor() throws Exception {
         PublicWebSiteInfo info = siteInfo(true);
-        Constants.zrLogConfig = null;
 
         PublicInfoVO publicInfo = new CommonService(() -> info).getPublicInfo(request("/", "fallback.example.com"));
 
@@ -136,11 +127,10 @@ public class ServiceWebAndNoticeTest {
 
     @Test
     public void shouldSyncFutureUpgradeNoticeToKvStoreWhenInstalled() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(siteInfo(false), true);
+        applicationConfig = new TestZrLogConfig(siteInfo(false), true);
         FakeWebsiteKvService kvService = new FakeWebsiteKvService();
         UpgradeNoticeService service = noticeService(kvService);
 
-        Constants.zrLogConfig = null;
         service.sync(futureVersion());
 
         assertEquals("admin_message_center_upgrade_notice", kvService.putKey);
@@ -150,11 +140,10 @@ public class ServiceWebAndNoticeTest {
 
     @Test
     public void shouldClearStoredUpgradeNoticeWhenNoUpgradeIsAvailable() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(siteInfo(false), true);
+        applicationConfig = new TestZrLogConfig(siteInfo(false), true);
         FakeWebsiteKvService kvService = new FakeWebsiteKvService();
         UpgradeNoticeService service = noticeService(kvService);
 
-        Constants.zrLogConfig = null;
         service.sync(null);
 
         assertEquals("admin_message_center_upgrade_notice", kvService.removedKey);
@@ -163,12 +152,11 @@ public class ServiceWebAndNoticeTest {
 
     @Test
     public void shouldIgnoreKvWriteFailuresWhenSyncingUpgradeNotice() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(siteInfo(false), true);
+        applicationConfig = new TestZrLogConfig(siteInfo(false), true);
         FakeWebsiteKvService kvService = new FakeWebsiteKvService();
         kvService.throwOnPut = true;
         UpgradeNoticeService service = noticeService(kvService);
 
-        Constants.zrLogConfig = null;
         service.sync(futureVersion());
 
         assertEquals(1, kvService.putAttempts);
@@ -188,13 +176,12 @@ public class ServiceWebAndNoticeTest {
     @Test
     public void shouldSkipSyncWhenConfigIsMissingOrNotInstalled() throws Exception {
         FakeWebsiteKvService missingConfigKv = new FakeWebsiteKvService();
-        Constants.zrLogConfig = null;
         noticeService(missingConfigKv).sync(futureVersion());
         assertNull(missingConfigKv.putKey);
         assertNull(missingConfigKv.removedKey);
 
         FakeWebsiteKvService notInstalledKv = new FakeWebsiteKvService();
-        Constants.zrLogConfig = new TestZrLogConfig(siteInfo(false), false);
+        applicationConfig = new TestZrLogConfig(siteInfo(false), false);
         noticeService(notInstalledKv).sync(futureVersion());
         assertNull(notInstalledKv.putKey);
         assertNull(notInstalledKv.removedKey);
@@ -229,8 +216,8 @@ public class ServiceWebAndNoticeTest {
                 });
     }
 
-    private static UpgradeNoticeService noticeService(FakeWebsiteKvService kvService) {
-        ZrLogConfig config = Constants.zrLogConfig;
+    private UpgradeNoticeService noticeService(FakeWebsiteKvService kvService) {
+        ZrLogConfig config = applicationConfig;
         return new UpgradeNoticeService(() -> config != null && config.isInstalled(), kvService);
     }
 
@@ -289,7 +276,6 @@ public class ServiceWebAndNoticeTest {
     }
 
     private static class FakeWebsiteKvService extends WebsiteKvService {
-
         private String storedJson;
         private String putKey;
         private String putValue;
@@ -327,7 +313,6 @@ public class ServiceWebAndNoticeTest {
     }
 
     private static class TestCacheService implements CacheService {
-
         private final PublicWebSiteInfo publicWebSiteInfo;
 
         TestCacheService(PublicWebSiteInfo publicWebSiteInfo) {

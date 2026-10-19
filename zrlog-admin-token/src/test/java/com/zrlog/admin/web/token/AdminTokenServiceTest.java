@@ -3,9 +3,7 @@ package com.zrlog.admin.web.token;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
 import com.hibegin.http.server.web.cookie.Cookie;
-import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
-import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.vo.AdminFullTokenVO;
 import org.junit.After;
 import org.junit.Test;
@@ -27,8 +25,6 @@ public class AdminTokenServiceTest {
 
     //TODO: Cover the DAO-backed secret lookup path with an isolated DataSource fixture.
     // The current unit tests intentionally avoid bootstrapping the shared DAO/global config stack.
-    private final ZrLogConfig previousConfig = Constants.zrLogConfig;
-
     private final Map<Integer, Long> personalTimeouts = new HashMap<>();
     // Keep encrypted fixtures deterministic, including the wrong-key padding failure.
     private boolean installed = true;
@@ -36,7 +32,6 @@ public class AdminTokenServiceTest {
 
     @org.junit.Before
     public void clearGlobalConfig() {
-        Constants.zrLogConfig = null;
     }
 
     private long now = 1_700_000_000_000L;
@@ -53,7 +48,6 @@ public class AdminTokenServiceTest {
 
     @After
     public void tearDown() {
-        Constants.zrLogConfig = previousConfig;
         AdminTokenThreadLocal.remove();
     }
 

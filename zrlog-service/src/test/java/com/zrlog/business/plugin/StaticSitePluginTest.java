@@ -8,8 +8,6 @@ import com.hibegin.http.server.config.ServerConfig;
 import com.hibegin.http.server.util.PathUtil;
 import com.sun.net.httpserver.HttpServer;
 import com.zrlog.business.plugin.type.StaticSiteType;
-import com.zrlog.common.Constants;
-import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.plugin.BaseStaticSitePlugin;
 import org.junit.Rule;
@@ -109,16 +107,10 @@ public class StaticSitePluginTest {
 
     @Test
     public void shouldResolveStaticSuffixFromRequestOrWebsiteConfig() throws Exception {
-        ZrLogConfig previous = Constants.zrLogConfig;
-        try {
-            Constants.zrLogConfig = null;
-            assertEquals("", StaticSitePlugin.getSuffix(request("/article", null, null), false));
-            assertEquals(".html", StaticSitePlugin.getSuffix(
-                    request("/article", BaseStaticSitePlugin.STATIC_USER_AGENT, null), false));
-            assertEquals(".html", StaticSitePlugin.getSuffix(request("/article", null, null), true));
-        } finally {
-            Constants.zrLogConfig = previous;
-        }
+        assertEquals("", StaticSitePlugin.getSuffix(request("/article", null, null), false));
+        assertEquals(".html", StaticSitePlugin.getSuffix(
+                request("/article", BaseStaticSitePlugin.STATIC_USER_AGENT, null), false));
+        assertEquals(".html", StaticSitePlugin.getSuffix(request("/article", null, null), true));
     }
 
     @Test
@@ -369,19 +361,16 @@ public class StaticSitePluginTest {
 
     private void withSite(TestStaticSitePlugin plugin, boolean staticHtmlStatus, String host,
                           ConfigThrowingRunnable runnable) throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         String previousRootPath = System.getProperty("sws.root.path");
         try {
             System.setProperty("sws.root.path", temporaryFolder.newFolder().getAbsolutePath());
             plugin.site.setGenerator_html_status(staticHtmlStatus);
             plugin.site.setHost(host);
-            Constants.zrLogConfig = null;
             ServerConfig server = new ServerConfig();
             server.setPort(18080);
             server.setContextPath("");
             runnable.run(server);
         } finally {
-            Constants.zrLogConfig = previousConfig;
             restoreProperty("sws.root.path", previousRootPath);
             StaticFetchInterceptor.pages.clear();
         }
@@ -431,7 +420,6 @@ public class StaticSitePluginTest {
     }
 
     public static class StaticFetchInterceptor implements Interceptor {
-
         private static final Map<String, String> pages = new ConcurrentHashMap<>();
 
         @Override
@@ -448,7 +436,6 @@ public class StaticSitePluginTest {
     }
 
     public static class NoBodyInterceptor implements Interceptor {
-
         @Override
         public boolean doInterceptor(HttpRequest request, HttpResponse response) {
             return false;

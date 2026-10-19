@@ -1,8 +1,6 @@
 package com.zrlog.business.plugin;
 
 import com.hibegin.http.server.util.PathUtil;
-import com.zrlog.common.Constants;
-import com.zrlog.common.ZrLogConfig;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.NetworkProxy;
 import org.graalvm.nativeimage.ImageInfo;
@@ -161,7 +159,6 @@ public class PluginCoreProcessImplTest {
         Field effective = NetworkProxy.class.getDeclaredField("effective");
         effective.setAccessible(true);
         Object previousPolicy = effective.get(null);
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
             System.setProperty("sws.root.path", root.toString());
             NetworkProxy.Settings active = NetworkProxy.preview("http://proxy.example:3128", ".internal.example");
@@ -182,7 +179,6 @@ public class PluginCoreProcessImplTest {
             Files.createDirectories(nativeProgram.getParent());
             Files.writeString(nativeProgram, "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsFile + "\n");
             assertTrue(nativeProgram.toFile().setExecutable(true));
-            Constants.zrLogConfig = null;
             ImageInfo.setInImageRuntimeCode(true);
             Process process = new PluginCoreProcessImpl(null, "/blog", () -> 19084).startPluginCore(nativeProgram.toFile(),
                     "db=ok", "-Xmx64m", root.toString(), "4.0.1", "test-token", 21000, 41000, 51000);
@@ -195,7 +191,6 @@ public class PluginCoreProcessImplTest {
             assertFalse(args.toString().contains("pending.example"));
         } finally {
             ImageInfo.setInImageRuntimeCode(false);
-            Constants.zrLogConfig = previousConfig;
             effective.set(null, previousPolicy);
             restoreProperty("sws.root.path", previousRoot);
             delete(root);
@@ -213,10 +208,8 @@ public class PluginCoreProcessImplTest {
                 StandardCharsets.UTF_8);
         assertTrue(pluginCore.toFile().setExecutable(true));
         String previousRootPath = System.getProperty("sws.root.path");
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
             System.setProperty("sws.root.path", root.toString());
-            Constants.zrLogConfig = null;
             ImageInfo.setInImageRuntimeCode(true);
             PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog", () -> 19084);
 
@@ -242,7 +235,6 @@ public class PluginCoreProcessImplTest {
             assertTrue(args.get(13).startsWith("-Duser.dir="));
         } finally {
             ImageInfo.setInImageRuntimeCode(false);
-            Constants.zrLogConfig = previousConfig;
             restoreProperty("sws.root.path", previousRootPath);
             delete(root);
         }
@@ -272,10 +264,8 @@ public class PluginCoreProcessImplTest {
     public void shouldReturnNullWhenPluginCoreFileIsMissing() throws Exception {
         Path root = Files.createTempDirectory("zrlog-plugin-core-missing");
         String previousRootPath = System.getProperty("sws.root.path");
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
             System.setProperty("sws.root.path", root.toString());
-            Constants.zrLogConfig = null;
             PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog", () -> 19084);
 
             Process started = process.startPluginCore(root.resolve("missing.jar").toFile(),
@@ -284,7 +274,6 @@ public class PluginCoreProcessImplTest {
 
             assertEquals(null, started);
         } finally {
-            Constants.zrLogConfig = previousConfig;
             restoreProperty("sws.root.path", previousRootPath);
             delete(root);
         }
@@ -301,10 +290,8 @@ public class PluginCoreProcessImplTest {
                 StandardCharsets.UTF_8);
         assertTrue(pluginCore.toFile().setExecutable(true));
         String previousRootPath = System.getProperty("sws.root.path");
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
             System.setProperty("sws.root.path", root.toString());
-            Constants.zrLogConfig = null;
             ImageInfo.setInImageRuntimeCode(true);
             PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/", () -> 19084);
 
@@ -318,7 +305,6 @@ public class PluginCoreProcessImplTest {
             assertEquals("#", args.get(12));
         } finally {
             ImageInfo.setInImageRuntimeCode(false);
-            Constants.zrLogConfig = previousConfig;
             restoreProperty("sws.root.path", previousRootPath);
             delete(root);
         }
@@ -333,11 +319,9 @@ public class PluginCoreProcessImplTest {
         Files.write(pluginCore, minimalElfExecutable());
         assertTrue(pluginCore.toFile().setExecutable(true));
         String previousRootPath = System.getProperty("sws.root.path");
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         String previousFileArch = setFileArch("Linux-x86_64");
         try {
             System.setProperty("sws.root.path", root.toString());
-            Constants.zrLogConfig = null;
             ImageInfo.setInImageRuntimeCode(true);
             TestablePluginCoreProcessImpl process = new TestablePluginCoreProcessImpl(null, "/blog", argsFile);
 
@@ -358,7 +342,6 @@ public class PluginCoreProcessImplTest {
         } finally {
             ImageInfo.setInImageRuntimeCode(false);
             setFileArch(previousFileArch);
-            Constants.zrLogConfig = previousConfig;
             restoreProperty("sws.root.path", previousRootPath);
             delete(root);
         }
@@ -799,7 +782,6 @@ public class PluginCoreProcessImplTest {
     }
 
     private static class TestPluginCoreProcessHandle extends AbstractPluginCoreProcessHandle {
-
         private final int failuresBeforeSuccess;
         private int closeCount;
 
@@ -823,7 +805,6 @@ public class PluginCoreProcessImplTest {
     }
 
     private static class RestartTrackingPluginCoreProcessImpl extends PluginCoreProcessImpl {
-
         private final ControlledProcess oldProcess;
         private final ControlledProcess replacementProcess;
         private final int failedWatcherConnections;
@@ -918,7 +899,6 @@ public class PluginCoreProcessImplTest {
     }
 
     private static class InitialLaunchRetryPluginCoreProcessImpl extends PluginCoreProcessImpl {
-
         private final AtomicReference<AbstractPluginCoreProcessHandle> handle = new AtomicReference<>();
         private final AtomicInteger startCount = new AtomicInteger();
         private final AtomicInteger watcherCount = new AtomicInteger();
@@ -983,7 +963,6 @@ public class PluginCoreProcessImplTest {
     }
 
     private static class RecoverableWatcherFailurePluginCoreProcessImpl extends PluginCoreProcessImpl {
-
         private final AtomicReference<AbstractPluginCoreProcessHandle> handle = new AtomicReference<>();
         private final AtomicInteger startCount = new AtomicInteger();
         private final AtomicInteger watcherCount = new AtomicInteger();
@@ -1033,7 +1012,6 @@ public class PluginCoreProcessImplTest {
     }
 
     private static class ControlledProcess extends Process {
-
         private final boolean exitsOnDestroy;
         private final boolean exitsOnDestroyForcibly;
         private final AtomicBoolean alive = new AtomicBoolean(true);
@@ -1106,7 +1084,6 @@ public class PluginCoreProcessImplTest {
     }
 
     private static class CrashLoopPluginCoreProcessImpl extends PluginCoreProcessImpl {
-
         private final long[] runtimesBeforeCrashMillis;
         private final int restartLaunchFailures;
         private final List<ControlledProcess> processes = new ArrayList<>();
@@ -1210,7 +1187,6 @@ public class PluginCoreProcessImplTest {
     }
 
     private static class TestablePluginCoreProcessImpl extends PluginCoreProcessImpl {
-
         private final Path launchMarker;
         private final AtomicReference<AbstractPluginCoreProcessHandle> handle = new AtomicReference<>();
         private final AtomicInteger handleStartCount = new AtomicInteger();

@@ -5,9 +5,6 @@ import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.config.ResponseConfig;
 import com.hibegin.http.server.config.ServerConfig;
 import com.zrlog.business.plugin.type.StaticSiteType;
-import com.zrlog.common.Constants;
-import com.zrlog.common.ZrLogConfig;
-import org.junit.After;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
@@ -30,17 +27,10 @@ import static org.junit.Assert.assertTrue;
 
 public class BodySaveResponseTest {
 
-    private final ZrLogConfig previousConfig = Constants.zrLogConfig;
-
-    @After
-    public void tearDown() {
-        Constants.zrLogConfig = previousConfig;
-    }
 
     @Test
     public void shouldPersistSuccessfulTextBodyToStaticCacheFile() throws Exception {
         File cacheFile = tempFile("article.html");
-        Constants.zrLogConfig = null;
 
         try (BodySaveResponse response = new BodySaveResponse(request("/article.html"), new ResponseConfig(), true, new TestStaticSitePlugin(cacheFile))) {
             response.renderText("zrlog");
@@ -53,7 +43,6 @@ public class BodySaveResponseTest {
     @Test
     public void shouldAppendHtmlSuffixForAdminExtensionlessUri() throws Exception {
         File cacheFile = tempFile("admin-page");
-        Constants.zrLogConfig = null;
 
         try (BodySaveResponse response = new BodySaveResponse(request("/admin/dashboard"), new ResponseConfig(), true, new TestStaticSitePlugin(cacheFile))) {
             response.renderText("admin");
@@ -66,7 +55,6 @@ public class BodySaveResponseTest {
     @Test
     public void shouldSkipNonSuccessBodiesWhenSuccessStatusIsRequired() throws Exception {
         File cacheFile = tempFile("missing.html");
-        Constants.zrLogConfig = null;
 
         try (BodySaveResponse response = new BodySaveResponse(request("/missing.html"), new ResponseConfig(), true, new TestStaticSitePlugin(cacheFile))) {
             response.write(new ByteArrayInputStream("missing".getBytes(StandardCharsets.UTF_8)), 404);
@@ -79,7 +67,6 @@ public class BodySaveResponseTest {
     @Test
     public void shouldAllowErrorBodyWhenSuccessStatusIsNotRequired() throws Exception {
         File cacheFile = tempFile("error.html");
-        Constants.zrLogConfig = null;
 
         try (BodySaveResponse response = new BodySaveResponse(request("/error.html"), new ResponseConfig(), false, new TestStaticSitePlugin(cacheFile))) {
             response.write(new ByteArrayInputStream("error".getBytes(StandardCharsets.UTF_8)), 500);
@@ -93,7 +80,6 @@ public class BodySaveResponseTest {
     public void shouldExportNotFoundAndLegacySuccessButRejectOtherErrors() throws Exception {
         for (int status : new int[]{404, 200, 500, 302}) {
             File cacheFile = tempFile("error-" + status + ".html");
-            Constants.zrLogConfig = null;
             try (BodySaveResponse response = new BodySaveResponse(request("/error/404.html"),
                     new ResponseConfig(), true, 404, new TestStaticSitePlugin(cacheFile))) {
                 response.write(new ByteArrayInputStream("missing page".getBytes(StandardCharsets.UTF_8)), status);

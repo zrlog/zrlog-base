@@ -19,7 +19,6 @@ public class Constants {
     public static final String ATTACHED_FOLDER = "/attached/";
     public static final String TEMPLATE_CONFIG_STR_KEY = "configStr";
     public static final String DATE_FORMAT_PATTERN = "yyyy-MM-dd HH:mm:ssXXX";
-    public static ZrLogConfig zrLogConfig;
     private static volatile long lastAccessTime = System.currentTimeMillis();
     public static final String DEFAULT_LANGUAGE = "zh_CN";
     public static final String MYSQL_JDBC_PARAMS = "characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=GMT";

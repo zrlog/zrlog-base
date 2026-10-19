@@ -10,8 +10,6 @@ import com.sun.net.httpserver.HttpServer;
 import com.zrlog.business.rest.response.PluginCoreStatus;
 import com.zrlog.business.rest.response.PluginStatusResponse;
 import com.zrlog.common.CacheService;
-import com.zrlog.common.Constants;
-import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.plugin.PluginAdminAppearance;
@@ -57,84 +55,65 @@ public class PluginCorePluginImplTest {
 
     @Test
     public void shouldBuildForwardHeadersFromRequestAndAdminToken() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try {
-            Constants.zrLogConfig = null;
-            AdminTokenVO adminToken = new AdminTokenVO();
-            adminToken.setUserId(5);
-            adminToken.setProtocol("https");
-            HttpRequest request = request(Map.of(
-                    "Cookie", "sid=1",
-                    "Content-Type", "application/json",
-                    "Referer", "https://example.com/admin",
-                    "User-Agent", "JUnit",
-                    "Authorization", "Bearer token",
-                    "X-forwarded-for", "203.0.113.7, 10.0.0.1"
-            ));
+        AdminTokenVO adminToken = new AdminTokenVO();
+        adminToken.setUserId(5);
+        adminToken.setProtocol("https");
+        HttpRequest request = request(Map.of(
+                "Cookie", "sid=1",
+                "Content-Type", "application/json",
+                "Referer", "https://example.com/admin",
+                "User-Agent", "JUnit",
+                "Authorization", "Bearer token",
+                "X-forwarded-for", "203.0.113.7, 10.0.0.1"
+        ));
 
-            Map<String, String> headers = headerMap(request, adminToken);
+        Map<String, String> headers = headerMap(request, adminToken);
 
-            assertEquals("5", headers.get("LoginUserId"));
-            assertEquals("true", headers.get("IsLogin"));
-            assertEquals("true", headers.get("Dark-Mode"));
-            assertEquals("#1677ff", headers.get("Admin-Color-Primary"));
-            assertEquals("desk", headers.get("Admin-Theme"));
-            assertEquals("true", headers.get("Admin-Compact-Mode"));
-            assertEquals("sid=1", headers.get("Cookie"));
-            assertEquals("http://127.0.0.1:19080", headers.get("AccessUrl"));
-            assertEquals("application/json", headers.get("Content-Type"));
-            assertEquals("https://example.com/admin", headers.get("Referer"));
-            assertEquals("JUnit", headers.get("User-Agent"));
-            assertEquals("Bearer token", headers.get("Authorization"));
-            assertEquals("203.0.113.7", headers.get("X-Real-IP"));
-            assertEquals(UrlEncodeUtils.encodeUrl("https://example.com/admin/plugin"), headers.get("Full-Url"));
-        } finally {
-            Constants.zrLogConfig = previousConfig;
-        }
+        assertEquals("5", headers.get("LoginUserId"));
+        assertEquals("true", headers.get("IsLogin"));
+        assertEquals("true", headers.get("Dark-Mode"));
+        assertEquals("#1677ff", headers.get("Admin-Color-Primary"));
+        assertEquals("desk", headers.get("Admin-Theme"));
+        assertEquals("true", headers.get("Admin-Compact-Mode"));
+        assertEquals("sid=1", headers.get("Cookie"));
+        assertEquals("http://127.0.0.1:19080", headers.get("AccessUrl"));
+        assertEquals("application/json", headers.get("Content-Type"));
+        assertEquals("https://example.com/admin", headers.get("Referer"));
+        assertEquals("JUnit", headers.get("User-Agent"));
+        assertEquals("Bearer token", headers.get("Authorization"));
+        assertEquals("203.0.113.7", headers.get("X-Real-IP"));
+        assertEquals(UrlEncodeUtils.encodeUrl("https://example.com/admin/plugin"), headers.get("Full-Url"));
     }
 
     @Test
     public void shouldBuildBaseForwardHeadersWithoutRequestOrLogin() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try {
-            Constants.zrLogConfig = null;
+        Map<String, String> headers = headerMap(null, null);
 
-            Map<String, String> headers = headerMap(null, null);
-
-            assertEquals("false", headers.get("IsLogin"));
-            assertEquals("true", headers.get("Dark-Mode"));
-            assertEquals("#1677ff", headers.get("Admin-Color-Primary"));
-            assertEquals("desk", headers.get("Admin-Theme"));
-            assertEquals("true", headers.get("Admin-Compact-Mode"));
-            assertFalse(headers.containsKey("Full-Url"));
-            assertFalse(headers.containsKey("Cookie"));
-        } finally {
-            Constants.zrLogConfig = previousConfig;
-        }
+        assertEquals("false", headers.get("IsLogin"));
+        assertEquals("true", headers.get("Dark-Mode"));
+        assertEquals("#1677ff", headers.get("Admin-Color-Primary"));
+        assertEquals("desk", headers.get("Admin-Theme"));
+        assertEquals("true", headers.get("Admin-Compact-Mode"));
+        assertFalse(headers.containsKey("Full-Url"));
+        assertFalse(headers.containsKey("Cookie"));
     }
 
     @Test
     public void shouldForwardTrustedPersonalAppearanceOnlyForAuthenticatedRequests() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try {
-            Constants.zrLogConfig = null;
-            HttpRequest request = request(Map.of("Admin-Theme", "spoofed", "Dark-Mode", "false"));
-            AdminTokenVO token = new AdminTokenVO();
-            token.setUserId(5);
-            token.setProtocol("https");
-            assertEquals("desk", headerMap(request, token).get("Admin-Theme"));
-            request.getAttr().put(PluginAdminAppearance.REQUEST_ATTRIBUTE,
-                    new PluginAdminAppearance("antd", false, "#00875a", false));
+        HttpRequest request = request(Map.of("Admin-Theme", "spoofed", "Dark-Mode", "false"));
+        AdminTokenVO token = new AdminTokenVO();
+        token.setUserId(5);
+        token.setProtocol("https");
+        assertEquals("desk", headerMap(request, token).get("Admin-Theme"));
+        request.getAttr().put(PluginAdminAppearance.REQUEST_ATTRIBUTE,
+                new PluginAdminAppearance("antd", false, "#00875a", false));
 
-            Map<String, String> headers = headerMap(request, token);
-            assertEquals("antd", headers.get("Admin-Theme"));
-            assertEquals("false", headers.get("Dark-Mode"));
-            assertEquals("#00875a", headers.get("Admin-Color-Primary"));
-            assertEquals("false", headers.get("Admin-Compact-Mode"));
-            assertEquals("desk", headerMap(request, null).get("Admin-Theme"));
-        } finally {
-            Constants.zrLogConfig = previousConfig;
-        }
+        Map<String, String> headers = headerMap(request, token);
+        assertEquals("antd", headers.get("Admin-Theme"));
+        assertEquals("false", headers.get("Dark-Mode"));
+        assertEquals("#00875a", headers.get("Admin-Color-Primary"));
+        assertEquals("false", headers.get("Admin-Compact-Mode"));
+        assertEquals("desk", headerMap(request, null).get("Admin-Theme"));
     }
 
     @Test
@@ -153,21 +132,15 @@ public class PluginCorePluginImplTest {
         });
         server.start();
         try {
-            ZrLogConfig previousConfig = Constants.zrLogConfig;
-            try {
-                Constants.zrLogConfig = null;
-                PluginCorePluginImpl plugin = startedPlugin(server);
+            PluginCorePluginImpl plugin = startedPlugin(server);
 
-                CloseResponseHandle handle = plugin.getContext("/api/test", HttpMethod.GET,
-                        request(Map.of("User-Agent", "JUnit")), null);
+            CloseResponseHandle handle = plugin.getContext("/api/test", HttpMethod.GET,
+                    request(Map.of("User-Agent", "JUnit")), null);
 
-                assertEquals(200, handle.getStatusCode());
-                assertEquals("plugin-ok", readBody(handle.getT().body()));
-                assertEquals("q=1", queryRef.get());
-                assertEquals("false", loginHeaderRef.get());
-            } finally {
-                Constants.zrLogConfig = previousConfig;
-            }
+            assertEquals(200, handle.getStatusCode());
+            assertEquals("plugin-ok", readBody(handle.getT().body()));
+            assertEquals("q=1", queryRef.get());
+            assertEquals("false", loginHeaderRef.get());
         } finally {
             server.stop(0);
         }
@@ -188,20 +161,14 @@ public class PluginCorePluginImplTest {
         });
         server.start();
         try {
-            ZrLogConfig previousConfig = Constants.zrLogConfig;
-            try {
-                Constants.zrLogConfig = null;
-                PluginCorePluginImpl plugin = startedPlugin(server);
+            PluginCorePluginImpl plugin = startedPlugin(server);
 
-                CloseResponseHandle handle = plugin.getContext("/api/post", HttpMethod.POST,
-                        request(Collections.emptyMap()), null);
+            CloseResponseHandle handle = plugin.getContext("/api/post", HttpMethod.POST,
+                    request(Collections.emptyMap()), null);
 
-                assertEquals("POST", methodRef.get());
-                assertEquals("body", bodyRef.get());
-                assertEquals("posted", readBody(handle.getT().body()));
-            } finally {
-                Constants.zrLogConfig = previousConfig;
-            }
+            assertEquals("POST", methodRef.get());
+            assertEquals("body", bodyRef.get());
+            assertEquals("posted", readBody(handle.getT().body()));
         } finally {
             server.stop(0);
         }
@@ -220,22 +187,16 @@ public class PluginCorePluginImplTest {
         });
         server.start();
         try {
-            ZrLogConfig previousConfig = Constants.zrLogConfig;
-            try {
-                Constants.zrLogConfig = null;
-                PluginCorePluginImpl plugin = startedPlugin(server);
-                CapturedHostResponse hostResponse = new CapturedHostResponse();
+            PluginCorePluginImpl plugin = startedPlugin(server);
+            CapturedHostResponse hostResponse = new CapturedHostResponse();
 
-                assertTrue(plugin.accessPlugin("/redirect", request(Collections.emptyMap()),
-                        hostResponse.proxy(), null));
+            assertTrue(plugin.accessPlugin("/redirect", request(Collections.emptyMap()),
+                    hostResponse.proxy(), null));
 
-                assertEquals(302, hostResponse.statusCode.get());
-                assertEquals("redirect-body", hostResponse.body());
-                assertEquals("/blog/login", hostResponse.header("location"));
-                assertEquals("redirect", hostResponse.header("x-plugin"));
-            } finally {
-                Constants.zrLogConfig = previousConfig;
-            }
+            assertEquals(302, hostResponse.statusCode.get());
+            assertEquals("redirect-body", hostResponse.body());
+            assertEquals("/blog/login", hostResponse.header("location"));
+            assertEquals("redirect", hostResponse.header("x-plugin"));
         } finally {
             server.stop(0);
         }
@@ -250,17 +211,13 @@ public class PluginCorePluginImplTest {
                 return new CloseResponseHandle();
             }
         };
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try {
-            Constants.zrLogConfig = null;
+        {
             Field serverBaseUrl = PluginCorePluginImpl.class.getDeclaredField("pluginServerBaseUrl");
             serverBaseUrl.setAccessible(true);
             serverBaseUrl.set(plugin, "http://127.0.0.1:1");
 
             assertFalse(plugin.accessPlugin("/empty", request(Collections.emptyMap()),
                     new CapturedHostResponse().proxy(), null));
-        } finally {
-            Constants.zrLogConfig = previousConfig;
         }
     }
 
@@ -282,24 +239,18 @@ public class PluginCorePluginImplTest {
         });
         server.start();
         try {
-            ZrLogConfig previousConfig = Constants.zrLogConfig;
-            try {
-                Constants.zrLogConfig = null;
-                PluginCorePluginImpl plugin = startedPlugin(server);
-                AdminTokenVO adminToken = new AdminTokenVO();
-                adminToken.setUserId(7);
+            PluginCorePluginImpl plugin = startedPlugin(server);
+            AdminTokenVO adminToken = new AdminTokenVO();
+            adminToken.setUserId(7);
 
-                PluginStatusResponse response = plugin.requestService(request(Collections.emptyMap()),
-                        Map.of("action", new String[]{"ping"}), adminToken, PluginStatusResponse.class);
+            PluginStatusResponse response = plugin.requestService(request(Collections.emptyMap()),
+                    Map.of("action", new String[]{"ping"}), adminToken, PluginStatusResponse.class);
 
-                assertEquals("POST", methodRef.get());
-                assertEquals("action=ping", bodyRef.get());
-                assertEquals("7", loginUserRef.get());
-                assertEquals(PluginCoreStatus.STARTED, response.getStatus());
-                assertEquals("comment", response.getRunningPlugins().get(0));
-            } finally {
-                Constants.zrLogConfig = previousConfig;
-            }
+            assertEquals("POST", methodRef.get());
+            assertEquals("action=ping", bodyRef.get());
+            assertEquals("7", loginUserRef.get());
+            assertEquals(PluginCoreStatus.STARTED, response.getStatus());
+            assertEquals("comment", response.getRunningPlugins().get(0));
         } finally {
             server.stop(0);
         }
@@ -317,31 +268,25 @@ public class PluginCorePluginImplTest {
         });
         server.start();
         try {
-            ZrLogConfig previousConfig = Constants.zrLogConfig;
-            try {
-                Constants.zrLogConfig = null;
-                PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo);
-                setPluginCoreProcess(plugin, new PluginCoreProcess() {
-                    @Override
-                    public int pluginServerStart(String dbProperties, String pluginJvmArgs, String runtimePath,
-                                                 String runTimeVersion, String token) {
-                        startCount.incrementAndGet();
-                        return server.getAddress().getPort();
-                    }
+            PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo);
+            setPluginCoreProcess(plugin, new PluginCoreProcess() {
+                @Override
+                public int pluginServerStart(String dbProperties, String pluginJvmArgs, String runtimePath,
+                                             String runTimeVersion, String token) {
+                    startCount.incrementAndGet();
+                    return server.getAddress().getPort();
+                }
 
-                    @Override
-                    public void stopPluginCore() {
-                    }
-                });
+                @Override
+                public void stopPluginCore() {
+                }
+            });
 
-                assertTrue(plugin.start());
-                assertTrue(plugin.start());
+            assertTrue(plugin.start());
+            assertTrue(plugin.start());
 
-                assertTrue(plugin.isStarted());
-                assertEquals(1, startCount.get());
-            } finally {
-                Constants.zrLogConfig = previousConfig;
-            }
+            assertTrue(plugin.isStarted());
+            assertEquals(1, startCount.get());
         } finally {
             server.stop(0);
         }
@@ -519,19 +464,13 @@ public class PluginCorePluginImplTest {
         });
         server.start();
         try {
-            ZrLogConfig previousConfig = Constants.zrLogConfig;
-            try {
-                Constants.zrLogConfig = null;
-                PluginCorePluginImpl plugin = startedPlugin(server);
+            PluginCorePluginImpl plugin = startedPlugin(server);
 
-                assertTrue(plugin.refreshCache("cache-123", request(Collections.emptyMap())));
+            assertTrue(plugin.refreshCache("cache-123", request(Collections.emptyMap())));
 
-                assertNotNull(queryRef.get());
-                assertTrue(queryRef.get().contains("cacheVersion=cache-123"));
-                assertTrue(queryRef.get().contains("token=" + plugin.getToken()));
-            } finally {
-                Constants.zrLogConfig = previousConfig;
-            }
+            assertNotNull(queryRef.get());
+            assertTrue(queryRef.get().contains("cacheVersion=cache-123"));
+            assertTrue(queryRef.get().contains("token=" + plugin.getToken()));
         } finally {
             server.stop(0);
         }
@@ -727,7 +666,6 @@ public class PluginCorePluginImplTest {
     }
 
     private static class CapturedHostResponse {
-
         private final Map<String, String> headers = new LinkedHashMap<>();
         private final ByteArrayOutputStream body = new ByteArrayOutputStream();
         private final AtomicInteger statusCode = new AtomicInteger();

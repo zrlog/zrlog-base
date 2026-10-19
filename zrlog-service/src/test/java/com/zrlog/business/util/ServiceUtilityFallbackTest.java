@@ -17,7 +17,6 @@ import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
 import com.zrlog.business.service.WebsiteKvService;
 import com.zrlog.business.updater.AutoUpgradeVersionType;
 import com.zrlog.common.CacheService;
-import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.cache.dto.TagDTO;
@@ -80,6 +79,8 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 public class ServiceUtilityFallbackTest {
+
+    private com.zrlog.common.ZrLogConfig applicationConfig;
 
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -739,7 +740,6 @@ public class ServiceUtilityFallbackTest {
 
     @Test
     public void shouldRefreshStaticSiteCacheWithPluginCoreNotification() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         DataSourceWrapper previousDataSource = setDefaultDataSource(null);
         FakeQueryRunner queryRunner = new FakeQueryRunner();
         FakePluginCorePlugin pluginCorePlugin = new FakePluginCorePlugin();
@@ -747,7 +747,7 @@ public class ServiceUtilityFallbackTest {
         try {
             PathUtil.setRootPath(temporaryFolder.newFolder("zrlog-cache-utils").getAbsolutePath());
             setDefaultDataSource(dataSource(queryRunner));
-            Constants.zrLogConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin);
+            applicationConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin);
 
             boolean refreshed = cacheRefresh(null).refreshStaticSiteCache(
                     request("https"), Collections.singletonList(StaticSiteType.BLOG));
@@ -760,41 +760,35 @@ public class ServiceUtilityFallbackTest {
             assertEquals("update website set value=? where name=?", queryRunner.sql);
             assertArrayEquals(new Object[]{"static-version", "test.static.version"}, queryRunner.params);
         } finally {
-            Constants.zrLogConfig = previousConfig;
             restoreDefaultDataSource(previousDataSource);
         }
     }
 
     @Test
     public void shouldUpdateCacheSynchronouslyAndNotifyPluginCore() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         FakePluginCorePlugin pluginCorePlugin = new FakePluginCorePlugin();
         FakeCacheService cacheService = new FakeCacheService(77L);
-        try {
+        {
             PathUtil.setRootPath(temporaryFolder.newFolder("zrlog-update-cache").getAbsolutePath());
-            Constants.zrLogConfig = new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
+            applicationConfig = new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
 
             com.zrlog.business.service.CacheRefreshService refresh = cacheRefresh(cacheService);
-            Constants.zrLogConfig = null;
             refresh.updateCache(false, request("http"), Collections.singletonList(StaticSiteType.BLOG));
 
             assertEquals(1, cacheService.refreshInitDataCount);
             assertEquals(1, pluginCorePlugin.startCount);
             assertEquals(1, pluginCorePlugin.refreshCacheCount);
             assertEquals("77", pluginCorePlugin.lastCacheVersion);
-        } finally {
-            Constants.zrLogConfig = previousConfig;
         }
     }
 
     @Test
     public void shouldUpdateCacheSynchronouslyOrThrowAndNotifyPluginCore() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         FakePluginCorePlugin pluginCorePlugin = new FakePluginCorePlugin();
         FakeCacheService cacheService = new FakeCacheService(78L);
-        try {
+        {
             PathUtil.setRootPath(temporaryFolder.newFolder("zrlog-update-cache-strict").getAbsolutePath());
-            Constants.zrLogConfig = new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
+            applicationConfig = new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
 
             cacheRefresh(cacheService).updateCacheSynchronouslyOrThrow(
                     request("http"), Collections.singletonList(StaticSiteType.BLOG));
@@ -803,52 +797,38 @@ public class ServiceUtilityFallbackTest {
             assertEquals(1, pluginCorePlugin.startCount);
             assertEquals(1, pluginCorePlugin.refreshCacheCount);
             assertEquals("78", pluginCorePlugin.lastCacheVersion);
-        } finally {
-            Constants.zrLogConfig = previousConfig;
         }
     }
 
     @Test
     public void shouldSwallowCacheRefreshFailureDuringUpdateCache() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try {
-            CacheService cacheService = new ThrowingCacheService();
-            Constants.zrLogConfig = new CacheTestConfig(new FakePluginCorePlugin(), new FakeStaticSitePlugin(), cacheService);
+        CacheService cacheService = new ThrowingCacheService();
+        applicationConfig = new CacheTestConfig(new FakePluginCorePlugin(), new FakeStaticSitePlugin(), cacheService);
 
-            com.zrlog.business.service.CacheRefreshService refresh = cacheRefresh(cacheService);
-            Constants.zrLogConfig = null;
-            refresh.updateCache(false, request("http"), Collections.singletonList(StaticSiteType.BLOG));
-        } finally {
-            Constants.zrLogConfig = previousConfig;
-        }
+        com.zrlog.business.service.CacheRefreshService refresh = cacheRefresh(cacheService);
+        refresh.updateCache(false, request("http"), Collections.singletonList(StaticSiteType.BLOG));
     }
 
     @Test
     public void shouldPropagateCacheRefreshFailureDuringSynchronousStrictUpdate() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
-        try {
-            CacheService cacheService = new ThrowingCacheService();
-            Constants.zrLogConfig = new CacheTestConfig(new FakePluginCorePlugin(), new FakeStaticSitePlugin(), cacheService);
+        CacheService cacheService = new ThrowingCacheService();
+        applicationConfig = new CacheTestConfig(new FakePluginCorePlugin(), new FakeStaticSitePlugin(), cacheService);
 
-            IllegalStateException error = assertThrows(IllegalStateException.class,
-                    () -> cacheRefresh(cacheService).updateCacheSynchronouslyOrThrow(
-                            request("http"), Collections.singletonList(StaticSiteType.BLOG)));
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> cacheRefresh(cacheService).updateCacheSynchronouslyOrThrow(
+                        request("http"), Collections.singletonList(StaticSiteType.BLOG)));
 
-            assertEquals("refresh failed", error.getMessage());
-        } finally {
-            Constants.zrLogConfig = previousConfig;
-        }
+        assertEquals("refresh failed", error.getMessage());
     }
 
     @Test
     public void shouldContinueStaticSiteRefreshWhenVersionWriteFails() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         DataSourceWrapper previousDataSource = setDefaultDataSource(null);
         FakePluginCorePlugin pluginCorePlugin = new FakePluginCorePlugin();
         FakeStaticSitePlugin staticSitePlugin = new FakeStaticSitePlugin();
         try {
             setDefaultDataSource(dataSource(new FailingQueryRunner()));
-            Constants.zrLogConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin);
+            applicationConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin);
 
             boolean refreshed = cacheRefresh(null).refreshStaticSiteCache(
                     request("https"), Collections.singletonList(StaticSiteType.BLOG));
@@ -857,21 +837,19 @@ public class ServiceUtilityFallbackTest {
             assertEquals(1, staticSitePlugin.startCount);
             assertEquals(2, pluginCorePlugin.refreshCacheCount);
         } finally {
-            Constants.zrLogConfig = previousConfig;
             restoreDefaultDataSource(previousDataSource);
         }
     }
 
     @Test
     public void shouldUpdateCacheAndRefreshStaticSiteWhenStaticHtmlIsEnabled() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         DataSourceWrapper previousDataSource = setDefaultDataSource(null);
         FakePluginCorePlugin pluginCorePlugin = new FakePluginCorePlugin();
         FakeStaticSitePlugin staticSitePlugin = new FakeStaticSitePlugin();
         FakeCacheService cacheService = new FakeCacheService(99L, true, "blog.example.com");
         try {
             setDefaultDataSource(dataSource(new FakeQueryRunner()));
-            Constants.zrLogConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin, cacheService);
+            applicationConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin, cacheService);
 
             cacheRefresh(cacheService).updateCache( false, request("https"), Collections.singletonList(StaticSiteType.BLOG));
 
@@ -880,34 +858,29 @@ public class ServiceUtilityFallbackTest {
             assertEquals(3, pluginCorePlugin.refreshCacheCount);
             assertEquals("static-version", pluginCorePlugin.lastCacheVersion);
         } finally {
-            Constants.zrLogConfig = previousConfig;
             restoreDefaultDataSource(previousDataSource);
         }
     }
 
     @Test
     public void shouldUpdateCacheAsynchronouslyAndNotifyPluginCore() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         FakePluginCorePlugin pluginCorePlugin = new FakePluginCorePlugin();
         FakeCacheService cacheService = new FakeCacheService(88L);
-        try {
-            Constants.zrLogConfig = new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
+        {
+            applicationConfig = new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
 
             com.zrlog.business.service.CacheRefreshService refresh = cacheRefresh(cacheService);
-            Constants.zrLogConfig = null;
             refresh.updateCache(true, request("http"), Collections.singletonList(StaticSiteType.BLOG));
             waitUntil(() -> pluginCorePlugin.refreshCacheCount == 1);
 
             assertEquals(1, cacheService.refreshInitDataCount);
             assertEquals(1, pluginCorePlugin.startCount);
             assertEquals("88", pluginCorePlugin.lastCacheVersion);
-        } finally {
-            Constants.zrLogConfig = previousConfig;
         }
     }
 
-    private static com.zrlog.business.service.CacheRefreshService cacheRefresh(CacheService cache) {
-        ZrLogConfig config = Constants.zrLogConfig;
+    private com.zrlog.business.service.CacheRefreshService cacheRefresh(CacheService cache) {
+        ZrLogConfig config = applicationConfig;
         return new com.zrlog.business.service.CacheRefreshService(cache == null ? new FakeCacheService(0L) : cache,
                 () -> config == null ? null : config.getPlugin(PluginCorePlugin.class),
                 () -> config == null ? Collections.emptyList() : config.getPluginsByClazz(StaticSitePlugin.class));
@@ -1163,7 +1136,6 @@ public class ServiceUtilityFallbackTest {
     }
 
     private static class CacheTestConfig extends ZrLogConfig {
-
         private final FakePluginCorePlugin pluginCorePlugin;
         private final FakeStaticSitePlugin staticSitePlugin;
         private final CacheService cacheService;
@@ -1232,7 +1204,6 @@ public class ServiceUtilityFallbackTest {
     }
 
     private static class FakeQueryRunner extends QueryRunner {
-
         private String sql;
         private Object[] params = new Object[0];
 
@@ -1253,7 +1224,6 @@ public class ServiceUtilityFallbackTest {
     }
 
     private static class FailingQueryRunner extends QueryRunner {
-
         @Override
         public int update(String sql, Object... params) throws SQLException {
             throw new SQLException("write failed");
@@ -1266,7 +1236,6 @@ public class ServiceUtilityFallbackTest {
     }
 
     private static class FakePluginCorePlugin implements PluginCorePlugin {
-
         private boolean started;
         private int startCount;
         private int refreshCacheCount;
@@ -1410,7 +1379,6 @@ public class ServiceUtilityFallbackTest {
     }
 
     private static class FakeCacheService implements CacheService {
-
         private final Long version;
         private final boolean generatorHtmlStatus;
         private final String host;
@@ -1479,7 +1447,6 @@ public class ServiceUtilityFallbackTest {
     }
 
     private static class ThrowingCacheService extends FakeCacheService {
-
         ThrowingCacheService() {
             super(0L);
         }

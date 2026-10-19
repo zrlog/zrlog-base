@@ -1,10 +1,7 @@
 package com.zrlog.business.util;
 
 import com.hibegin.common.dao.dto.PageData;
-import com.zrlog.common.Constants;
-import com.zrlog.common.ZrLogConfig;
 import com.zrlog.data.dto.ArticleBasicDTO;
-import org.junit.After;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -14,12 +11,6 @@ import static org.junit.Assert.assertNull;
 
 public class ArticleHelpersTest {
 
-    private final ZrLogConfig previousConfig = Constants.zrLogConfig;
-
-    @After
-    public void tearDown() {
-        Constants.zrLogConfig = previousConfig;
-    }
 
     @Test
     public void shouldSkipEmptyKeywordWithoutRequiringGlobalConfig() {
@@ -43,7 +34,6 @@ public class ArticleHelpersTest {
 
     @Test
     public void shouldHighlightTitleAndDigestWhenDigestContainsKeyword() throws Exception {
-        Constants.zrLogConfig = null;
         ArticleBasicDTO article = article("About ZrLog", "ZrLog digest", "<p>body</p>");
 
         ArticleHelpers.wrapperSearchKeyword(new PageData<>(1L, Arrays.asList(article)), "ZrLog", 120);
@@ -54,7 +44,6 @@ public class ArticleHelpersTest {
 
     @Test
     public void shouldFallbackToPlainContentWhenDigestDoesNotContainKeyword() throws Exception {
-        Constants.zrLogConfig = null;
         ArticleBasicDTO article = article("Plain title", "short digest", "<p>Hello <strong>ZrLog</strong></p>");
 
         ArticleHelpers.wrapperSearchKeyword(new PageData<>(1L, Arrays.asList(article)), "ZrLog", 120);

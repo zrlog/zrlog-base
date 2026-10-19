@@ -5,8 +5,6 @@ import com.hibegin.common.dao.dto.Direction;
 import com.hibegin.common.dao.dto.OrderBy;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequestImpl;
-import com.zrlog.common.Constants;
-import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.cache.dto.LinkDTO;
 import com.zrlog.common.cache.dto.LogNavDTO;
 import com.zrlog.common.cache.dto.PluginDTO;
@@ -150,10 +148,8 @@ public class CoreModelDatabaseTest {
 
     @Test
     public void shouldQueryArticleDetailThroughRealTables() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
-            Constants.zrLogConfig = null;
             Log log = new Log();
 
             ArticleDetailDTO byId = log.findByIdOrAlias(1, false);
@@ -167,25 +163,19 @@ public class CoreModelDatabaseTest {
             assertEquals("First", byAlias.getTitle());
             assertEquals(null, log.findByIdOrAlias(null, false));
             assertEquals(null, log.findByIdOrAlias(999, false));
-        } finally {
-            Constants.zrLogConfig = previousConfig;
         }
     }
 
     @Test
     public void shouldSkipDetailCommentsWhenWebsiteDisablesComments() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
-            Constants.zrLogConfig = null;
 
             ArticleDetailDTO detail = new Log().findByIdOrAlias(1, true);
 
             assertEquals("First", detail.getTitle());
             assertTrue(detail.getComments().isEmpty());
             assertEquals("Second", detail.getNextLog().getTitle());
-        } finally {
-            Constants.zrLogConfig = previousConfig;
         }
     }
 

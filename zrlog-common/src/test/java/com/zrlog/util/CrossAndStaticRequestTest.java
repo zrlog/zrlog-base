@@ -2,8 +2,6 @@ package com.zrlog.util;
 
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
-import com.zrlog.common.Constants;
-import com.zrlog.common.ZrLogConfig;
 import com.zrlog.plugin.BaseStaticSitePlugin;
 import org.junit.Rule;
 import org.junit.Test;
@@ -54,14 +52,11 @@ public class CrossAndStaticRequestTest {
     }
 
     private void withConfig(boolean generatorHtmlStatus, ThrowingRunnable runnable) throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         String previousRootPath = System.getProperty("sws.root.path");
         try {
             System.setProperty("sws.root.path", temporaryFolder.newFolder().getAbsolutePath());
-            Constants.zrLogConfig = null;
             runnable.run();
         } finally {
-            Constants.zrLogConfig = previousConfig;
             restoreProperty("sws.root.path", previousRootPath);
         }
     }
@@ -99,7 +94,6 @@ public class CrossAndStaticRequestTest {
     }
 
     private static class ResponseRecorder {
-
         private final Map<String, String> headers = new LinkedHashMap<>();
 
         private HttpResponse response() {

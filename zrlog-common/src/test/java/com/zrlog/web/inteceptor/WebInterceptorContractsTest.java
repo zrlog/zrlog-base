@@ -4,7 +4,6 @@ import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
 import com.hibegin.http.server.execption.NotFindResourceException;
 import com.zrlog.common.Constants;
-import com.zrlog.common.ZrLogConfig;
 import com.zrlog.plugin.BaseStaticSitePlugin;
 import com.zrlog.util.I18nUtil;
 import org.junit.Test;
@@ -49,9 +48,7 @@ public class WebInterceptorContractsTest {
         assertFalse(interceptor.isHandleAble(request("/install/index.html")));
         assertTrue(interceptor.isHandleAble(request("/admin/index")));
 
-        ZrLogConfig previous = Constants.zrLogConfig;
-        try {
-            Constants.zrLogConfig = null;
+        {
             ResponseRecorder recorder = new ResponseRecorder();
             assertFalse(interceptor.doInterceptor(request("/admin/index"), recorder.response()));
             assertEquals("/install?ref=%2Fadmin%2Findex", recorder.redirect);
@@ -61,8 +58,6 @@ public class WebInterceptorContractsTest {
             assertEquals("/install?ref=%2Fadmin%2Findex&missingConfig=true", recorder.redirect);
             missingConfig.set(false);
             assertTrue(interceptor.doInterceptor(request("/admin/index"), new ResponseRecorder().response()));
-        } finally {
-            Constants.zrLogConfig = previous;
         }
     }
 
@@ -139,13 +134,11 @@ public class WebInterceptorContractsTest {
 
     @Test
     public void adminLanguageFollowsItsSupplierWhilePublicPagesKeepBrowserPreference() {
-        var previousConfig = Constants.zrLogConfig;
         var previousLanguage = I18nUtil.threadLocal.get();
         var siteLanguage = new java.util.concurrent.atomic.AtomicReference<>("en_US");
         MyI18nInterceptor first = new MyI18nInterceptor(siteLanguage::get);
         MyI18nInterceptor second = new MyI18nInterceptor(() -> "zh_CN");
         try {
-            Constants.zrLogConfig = null;
             first.doInterceptor(request("/api/admin/user", null, "zh-CN"), new ResponseRecorder().response());
             assertEquals("en_US", I18nUtil.getCurrentLocale());
             second.doInterceptor(request("/api/public/adminResource"), new ResponseRecorder().response());
@@ -161,7 +154,6 @@ public class WebInterceptorContractsTest {
             assertEquals("en_US", I18nUtil.getCurrentLocale("en_US"));
             assertEquals(Constants.DEFAULT_LANGUAGE, I18nUtil.getCurrentLocale());
         } finally {
-            Constants.zrLogConfig = previousConfig;
             if (previousLanguage == null) I18nUtil.removeI18n();
             else I18nUtil.threadLocal.set(previousLanguage);
         }
@@ -199,7 +191,6 @@ public class WebInterceptorContractsTest {
     }
 
     private static class ResponseRecorder {
-
         private final Map<String, String> headers = new LinkedHashMap<>();
         private int renderCode;
         private String redirect;

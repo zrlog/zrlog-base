@@ -1,7 +1,6 @@
 package com.zrlog.common.adapter;
 
 import com.hibegin.common.dao.DataSourceWrapper;
-import com.zrlog.common.Constants;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
 import com.zrlog.common.ZrLogConfig;
@@ -21,23 +20,21 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class UpdaterHostLifecycleTest {
+
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     @Test
     public void upgradeCallbacksFollowTheOwningServerPortAndStopWithoutGlobalConfig() throws Exception {
         String oldRoot = System.getProperty("sws.root.path");
-        ZrLogConfig oldConfig = Constants.zrLogConfig;
         try {
             System.setProperty("sws.root.path", temporaryFolder.newFolder().getAbsolutePath());
-            Constants.zrLogConfig = null;
             Updater first = updater(18080);
             assertEquals(18080, UpdaterHosts.context(first).port());
             UpdaterHosts.context(first).stop.run(); // CLI context is valid before a server is attached.
             TestConfig firstServer = new TestConfig(19080, first);
             Updater second = updater(18081);
             TestConfig secondServer = new TestConfig(19081, second);
-            Constants.zrLogConfig = secondServer;
 
             firstServer.getServerConfig().setPort(20080);
             assertEquals(20080, UpdaterHosts.context(first).port());
@@ -46,13 +43,11 @@ public class UpdaterHostLifecycleTest {
             assertTrue(firstServer.stopped);
             assertFalse(secondServer.stopped);
 
-            Constants.zrLogConfig = null;
             secondServer.getServerConfig().setPort(20081);
             assertEquals(20081, UpdaterHosts.context(second).port());
             UpdaterHosts.context(second).stop.run();
             assertTrue(secondServer.stopped);
         } finally {
-            Constants.zrLogConfig = oldConfig;
             if (oldRoot == null) System.clearProperty("sws.root.path");
             else System.setProperty("sws.root.path", oldRoot);
         }

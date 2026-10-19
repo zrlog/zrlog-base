@@ -2,7 +2,6 @@ package com.zrlog.data.cache;
 
 import com.google.gson.Gson;
 import com.hibegin.common.dao.DataSourceWrapper;
-import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.cache.dto.TagDTO;
@@ -29,6 +28,8 @@ import static org.junit.Assert.assertTrue;
 @RunWith(Parameterized.class)
 public class CacheServiceImplDatabaseTest {
 
+    private com.zrlog.common.ZrLogConfig applicationConfig;
+
     @Parameterized.Parameters(name = "{0}")
     public static DatabaseType[] databases() {
         return DatabaseType.values();
@@ -42,16 +43,15 @@ public class CacheServiceImplDatabaseTest {
 
     @Test
     public void shouldLoadExistingInitCacheFromWebsiteTable() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-            Constants.zrLogConfig = testConfig(true);
+            applicationConfig = testConfig(true);
             BaseDataInitVO cached = cachedInit();
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     "base_data_init_cache_v3", new Gson().toJson(cached), "");
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     "zrlogSqlVersion", "7", "");
 
-            CacheServiceImpl service = new CacheServiceImpl(Constants.zrLogConfig::isInstalled);
+            CacheServiceImpl service = new CacheServiceImpl(applicationConfig::isInstalled);
 
             assertEquals(7L, service.getCurrentSqlVersion());
             assertEquals(99L, service.getWebSiteVersion());
@@ -61,23 +61,20 @@ public class CacheServiceImplDatabaseTest {
             assertEquals("red", service.getTemplateConfigMapWithCache("default").get("color"));
             assertEquals("Cached Site", service.getPublicWebSiteInfo().getTitle());
             assertEquals(cached.getVersion(), service.getInitData().getVersion());
-        } finally {
-            Constants.zrLogConfig = previousConfig;
         }
     }
 
     @Test
     public void shouldFallbackToDatabaseWhenStoredInitCacheIsInvalid() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-            Constants.zrLogConfig = testConfig(false);
+            applicationConfig = testConfig(false);
             seedLookupTables(db);
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     "base_data_init_cache_v3", "{bad-json", "");
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     "default_setting", "{\"color\":\"blue\"}", "");
 
-            CacheServiceImpl service = new CacheServiceImpl(Constants.zrLogConfig::isInstalled);
+            CacheServiceImpl service = new CacheServiceImpl(applicationConfig::isInstalled);
 
             assertEquals(-1L, service.getCurrentSqlVersion());
             assertEquals(0L, service.getWebSiteVersion());
@@ -87,16 +84,13 @@ public class CacheServiceImplDatabaseTest {
             assertEquals("blue", service.getTemplateConfigMapWithCache("default").get("color"));
             assertEquals("", service.getPublicWebSiteInfo().getTitle());
             assertFalse(service.getPublicWebSiteInfo().getDisable_comment_status());
-        } finally {
-            Constants.zrLogConfig = previousConfig;
         }
     }
 
     @Test
     public void shouldReadPublicWebsiteInfoFromDatabaseWhenInstalledAndCacheIsMissing() throws Exception {
-        ZrLogConfig previousConfig = Constants.zrLogConfig;
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-            Constants.zrLogConfig = testConfig(true);
+            applicationConfig = testConfig(true);
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     "base_data_init_cache_v3", "{bad-json", "");
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
@@ -104,12 +98,10 @@ public class CacheServiceImplDatabaseTest {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     "author", "Installed Author", "");
 
-            PublicWebSiteInfo info = new CacheServiceImpl(Constants.zrLogConfig::isInstalled).getPublicWebSiteInfo();
+            PublicWebSiteInfo info = new CacheServiceImpl(applicationConfig::isInstalled).getPublicWebSiteInfo();
 
             assertEquals("Installed Site", info.getTitle());
             assertEquals("Installed Author", info.getAuthor());
-        } finally {
-            Constants.zrLogConfig = previousConfig;
         }
     }
 
@@ -163,7 +155,6 @@ public class CacheServiceImplDatabaseTest {
     }
 
     private static class TestZrLogConfig extends ZrLogConfig {
-
         private boolean installed;
 
         private TestZrLogConfig() {

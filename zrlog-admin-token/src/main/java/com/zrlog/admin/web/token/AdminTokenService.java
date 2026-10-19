@@ -20,6 +20,10 @@ import com.zrlog.model.User;
 import com.zrlog.util.CrossUtils;
 import com.zrlog.util.ParseUtil;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
+
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -36,6 +40,7 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+@Singleton
 public class AdminTokenService implements TokenService {
 
     private static final String ADMIN_TOKEN_KEY_IN_COOKIE = "admin-token";
@@ -54,10 +59,11 @@ public class AdminTokenService implements TokenService {
         this(sessionTimeoutInMinutes, installed, staticHtml, User::new, UserPreferenceStore::new);
     }
 
+    @Inject
     public AdminTokenService(
-            long sessionTimeoutInMinutes,
+            @Named("adminSessionTimeoutMinutes") long sessionTimeoutInMinutes,
             BooleanSupplier installed,
-            BooleanSupplier staticHtml,
+            @Named("adminStaticHtml") BooleanSupplier staticHtml,
             jakarta.inject.Provider<User> users,
             jakarta.inject.Provider<UserPreferenceStore> preferences) {
         this.users = Objects.requireNonNull(users);

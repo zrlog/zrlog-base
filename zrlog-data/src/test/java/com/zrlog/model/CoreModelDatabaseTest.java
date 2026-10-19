@@ -1,14 +1,11 @@
 package com.zrlog.model;
 
-import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.hibegin.common.dao.dto.Direction;
 import com.hibegin.common.dao.dto.OrderBy;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequestImpl;
-import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
-import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.cache.dto.LinkDTO;
 import com.zrlog.common.cache.dto.LogNavDTO;
@@ -16,18 +13,16 @@ import com.zrlog.common.cache.dto.PluginDTO;
 import com.zrlog.common.cache.dto.TagDTO;
 import com.zrlog.common.cache.dto.TypeDTO;
 import com.zrlog.common.cache.dto.UserBasicDTO;
-import com.zrlog.common.cache.vo.BaseDataInitVO;
-import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
 import com.zrlog.data.dto.CommentDTO;
 import com.zrlog.data.dto.VisitorCommentDTO;
-import com.zrlog.plugin.IPlugin;
-import com.zrlog.plugin.Plugins;
-import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
-import com.zrlog.web.WebSiteInfoProvider;
-import java.lang.reflect.Field;
+import com.zrlog.test.support.ZrLogTestDatabase;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
@@ -36,10 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import sun.misc.Unsafe;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -161,11 +153,11 @@ public class CoreModelDatabaseTest {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
-            Constants.zrLogConfig = testConfig();
+            Constants.zrLogConfig = null;
             Log log = new Log();
 
-            ArticleDetailDTO byId = log.findByIdOrAlias(1);
-            ArticleDetailDTO byAlias = log.findByIdOrAlias("first");
+            ArticleDetailDTO byId = log.findByIdOrAlias(1, false);
+            ArticleDetailDTO byAlias = log.findByIdOrAlias("first", false);
 
             assertEquals("First", byId.getTitle());
             assertEquals("admin", byId.getUserName());
@@ -173,8 +165,8 @@ public class CoreModelDatabaseTest {
             assertEquals("Reader", byId.getComments().get(0).getUserName());
             assertEquals("Second", byId.getNextLog().getTitle());
             assertEquals("First", byAlias.getTitle());
-            assertEquals(null, log.findByIdOrAlias(null));
-            assertEquals(null, log.findByIdOrAlias(999));
+            assertEquals(null, log.findByIdOrAlias(null, false));
+            assertEquals(null, log.findByIdOrAlias(999, false));
         } finally {
             Constants.zrLogConfig = previousConfig;
         }
@@ -185,9 +177,9 @@ public class CoreModelDatabaseTest {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
-            Constants.zrLogConfig = testConfig(true);
+            Constants.zrLogConfig = null;
 
-            ArticleDetailDTO detail = new Log().findByIdOrAlias(1);
+            ArticleDetailDTO detail = new Log().findByIdOrAlias(1, true);
 
             assertEquals("First", detail.getTitle());
             assertTrue(detail.getComments().isEmpty());
@@ -342,116 +334,4 @@ public class CoreModelDatabaseTest {
                 releaseTime, releaseTime, title, 1, 1, false, rubbish, privacy, "markdown");
     }
 
-    private static ZrLogConfig testConfig() throws Exception {
-        return testConfig(false);
-    }
-
-    private static ZrLogConfig testConfig(boolean disableComment) throws Exception {
-        TestZrLogConfig config = allocate(TestZrLogConfig.class);
-        config.cacheService = new TestCacheService(disableComment);
-        return config;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <T> T allocate(Class<T> type) throws Exception {
-        Field field = Unsafe.class.getDeclaredField("theUnsafe");
-        field.setAccessible(true);
-        return (T) ((Unsafe) field.get(null)).allocateInstance(type);
-    }
-
-    private static class TestZrLogConfig extends ZrLogConfig {
-        private CacheService cacheService;
-
-        @Override
-        public <T> T getWebSetup(Class<T> capability) {
-            if (capability == WebSiteInfoProvider.class) {
-                return capability.cast((WebSiteInfoProvider) cacheService::getPublicWebSiteInfo);
-            }
-            return super.getWebSetup(capability);
-        }
-
-
-        private TestZrLogConfig() {
-            super(0, null, "");
-        }
-
-        @Override
-        public boolean isInstalled() {
-            return true;
-        }
-
-        @Override
-        public DataSourceWrapper configDatabase() {
-            return null;
-        }
-
-        @Override
-        protected TokenService initTokenService() {
-            return null;
-        }
-
-        @Override
-        public List<IPlugin> getBasePluginList() {
-            return new Plugins();
-        }
-    }
-
-    private static class TestCacheService implements CacheService {
-
-        private final boolean disableComment;
-
-        TestCacheService(boolean disableComment) {
-            this.disableComment = disableComment;
-        }
-
-        @Override
-        public long getCurrentSqlVersion() {
-            return 0;
-        }
-
-        @Override
-        public long getWebSiteVersion() {
-            return 0;
-        }
-
-        @Override
-        public BaseDataInitVO getInitData() {
-            return new BaseDataInitVO();
-        }
-
-        @Override
-        public BaseDataInitVO refreshInitData() {
-            return getInitData();
-        }
-
-        @Override
-        public PublicWebSiteInfo getPublicWebSiteInfo() {
-            PublicWebSiteInfo info = new PublicWebSiteInfo();
-            info.setDisable_comment_status(disableComment);
-            return info;
-        }
-
-        @Override
-        public List<TypeDTO> getArticleTypes() {
-            return Collections.emptyList();
-        }
-
-        @Override
-        public List<TagDTO> getTags() {
-            return Collections.emptyList();
-        }
-
-        @Override
-        public UserBasicDTO getUserInfoById(Long userId) {
-            UserBasicDTO user = new UserBasicDTO();
-            user.setUserId(userId);
-            user.setUserName("admin");
-            return user;
-        }
-
-        @Override
-        public Map<String, Object> getTemplateConfigMapWithCache(String template) {
-            return Collections.emptyMap();
-        }
-    }
 }

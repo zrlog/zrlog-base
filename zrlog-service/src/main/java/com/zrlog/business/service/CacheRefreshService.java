@@ -1,7 +1,8 @@
-package com.zrlog.business.util;
+package com.zrlog.business.service;
 
 import com.hibegin.common.util.EnvKit;
 import com.hibegin.common.util.LoggerUtil;
+import com.hibegin.common.util.StringUtils;
 import com.hibegin.http.server.api.HttpRequest;
 import com.zrlog.business.plugin.PluginCorePlugin;
 import com.zrlog.business.plugin.StaticSitePlugin;
@@ -9,24 +10,43 @@ import com.zrlog.business.plugin.type.StaticSiteType;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
+import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.model.WebSite;
 import com.zrlog.util.ThreadUtils;
+
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.*;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.concurrent.*;
 
 /**
- * 缓存工具，便于处理程序缓存和插件缓存
+ * 应用内缓存刷新，协调程序缓存、插件缓存和静态发布
  */
-public class CacheUtils {
+public class CacheRefreshService {
+    private final CacheService cacheService;
+    private final Supplier<PluginCorePlugin> pluginCore;
+    private final Supplier<List<StaticSitePlugin>> staticSites;
 
-    private static final Logger LOGGER = LoggerUtil.getLogger(CacheUtils.class);
+    public CacheRefreshService(CacheService cacheService, Supplier<PluginCorePlugin> pluginCore,
+                               Supplier<List<StaticSitePlugin>> staticSites) {
+        this.cacheService = Objects.requireNonNull(cacheService);
+        this.pluginCore = Objects.requireNonNull(pluginCore);
+        this.staticSites = Objects.requireNonNull(staticSites);
+    }
 
-    public static void updateCache(CacheService cacheService, boolean async, HttpRequest request, List<StaticSiteType> staticSiteTypeList) {
+    public boolean isStaticSiteDisabled() {
+        PublicWebSiteInfo site = cacheService.getPublicWebSiteInfo();
+        return site == null || !Boolean.TRUE.equals(site.getGenerator_html_status()) || StringUtils.isEmpty(site.getHost());
+    }
+
+
+    private static final Logger LOGGER = LoggerUtil.getLogger(CacheRefreshService.class);
+
+    public void updateCache(boolean async, HttpRequest request, List<StaticSiteType> staticSiteTypeList) {
         try {
             if (async) {
                 BaseDataInitVO initVO = cacheService.refreshInitData();
@@ -34,7 +54,7 @@ public class CacheUtils {
                     refreshPluginCacheData(initVO.getVersion() + "", request, staticSiteTypeList);
                 });
             } else {
-                updateCacheSynchronouslyOrThrow(cacheService, request, staticSiteTypeList);
+                updateCacheSynchronouslyOrThrow(request, staticSiteTypeList);
             }
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Refresh cache error ", e);
@@ -44,8 +64,8 @@ public class CacheUtils {
     /**
      * Refreshes cache data synchronously for callers that need to report the actual completion result.
      */
-    public static void updateCacheSynchronouslyOrThrow(CacheService cacheService, HttpRequest request,
-                                                       List<StaticSiteType> staticSiteTypeList) {
+    public void updateCacheSynchronouslyOrThrow(HttpRequest request,
+                                                 List<StaticSiteType> staticSiteTypeList) {
         BaseDataInitVO initVO = cacheService.refreshInitData();
         refreshPluginCacheData(initVO.getVersion() + "", request, staticSiteTypeList);
     }
@@ -58,9 +78,9 @@ public class CacheUtils {
         return 3600;
     }
 
-    private static void notifyPluginUpdateCache(String cacheVersion, HttpRequest request) {
+    private void notifyPluginUpdateCache(String cacheVersion, HttpRequest request) {
         //启动插件
-        PluginCorePlugin pluginCorePlugin = Constants.zrLogConfig.getPlugin(PluginCorePlugin.class);
+        PluginCorePlugin pluginCorePlugin = pluginCore.get();
         if (Objects.nonNull(pluginCorePlugin) && !pluginCorePlugin.isStarted()) {
             pluginCorePlugin.start();
         }
@@ -70,10 +90,10 @@ public class CacheUtils {
         }
     }
 
-    private static void waitStaticSiteCacheSync(HttpRequest request, StaticSitePlugin staticSitePlugin) {
+    private void waitStaticSiteCacheSync(HttpRequest request, StaticSitePlugin staticSitePlugin) {
         //启动插件
         String version = staticSitePlugin.getSiteVersion();
-        CacheUtils.notifyPluginUpdateCache(version, request);
+        notifyPluginUpdateCache(version, request);
         for (; ; ) {
             if (staticSitePlugin.isSynchronized(request.getScheme())) {
                 try {
@@ -94,11 +114,14 @@ public class CacheUtils {
         }
     }
 
-    public static boolean refreshStaticSiteCache(HttpRequest request, List<StaticSiteType> siteTypes) {
+    public boolean refreshStaticSiteCache(HttpRequest request, List<StaticSiteType> siteTypes) {
         if (siteTypes == null || siteTypes.isEmpty()) {
             return false;
         }
-        List<StaticSitePlugin> staticSitePlugins = Constants.zrLogConfig.getPluginsByClazz(StaticSitePlugin.class).stream().filter(e -> siteTypes.contains(e.getType())).collect(Collectors.toList());
+        List<StaticSitePlugin> staticSitePlugins = staticSites.get().stream().filter(e -> siteTypes.contains(e.getType())).collect(Collectors.toList());
+        if (staticSitePlugins.isEmpty()) {
+            return false;
+        }
         ExecutorService executorService = ThreadUtils.newFixedThreadPool(staticSitePlugins.size());
         try {
             CompletableFuture.allOf(staticSitePlugins.stream().map(staticSitePlugin -> {
@@ -116,9 +139,9 @@ public class CacheUtils {
         }
     }
 
-    private static void refreshPluginCacheData(String cacheVersion, HttpRequest request, List<StaticSiteType> staticSiteTypeList) {
+    private void refreshPluginCacheData(String cacheVersion, HttpRequest request, List<StaticSiteType> staticSiteTypeList) {
         notifyPluginUpdateCache(cacheVersion, request);
-        if (!StaticSitePlugin.isDisabled()) {
+        if (!isStaticSiteDisabled()) {
             refreshStaticSiteCache(request, staticSiteTypeList);
         }
     }

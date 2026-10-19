@@ -1,12 +1,10 @@
 package com.zrlog.common;
 
 import com.hibegin.common.util.EnvKit;
-import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.theme.spi.BundledThemes;
-import com.zrlog.web.WebSiteInfoProvider;
+
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * 存放全局的静态变量，有多个地方使用一个key时，存放在这里，方便代码的维护。
@@ -54,24 +52,9 @@ public class Constants {
         }
     }
 
-    public static PublicWebSiteInfo getPublicWebSiteInfo() {
-        WebSiteInfoProvider provider = zrLogConfig == null ? null
-                : zrLogConfig.getWebSetup(WebSiteInfoProvider.class);
-        return provider == null ? null : provider.getPublicWebSiteInfo();
-    }
-
-    public static boolean isStaticHtmlStatus() {
-        PublicWebSiteInfo info = getPublicWebSiteInfo();
-        return info != null && Boolean.TRUE.equals(info.getGenerator_html_status());
-    }
 
     public static String getArticleUri() {
         return "";
-    }
-
-    public static String getHost() {
-        PublicWebSiteInfo info = getPublicWebSiteInfo();
-        return info == null ? "" : Objects.requireNonNullElse(info.getHost(), "");
     }
 
     public static List<String> articleRouterList() {
@@ -82,8 +65,4 @@ public class Constants {
         System.getProperties().put("java.util.logging.SimpleFormatter.format", "%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS.%1$tL %4$s %5$s%6$s%n");
     }
 
-    public static String getLanguage() {
-        PublicWebSiteInfo info = getPublicWebSiteInfo();
-        return info == null ? DEFAULT_LANGUAGE : info.getLanguage();
-    }
 }

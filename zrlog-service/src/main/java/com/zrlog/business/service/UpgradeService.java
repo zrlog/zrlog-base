@@ -1,36 +1,38 @@
 package com.zrlog.business.service;
 
 import com.hibegin.common.util.*;
-import com.zrlog.business.exception.DownloadUpgradeFileException;
 import com.zrlog.business.exception.CheckUpgradeVersionException;
+import com.zrlog.business.exception.DownloadUpgradeFileException;
 import com.zrlog.business.rest.response.CheckVersionResponse;
 import com.zrlog.business.rest.response.PreCheckVersionResponse;
 import com.zrlog.business.rest.response.UpgradeProcessResponse;
 import com.zrlog.business.updater.UpdateVersionInfoPlugin;
-import com.zrlog.common.updater.*;
-import com.zrlog.common.adapter.UpdaterHosts;
-import com.zrlog.common.Constants;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
+import com.zrlog.common.adapter.UpdaterHosts;
+import com.zrlog.common.updater.*;
 import com.zrlog.common.vo.Version;
+import com.zrlog.updater.spi.*;
 import com.zrlog.util.I18nUtil;
 import com.zrlog.util.ZrLogUtil;
 
 import java.io.File;
 import java.util.Map;
 import java.util.Objects;
-import com.zrlog.updater.spi.*;
 
 public class UpgradeService {
 
-    private final UpgradeNoticeService upgradeNoticeService = new UpgradeNoticeService();
+    private final UpgradeNoticeService upgradeNoticeService;
+    private final Updater updater;
     private final BackupProtectionService backupProtectionService;
 
-    public UpgradeService() {
-        this(new BackupProtectionService());
+    public UpgradeService(Updater updater, UpgradeNoticeService upgradeNoticeService) {
+        this(updater, upgradeNoticeService, new BackupProtectionService());
     }
 
-    UpgradeService(BackupProtectionService backupProtectionService) {
+    UpgradeService(Updater updater, UpgradeNoticeService upgradeNoticeService, BackupProtectionService backupProtectionService) {
+        this.updater = updater;
+        this.upgradeNoticeService = Objects.requireNonNull(upgradeNoticeService);
         this.backupProtectionService = backupProtectionService;
     }
 
@@ -78,14 +80,14 @@ public class UpgradeService {
         checkVersionResponse.setNativeImageMode(EnvKit.isNativeImage());
         boolean disable = isOnlineUpgradeDisabled();
         checkVersionResponse.setOnlineUpgradable(!disable);
-        Updater currentUpdater = Constants.zrLogConfig == null ? null : Constants.zrLogConfig.getUpdater();
+        Updater currentUpdater = updater;
         if (currentUpdater != null && UpdaterHosts.unwrap(currentUpdater) instanceof SystemPackageUpdater) {
             try { checkVersionResponse.setSystemPackageUpgrade(((SystemPackageUpdater) UpdaterHosts.unwrap(currentUpdater)).status()); }
             catch (Exception e) { throw new IllegalStateException("Unable to read system package upgrade status", e); }
         }
         if (isDockerMode() && UpdaterHosts.dockerConfigured()) {
             try {
-                UpdaterHosts.dockerControl().capabilities();
+                UpdaterHosts.dockerControl(updater).capabilities();
                 checkVersionResponse.setOnlineUpgradable(true);
                 checkVersionResponse.setDockerUpdaterAvailable(true);
             } catch (RuntimeException error) {
@@ -132,7 +134,6 @@ public class UpgradeService {
         if (Objects.isNull(version) || !Objects.equals(checkVersionResponse.getUpgrade(), true)) {
             return new UpgradeProcessResponse(true, backendString(backend, "upgrade.result.noChange"));
         }
-        Updater updater = Objects.nonNull(Constants.zrLogConfig) ? Constants.zrLogConfig.getUpdater() : null;
         if (isOnlineUpgradeDisabled()) {
             return buildManualUpgradeResponse(version, backend);
         }
@@ -165,7 +166,6 @@ public class UpgradeService {
     UpdateVersionHandler newOnlineUpdateVersionHandler(Version version, File upgradePackage,
                                                        UpgradeProgressListener progressListener,
                                                        Map<String, Object> backend) {
-        Updater updater = Objects.nonNull(Constants.zrLogConfig) ? Constants.zrLogConfig.getUpdater() : null;
         return newOnlineUpdateVersionHandler(version, upgradePackage, progressListener, backend, updater);
     }
 
@@ -186,11 +186,11 @@ public class UpgradeService {
     private UpgradeProcessResponse buildManualUpgradeResponse(Version version, Map<String, Object> backend) {
         UpdateVersionHandler updateVersionHandler;
         if (isDockerMode()) {
-            updateVersionHandler = UpdaterHosts.manualHandler(UpdaterTypeEnum.DOCKER, null, version, backend);
+            updateVersionHandler = UpdaterHosts.manualHandler(UpdaterTypeEnum.DOCKER, updater, version, backend);
         } else if (isSystemServiceMode()) {
-            updateVersionHandler = UpdaterHosts.manualHandler(UpdaterTypeEnum.DEB, null, version, backend);
+            updateVersionHandler = UpdaterHosts.manualHandler(UpdaterTypeEnum.DEB, updater, version, backend);
         } else if (isFaaSMode()) {
-            updateVersionHandler = UpdaterHosts.manualHandler(UpdaterTypeEnum.FAAS, null, version, backend);
+            updateVersionHandler = UpdaterHosts.manualHandler(UpdaterTypeEnum.FAAS, updater, version, backend);
         } else {
             return new UpgradeProcessResponse(false, "");
         }
@@ -199,7 +199,6 @@ public class UpgradeService {
     }
 
     boolean isDebOnlineUpgradeSupported() {
-        Updater updater = Constants.zrLogConfig == null ? null : Constants.zrLogConfig.getUpdater();
         return updater != null && UpdaterHosts.unwrap(updater) instanceof SystemPackageUpdater && ((SystemPackageUpdater) UpdaterHosts.unwrap(updater)).available();
     }
 
@@ -212,7 +211,7 @@ public class UpgradeService {
     }
 
     boolean isWarMode() {
-        return ZrLogUtil.isWarMode();
+        return ZrLogUtil.isWarMode(updater);
     }
 
     boolean isWarMode(Updater updater) {
@@ -224,7 +223,7 @@ public class UpgradeService {
     }
 
     boolean isFaaSOnlineUpgradeSupported() {
-        return UpdaterHosts.onlineUpgradeSupported(UpdaterTypeEnum.FAAS);
+        return UpdaterHosts.onlineUpgradeSupported(UpdaterTypeEnum.FAAS, updater);
     }
 
     static String buildUpgradeKey(Version version) {

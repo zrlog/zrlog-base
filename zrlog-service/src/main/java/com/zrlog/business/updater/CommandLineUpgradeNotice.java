@@ -3,7 +3,6 @@ package com.zrlog.business.updater;
 import com.hibegin.common.util.EnvKit;
 import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.StringUtils;
-import com.zrlog.common.Constants;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
 import com.zrlog.common.updater.UpdateVersionCheckResult;
@@ -20,15 +19,16 @@ import java.util.logging.Logger;
 final class CommandLineUpgradeNotice {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(CommandLineUpgradeNotice.class);
-    private static final Set<String> NOTIFIED_UPDATES = ConcurrentHashMap.newKeySet();
+    private final Set<String> notifiedUpdates = ConcurrentHashMap.newKeySet();
+    private final Updater updater;
 
-    private CommandLineUpgradeNotice() {
+    CommandLineUpgradeNotice(Updater updater) {
+        this.updater = updater;
     }
 
-    static void notifyUpdate(UpdateVersionCheckResult checkResult) {
-        Updater updater = Objects.nonNull(Constants.zrLogConfig) ? Constants.zrLogConfig.getUpdater() : null;
+    void notifyUpdate(UpdateVersionCheckResult checkResult) {
         String notice = nextNotice(checkResult, updater, ZrLogUtil.isDockerMode(),
-                ZrLogUtil.isSystemServiceMode(), EnvKit.isFaaSMode(), EnvKit.isDevMode(), NOTIFIED_UPDATES);
+                ZrLogUtil.isSystemServiceMode(), EnvKit.isFaaSMode(), EnvKit.isDevMode(), notifiedUpdates);
         if (Objects.nonNull(notice)) {
             LOGGER.info("\n" + notice);
         }

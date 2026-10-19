@@ -9,20 +9,20 @@ import com.hibegin.common.dao.dto.PageRequest;
 import com.hibegin.common.dao.dto.PageRequestImpl;
 import com.hibegin.common.util.BeanUtil;
 import com.hibegin.common.util.StringUtils;
-import com.zrlog.common.Constants;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.util.ParseUtil;
 import com.zrlog.util.ThreadUtils;
+
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.*;
 
 /**
  * 存放文章数据，对应数据的 log 表。
@@ -66,7 +66,7 @@ public class Log extends BasePageableDAO implements Serializable {
         return detail;
     }
 
-    public ArticleDetailDTO findByIdOrAlias(Object idOrAlias) throws SQLException {
+    public ArticleDetailDTO findByIdOrAlias(Object idOrAlias, boolean commentsDisabled) throws SQLException {
         ExecutorService executor = ThreadUtils.newFixedThreadPool(3);
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         ArticleDetailDTO detail = getDetail(idOrAlias);
@@ -74,7 +74,7 @@ public class Log extends BasePageableDAO implements Serializable {
             return null;
         }
         try {
-            if (ResultValueConvertUtils.toBoolean(detail.getCanComment()) && !Constants.getPublicWebSiteInfo().getDisable_comment_status()) {
+            if (ResultValueConvertUtils.toBoolean(detail.getCanComment()) && !commentsDisabled) {
                 futures.add(CompletableFuture.runAsync(() -> {
                     try {
                         detail.setComments(new Comment().visitorFindAllByLogId(detail.getId().intValue()));

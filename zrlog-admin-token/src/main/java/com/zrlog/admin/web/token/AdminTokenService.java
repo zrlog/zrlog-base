@@ -14,24 +14,25 @@ import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.vo.AdminFullTokenVO;
 import com.zrlog.common.vo.AdminTokenVO;
-import com.zrlog.model.User;
 import com.zrlog.data.security.AccountAccess;
-import java.sql.SQLException;
+import com.zrlog.model.User;
 import com.zrlog.util.CrossUtils;
 import com.zrlog.util.ParseUtil;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
 import java.util.logging.Logger;
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 public class AdminTokenService implements TokenService {
 
@@ -41,9 +42,13 @@ public class AdminTokenService implements TokenService {
     private final String TOKEN_SPLIT_CHAR = "#";
     private final IvParameterSpec iv;
     private volatile long sessionTimeout;
+    private final BooleanSupplier installed;
+    private final BooleanSupplier staticHtml;
     private final Map<Integer, String> userSecretKeyCacheMap = new ConcurrentHashMap<>();
 
-    public AdminTokenService(long sessionTimeoutInMinutes) {
+    public AdminTokenService(long sessionTimeoutInMinutes, BooleanSupplier installed, BooleanSupplier staticHtml) {
+        this.installed = Objects.requireNonNull(installed);
+        this.staticHtml = Objects.requireNonNull(staticHtml);
         //字符长度必须要大于16个字符
         this.iv = new IvParameterSpec("_BLOG_BLOG_BLOG_".getBytes(StandardCharsets.UTF_8));
         //*60000， Cookie过期时间单位为分钟
@@ -85,7 +90,7 @@ public class AdminTokenService implements TokenService {
 
     @Override
     public AdminFullTokenVO getAdminTokenVO(HttpRequest request) {
-        if (!Constants.zrLogConfig.isInstalled()) {
+        if (!installed.getAsBoolean()) {
             return null;
         }
         //header first, seconds parse cookie
@@ -173,7 +178,7 @@ public class AdminTokenService implements TokenService {
             return;
         }
         URI uri = URI.create(referer);
-        if (!CrossUtils.isEnableOrigin(request)) {
+        if (!CrossUtils.isEnableOrigin(request, staticHtml.getAsBoolean())) {
             response.redirect(ADMIN_LOGIN_URI_PATH);
             return;
         }
@@ -218,7 +223,7 @@ public class AdminTokenService implements TokenService {
         cookie.setValue(tokenString);
         cookie.setExpireDate(new Date(adminTokenVO.getExpiresAt()));
         if (Objects.equals(protocol, "https")) {
-            if (CrossUtils.isEnableOrigin(request) && !EnvKit.isDevMode()) {
+            if (CrossUtils.isEnableOrigin(request, staticHtml.getAsBoolean()) && !EnvKit.isDevMode()) {
                 cookie.setSameSite("None");
             }
             cookie.setSecure(true);

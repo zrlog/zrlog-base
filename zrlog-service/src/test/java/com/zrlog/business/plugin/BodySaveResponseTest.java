@@ -1,18 +1,12 @@
 package com.zrlog.business.plugin;
 
-import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.http.HttpVersion;
-import com.hibegin.http.server.ApplicationContext;
 import com.hibegin.http.server.api.HttpRequest;
-import com.hibegin.http.server.config.AbstractServerConfig;
 import com.hibegin.http.server.config.ResponseConfig;
 import com.hibegin.http.server.config.ServerConfig;
 import com.zrlog.business.plugin.type.StaticSiteType;
 import com.zrlog.common.Constants;
-import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
-import com.zrlog.plugin.IPlugin;
-import com.zrlog.plugin.Plugins;
 import org.junit.After;
 import org.junit.Test;
 
@@ -46,9 +40,9 @@ public class BodySaveResponseTest {
     @Test
     public void shouldPersistSuccessfulTextBodyToStaticCacheFile() throws Exception {
         File cacheFile = tempFile("article.html");
-        Constants.zrLogConfig = new TestZrLogConfig(new TestStaticSitePlugin(cacheFile));
+        Constants.zrLogConfig = null;
 
-        try (BodySaveResponse response = new BodySaveResponse(request("/article.html"), new ResponseConfig(), true)) {
+        try (BodySaveResponse response = new BodySaveResponse(request("/article.html"), new ResponseConfig(), true, new TestStaticSitePlugin(cacheFile))) {
             response.renderText("zrlog");
 
             assertEquals(cacheFile.getCanonicalFile(), response.getCacheFile().getCanonicalFile());
@@ -59,9 +53,9 @@ public class BodySaveResponseTest {
     @Test
     public void shouldAppendHtmlSuffixForAdminExtensionlessUri() throws Exception {
         File cacheFile = tempFile("admin-page");
-        Constants.zrLogConfig = new TestZrLogConfig(new TestStaticSitePlugin(cacheFile));
+        Constants.zrLogConfig = null;
 
-        try (BodySaveResponse response = new BodySaveResponse(request("/admin/dashboard"), new ResponseConfig(), true)) {
+        try (BodySaveResponse response = new BodySaveResponse(request("/admin/dashboard"), new ResponseConfig(), true, new TestStaticSitePlugin(cacheFile))) {
             response.renderText("admin");
 
             assertTrue(response.getCacheFile().getName().endsWith(".html"));
@@ -72,9 +66,9 @@ public class BodySaveResponseTest {
     @Test
     public void shouldSkipNonSuccessBodiesWhenSuccessStatusIsRequired() throws Exception {
         File cacheFile = tempFile("missing.html");
-        Constants.zrLogConfig = new TestZrLogConfig(new TestStaticSitePlugin(cacheFile));
+        Constants.zrLogConfig = null;
 
-        try (BodySaveResponse response = new BodySaveResponse(request("/missing.html"), new ResponseConfig(), true)) {
+        try (BodySaveResponse response = new BodySaveResponse(request("/missing.html"), new ResponseConfig(), true, new TestStaticSitePlugin(cacheFile))) {
             response.write(new ByteArrayInputStream("missing".getBytes(StandardCharsets.UTF_8)), 404);
 
             assertNull(response.getCacheFile());
@@ -85,9 +79,9 @@ public class BodySaveResponseTest {
     @Test
     public void shouldAllowErrorBodyWhenSuccessStatusIsNotRequired() throws Exception {
         File cacheFile = tempFile("error.html");
-        Constants.zrLogConfig = new TestZrLogConfig(new TestStaticSitePlugin(cacheFile));
+        Constants.zrLogConfig = null;
 
-        try (BodySaveResponse response = new BodySaveResponse(request("/error.html"), new ResponseConfig(), false)) {
+        try (BodySaveResponse response = new BodySaveResponse(request("/error.html"), new ResponseConfig(), false, new TestStaticSitePlugin(cacheFile))) {
             response.write(new ByteArrayInputStream("error".getBytes(StandardCharsets.UTF_8)), 500);
 
             assertNull(response.getCacheFile());
@@ -99,9 +93,9 @@ public class BodySaveResponseTest {
     public void shouldExportNotFoundAndLegacySuccessButRejectOtherErrors() throws Exception {
         for (int status : new int[]{404, 200, 500, 302}) {
             File cacheFile = tempFile("error-" + status + ".html");
-            Constants.zrLogConfig = new TestZrLogConfig(new TestStaticSitePlugin(cacheFile));
+            Constants.zrLogConfig = null;
             try (BodySaveResponse response = new BodySaveResponse(request("/error/404.html"),
-                    new ResponseConfig(), true, 404)) {
+                    new ResponseConfig(), true, 404, new TestStaticSitePlugin(cacheFile))) {
                 response.write(new ByteArrayInputStream("missing page".getBytes(StandardCharsets.UTF_8)), status);
                 if (status == 404 || status == 200) assertEquals(cacheFile, response.getCacheFile());
                 else assertNull(response.getCacheFile());
@@ -158,42 +152,10 @@ public class BodySaveResponseTest {
                 });
     }
 
-    private static class TestZrLogConfig extends ZrLogConfig {
-
-        private final Plugins plugins = new Plugins();
-
-        TestZrLogConfig(StaticSitePlugin staticSitePlugin) {
-            super(19081, null, "/");
-            this.plugins.add(staticSitePlugin);
-        }
-
-        @Override
-        public boolean isInstalled() {
-            return false;
-        }
-
-        @Override
-        public DataSourceWrapper configDatabase() {
-            return null;
-        }
-
-        @Override
-        protected TokenService initTokenService() {
-            return null;
-        }
-
-        @Override
-        public Plugins getAllPlugins() {
-            return plugins;
-        }
-
-        @Override
-        public List<IPlugin> getBasePluginList() {
-            return plugins;
-        }
-    }
-
     private static class TestStaticSitePlugin implements StaticSitePlugin {
+        private final com.zrlog.common.vo.PublicWebSiteInfo site = new com.zrlog.common.vo.PublicWebSiteInfo();
+        @Override public com.zrlog.common.vo.PublicWebSiteInfo getSiteInfo() { return site; }
+
 
         private final File cacheFile;
         private final Map<String, HandleState> handleStatusPageMap = new HashMap<>();
@@ -270,7 +232,7 @@ public class BodySaveResponseTest {
         }
 
         @Override
-        public void doFetch(AbstractServerConfig serverConfig, ApplicationContext applicationContext) {
+        public void doFetch(StaticSiteRenderer renderer) {
         }
     }
 }

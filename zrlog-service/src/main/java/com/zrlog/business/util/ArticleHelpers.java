@@ -2,9 +2,9 @@ package com.zrlog.business.util;
 
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.util.StringUtils;
-import com.zrlog.common.Constants;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.util.ParseUtil;
+
 import java.util.List;
 
 /**
@@ -15,7 +15,7 @@ public class ArticleHelpers {
     /**
      * 高亮用户检索的关键字
      */
-    public static void wrapperSearchKeyword(PageData<ArticleBasicDTO> data, String keywords) {
+    public static void wrapperSearchKeyword(PageData<ArticleBasicDTO> data, String keywords, long digestLength) {
         if (StringUtils.isEmpty(keywords)) {
             return;
         }
@@ -23,7 +23,6 @@ public class ArticleHelpers {
         if (logs == null || logs.isEmpty()) {
             return;
         }
-        long digestLength = Constants.getPublicWebSiteInfo().getArticle_auto_digest_length();
         for (ArticleBasicDTO log : logs) {
             String title = log.getTitle();
             String content = log.getContent();

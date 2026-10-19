@@ -2,6 +2,7 @@ package com.zrlog.business.plugin;
 
 import com.google.gson.Gson;
 import com.hibegin.common.BaseLockObject;
+import com.hibegin.common.util.*;
 import com.hibegin.common.util.http.HttpUtil;
 import com.hibegin.common.util.http.handle.CloseResponseHandle;
 import com.hibegin.common.util.http.handle.HttpHandle;
@@ -20,16 +21,17 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.plugin.PluginAdminAppearance;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.I18nUtil;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.IntSupplier;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import com.hibegin.common.util.*;
-
-import java.util.*;
 
 public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePlugin {
 
@@ -38,19 +40,22 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
     private final File dbPropertiesPath;
     private final String pluginJvmArgs;
     private final PluginCoreProcess pluginCoreProcess;
+    private final Supplier<PublicWebSiteInfo> siteInfo;
     private final String token;
     private volatile String pluginServerBaseUrl;
     private volatile String pendingPluginServerBaseUrl;
     private long pluginServerGeneration;
 
-    public PluginCorePluginImpl(File dbPropertiesPath, String contextPath) {
+    public PluginCorePluginImpl(File dbPropertiesPath, String contextPath, IntSupplier hostPort,
+                                Supplier<PublicWebSiteInfo> siteInfo) {
         this.dbPropertiesPath = dbPropertiesPath;
+        this.siteInfo = Objects.requireNonNull(siteInfo);
         String args = ConfigKit.get("pluginJvmArgs", "-Xms8m -Xmx64m -Dfile.encoding=UTF-8");
         if (EnvKit.isDevMode()) {
             args += " -Dsws.run.mode=dev";
         }
         this.pluginJvmArgs = args;
-        this.pluginCoreProcess = new PluginCoreProcessImpl(this::stop, contextPath);
+        this.pluginCoreProcess = new PluginCoreProcessImpl(this::stop, contextPath, hostPort);
         this.token = UUID.randomUUID().toString().replace("-", "");
     }
 
@@ -59,15 +64,16 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
         return !EnvKit.isFaaSMode();
     }
 
-    private static Map<String, String> genHeaderMapByRequest(HttpRequest request, AdminTokenVO adminTokenVO) {
+    private Map<String, String> genHeaderMapByRequest(HttpRequest request, AdminTokenVO adminTokenVO) {
         Map<String, String> map = new HashMap<>();
         if (adminTokenVO != null) {
             map.put("LoginUserId", adminTokenVO.getUserId() + "");
         }
         map.put("IsLogin", (adminTokenVO != null) + "");
-        map.put("Current-Locale", I18nUtil.getCurrentLocale());
+
         map.put("Blog-Version", BlogBuildInfoUtil.getVersion());
-        PublicWebSiteInfo publicWebSiteInfo = Constants.getPublicWebSiteInfo();
+        PublicWebSiteInfo publicWebSiteInfo = siteInfo.get();
+        map.put("Current-Locale", I18nUtil.getCurrentLocale(publicWebSiteInfo.getLanguage()));
         PluginAdminAppearance appearance = new PluginAdminAppearance(publicWebSiteInfo.getAdmin_theme(),
                 Boolean.TRUE.equals(publicWebSiteInfo.getAdmin_darkMode()), publicWebSiteInfo.getAdmin_color_primary(),
                 Boolean.TRUE.equals(publicWebSiteInfo.getAdmin_compactMode()));

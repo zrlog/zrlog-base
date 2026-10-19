@@ -19,14 +19,16 @@ import com.zrlog.common.vo.Version;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.web.WebSiteInfoProvider;
+import org.junit.After;
+import org.junit.Test;
+
 import java.io.File;
 import java.lang.reflect.Proxy;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.junit.After;
-import org.junit.Test;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -56,44 +58,44 @@ public class ZrLogUtilTest {
 
     @Test
     public void shouldPreferConfiguredBlogHostWhenPresent() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig("configured.example.com");
+        Constants.zrLogConfig = null;
 
         assertEquals("configured.example.com", ZrLogUtil.getBlogHost(request("/blog", "fallback.example.com",
-                "/post/1")));
+                "/post/1"), "configured.example.com"));
         assertEquals("//configured.example.com/blog/", ZrLogUtil.getHomeUrlWithHost(request("/blog",
-                "fallback.example.com", "/post/1")));
+                "fallback.example.com", "/post/1"), "configured.example.com"));
         assertEquals("configured.example.com/blog/", ZrLogUtil.getHomeUrlWithHostNotProtocol(request("/blog",
-                "fallback.example.com", "/post/1")));
+                "fallback.example.com", "/post/1"), "configured.example.com"));
     }
 
     @Test
     public void shouldBuildFullUrlFromConfiguredHost() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig("configured.example.com/");
+        Constants.zrLogConfig = null;
 
         assertEquals("//configured.example.com/post/1", ZrLogUtil.getFullUrl(request("/blog",
-                "fallback.example.com", "/post/1")));
+                "fallback.example.com", "/post/1"), "configured.example.com/"));
     }
 
     @Test
     public void shouldBuildFullUrlFromRequestHostWithoutDroppingPathSeparator() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig("");
+        Constants.zrLogConfig = null;
 
         assertEquals("//localhost:7080/all-3", ZrLogUtil.getFullUrl(request("/",
-                "localhost:7080", "/all-3")));
+                "localhost:7080", "/all-3"), ""));
         assertEquals("//localhost:7080/", ZrLogUtil.getFullUrl(request("/",
-                "localhost:7080", "/")));
+                "localhost:7080", "/"), ""));
 
-        Constants.zrLogConfig = new TestZrLogConfig("blog.example.com/");
+        Constants.zrLogConfig = null;
         assertEquals("//blog.example.com/all-3", ZrLogUtil.getFullUrl(request("/",
-                "ignored.example.com", "/all-3")));
+                "ignored.example.com", "/all-3"), "blog.example.com/"));
     }
 
     @Test
     public void shouldFallbackToRequestHostWhenWebsiteHostIsMissing() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig("");
+        Constants.zrLogConfig = null;
 
-        assertEquals("fallback.example.com", ZrLogUtil.getBlogHost(request("/", "fallback.example.com", "/post/1")));
-        assertEquals("", ZrLogUtil.getBlogHost(null));
+        assertEquals("fallback.example.com", ZrLogUtil.getBlogHost(request("/", "fallback.example.com", "/post/1"), ""));
+        assertEquals("", ZrLogUtil.getBlogHost(null, ""));
     }
 
     @Test
@@ -135,15 +137,7 @@ public class ZrLogUtilTest {
     }
 
     @Test
-    public void shouldReadWebsiteInfoFromConstantsCache() throws Exception {
-        Constants.zrLogConfig = null;
-        assertEquals(Constants.DEFAULT_LANGUAGE, Constants.getLanguage());
-
-        Constants.zrLogConfig = new TestZrLogConfig("configured.example.com", "en_US", true, null);
-
-        assertEquals("configured.example.com", Constants.getHost());
-        assertEquals("en_US", Constants.getLanguage());
-        assertTrue(Constants.isStaticHtmlStatus());
+    public void shouldTrackLastAccessTime() {
         Constants.setLastAccessTime(1234L);
         assertEquals(1234L, Constants.getLastAccessTime());
     }
@@ -154,17 +148,17 @@ public class ZrLogUtilTest {
         try {
             System.setProperty("sws.run.mode", "test");
             Constants.zrLogConfig = new TestZrLogConfig("configured.example.com", updater(UpdaterTypeEnum.WAR));
-            assertTrue(ZrLogUtil.isWarMode());
+            assertTrue(ZrLogUtil.isWarMode(Constants.zrLogConfig == null ? null : Constants.zrLogConfig.getUpdater()));
 
             Constants.zrLogConfig = new TestZrLogConfig("configured.example.com", updater(UpdaterTypeEnum.ZIP));
-            assertFalse(ZrLogUtil.isWarMode());
+            assertFalse(ZrLogUtil.isWarMode(Constants.zrLogConfig == null ? null : Constants.zrLogConfig.getUpdater()));
 
             Constants.zrLogConfig = new TestZrLogConfig("configured.example.com", null);
-            assertFalse(ZrLogUtil.isWarMode());
+            assertFalse(ZrLogUtil.isWarMode(Constants.zrLogConfig == null ? null : Constants.zrLogConfig.getUpdater()));
 
             System.setProperty("sws.run.mode", "dev");
             Constants.zrLogConfig = new TestZrLogConfig("configured.example.com", updater(UpdaterTypeEnum.WAR));
-            assertFalse(ZrLogUtil.isWarMode());
+            assertFalse(ZrLogUtil.isWarMode(Constants.zrLogConfig == null ? null : Constants.zrLogConfig.getUpdater()));
         } finally {
             restoreProperty("sws.run.mode", previousRunMode);
         }

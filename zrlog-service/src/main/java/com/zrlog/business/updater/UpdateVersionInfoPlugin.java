@@ -8,7 +8,7 @@ import com.hibegin.common.util.http.HttpUtil;
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
 import com.zrlog.business.service.UpgradeNoticeService;
 import com.zrlog.business.service.WebsiteKvService;
-import com.zrlog.common.Constants;
+import com.zrlog.common.Updater;
 import com.zrlog.common.vo.Version;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.util.BlogBuildInfoUtil;
@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,6 +32,16 @@ import java.util.logging.Logger;
 public class UpdateVersionInfoPlugin implements IPlugin {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(UpdateVersionInfoPlugin.class);
+
+    private final UpgradeNoticeService notices;
+    private final Supplier<String> language;
+    private final CommandLineUpgradeNotice commandLineNotice;
+
+    public UpdateVersionInfoPlugin(UpgradeNoticeService notices, Supplier<String> language, Updater updater) {
+        this.notices = Objects.requireNonNull(notices);
+        this.language = Objects.requireNonNull(language);
+        this.commandLineNotice = new CommandLineUpgradeNotice(updater);
+    }
 
     private ScheduledExecutorService scheduledExecutorService;
 
@@ -99,8 +110,8 @@ public class UpdateVersionInfoPlugin implements IPlugin {
     }
 
     UpdateVersionTimerTask newUpdateVersionTimerTask(UpgradeWebSiteInfo upgradeWebSiteInfo) {
-        return new UpdateVersionTimerTask(upgradeWebSiteInfo.getUpgradePreview(), Constants.getLanguage(),
-                version -> new UpgradeNoticeService().sync(version), CommandLineUpgradeNotice::notifyUpdate);
+        return new UpdateVersionTimerTask(upgradeWebSiteInfo.getUpgradePreview(), language.get(),
+                notices::sync, commandLineNotice::notifyUpdate);
     }
 
     @Override

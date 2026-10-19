@@ -1,6 +1,5 @@
 package com.zrlog.business.plugin;
 
-import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.util.UrlEncodeUtils;
 import com.hibegin.common.util.http.handle.CloseResponseHandle;
 import com.hibegin.http.HttpMethod;
@@ -12,14 +11,12 @@ import com.zrlog.business.rest.response.PluginCoreStatus;
 import com.zrlog.business.rest.response.PluginStatusResponse;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
-import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
-import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.PluginAdminAppearance;
-import com.zrlog.plugin.Plugins;
-import com.zrlog.web.WebSiteInfoProvider;
+import org.junit.Test;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -31,7 +28,6 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -40,8 +36,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import org.junit.Test;
-import sun.misc.Unsafe;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -51,7 +46,7 @@ public class PluginCorePluginImplTest {
 
     @Test
     public void shouldExposeLifecycleWithoutStartingPluginCore() {
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog");
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo);
 
         assertTrue(plugin.autoStart());
         assertFalse(plugin.isStarted());
@@ -64,7 +59,7 @@ public class PluginCorePluginImplTest {
     public void shouldBuildForwardHeadersFromRequestAndAdminToken() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
-            Constants.zrLogConfig = testConfig();
+            Constants.zrLogConfig = null;
             AdminTokenVO adminToken = new AdminTokenVO();
             adminToken.setUserId(5);
             adminToken.setProtocol("https");
@@ -102,7 +97,7 @@ public class PluginCorePluginImplTest {
     public void shouldBuildBaseForwardHeadersWithoutRequestOrLogin() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
-            Constants.zrLogConfig = testConfig();
+            Constants.zrLogConfig = null;
 
             Map<String, String> headers = headerMap(null, null);
 
@@ -122,7 +117,7 @@ public class PluginCorePluginImplTest {
     public void shouldForwardTrustedPersonalAppearanceOnlyForAuthenticatedRequests() throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
-            Constants.zrLogConfig = testConfig();
+            Constants.zrLogConfig = null;
             HttpRequest request = request(Map.of("Admin-Theme", "spoofed", "Dark-Mode", "false"));
             AdminTokenVO token = new AdminTokenVO();
             token.setUserId(5);
@@ -160,7 +155,7 @@ public class PluginCorePluginImplTest {
         try {
             ZrLogConfig previousConfig = Constants.zrLogConfig;
             try {
-                Constants.zrLogConfig = testConfig();
+                Constants.zrLogConfig = null;
                 PluginCorePluginImpl plugin = startedPlugin(server);
 
                 CloseResponseHandle handle = plugin.getContext("/api/test", HttpMethod.GET,
@@ -195,7 +190,7 @@ public class PluginCorePluginImplTest {
         try {
             ZrLogConfig previousConfig = Constants.zrLogConfig;
             try {
-                Constants.zrLogConfig = testConfig();
+                Constants.zrLogConfig = null;
                 PluginCorePluginImpl plugin = startedPlugin(server);
 
                 CloseResponseHandle handle = plugin.getContext("/api/post", HttpMethod.POST,
@@ -227,7 +222,7 @@ public class PluginCorePluginImplTest {
         try {
             ZrLogConfig previousConfig = Constants.zrLogConfig;
             try {
-                Constants.zrLogConfig = testConfig();
+                Constants.zrLogConfig = null;
                 PluginCorePluginImpl plugin = startedPlugin(server);
                 CapturedHostResponse hostResponse = new CapturedHostResponse();
 
@@ -248,7 +243,7 @@ public class PluginCorePluginImplTest {
 
     @Test
     public void shouldReturnFalseWhenPluginResponseBodyIsMissing() throws Exception {
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog") {
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
             @Override
             public CloseResponseHandle getContext(String uri, HttpMethod method, HttpRequest request,
                                                   AdminTokenVO adminTokenVO) {
@@ -257,7 +252,7 @@ public class PluginCorePluginImplTest {
         };
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
-            Constants.zrLogConfig = testConfig();
+            Constants.zrLogConfig = null;
             Field serverBaseUrl = PluginCorePluginImpl.class.getDeclaredField("pluginServerBaseUrl");
             serverBaseUrl.setAccessible(true);
             serverBaseUrl.set(plugin, "http://127.0.0.1:1");
@@ -289,7 +284,7 @@ public class PluginCorePluginImplTest {
         try {
             ZrLogConfig previousConfig = Constants.zrLogConfig;
             try {
-                Constants.zrLogConfig = testConfig();
+                Constants.zrLogConfig = null;
                 PluginCorePluginImpl plugin = startedPlugin(server);
                 AdminTokenVO adminToken = new AdminTokenVO();
                 adminToken.setUserId(7);
@@ -324,8 +319,8 @@ public class PluginCorePluginImplTest {
         try {
             ZrLogConfig previousConfig = Constants.zrLogConfig;
             try {
-                Constants.zrLogConfig = testConfig();
-                PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog");
+                Constants.zrLogConfig = null;
+                PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo);
                 setPluginCoreProcess(plugin, new PluginCoreProcess() {
                     @Override
                     public int pluginServerStart(String dbProperties, String pluginJvmArgs, String runtimePath,
@@ -357,7 +352,7 @@ public class PluginCorePluginImplTest {
         AtomicInteger startCount = new AtomicInteger();
         AtomicInteger stopCount = new AtomicInteger();
         AtomicInteger readinessCount = new AtomicInteger();
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog") {
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
             @Override
             boolean waitToStarted(String pluginServerBaseUrl, String token) {
                 assertEquals("http://127.0.0.1:21000", pluginServerBaseUrl);
@@ -392,7 +387,7 @@ public class PluginCorePluginImplTest {
     @Test
     public void shouldLaunchOnlyOneSupervisorForConcurrentStarts() throws Exception {
         AtomicInteger startCount = new AtomicInteger();
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog") {
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
             @Override
             boolean waitToStarted(String pluginServerBaseUrl, String token) {
                 return true;
@@ -424,7 +419,7 @@ public class PluginCorePluginImplTest {
     @Test
     public void shouldRejectForwardingWhilePendingWithoutBuildingNullUrl() throws Exception {
         AtomicInteger startCount = new AtomicInteger();
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog") {
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
             @Override
             boolean waitToStarted(String pluginServerBaseUrl, String token) {
                 return false;
@@ -455,7 +450,7 @@ public class PluginCorePluginImplTest {
     public void shouldClearPendingSupervisorOnExplicitStop() throws Exception {
         AtomicInteger startCount = new AtomicInteger();
         AtomicInteger stopCount = new AtomicInteger();
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog") {
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
             @Override
             boolean waitToStarted(String pluginServerBaseUrl, String token) {
                 return false;
@@ -478,7 +473,7 @@ public class PluginCorePluginImplTest {
         AtomicInteger stopCount = new AtomicInteger();
         CountDownLatch readinessEntered = new CountDownLatch(1);
         CountDownLatch releaseReadiness = new CountDownLatch(1);
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog") {
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
             @Override
             boolean waitToStarted(String pluginServerBaseUrl, String token) {
                 readinessEntered.countDown();
@@ -526,7 +521,7 @@ public class PluginCorePluginImplTest {
         try {
             ZrLogConfig previousConfig = Constants.zrLogConfig;
             try {
-                Constants.zrLogConfig = testConfig();
+                Constants.zrLogConfig = null;
                 PluginCorePluginImpl plugin = startedPlugin(server);
 
                 assertTrue(plugin.refreshCache("cache-123", request(Collections.emptyMap())));
@@ -545,7 +540,7 @@ public class PluginCorePluginImplTest {
     @Test
     public void shouldRetryRefreshCacheUntilRetriesAreExhausted() throws Exception {
         AtomicInteger pauseCount = new AtomicInteger();
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog") {
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
             @Override
             void pauseBeforeRefreshCacheRetry() {
                 pauseCount.incrementAndGet();
@@ -608,7 +603,8 @@ public class PluginCorePluginImplTest {
         Method method = PluginCorePluginImpl.class.getDeclaredMethod("genHeaderMapByRequest",
                 HttpRequest.class, AdminTokenVO.class);
         method.setAccessible(true);
-        return (Map<String, String>) method.invoke(null, request, adminTokenVO);
+        return (Map<String, String>) method.invoke(new PluginCorePluginImpl(new File("db.properties"), "/blog",
+                () -> 19084, cacheService()::getPublicWebSiteInfo), request, adminTokenVO);
     }
 
     private static HttpRequest request(Map<String, String> headers) {
@@ -653,7 +649,7 @@ public class PluginCorePluginImplTest {
     }
 
     private static PluginCorePluginImpl startedPlugin(HttpServer server) throws Exception {
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog");
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo);
         setPluginServerBaseUrl(plugin, "http://127.0.0.1:" + server.getAddress().getPort());
         return plugin;
     }
@@ -707,19 +703,6 @@ public class PluginCorePluginImplTest {
         }
     }
 
-    private static ZrLogConfig testConfig() throws Exception {
-        TestZrLogConfig config = allocate(TestZrLogConfig.class);
-        config.cacheService = cacheService();
-        return config;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <T> T allocate(Class<T> type) throws Exception {
-        Field field = Unsafe.class.getDeclaredField("theUnsafe");
-        field.setAccessible(true);
-        return (T) ((Unsafe) field.get(null)).allocateInstance(type);
-    }
-
     private static CacheService cacheService() {
         PublicWebSiteInfo info = new PublicWebSiteInfo();
         info.setAdmin_darkMode(true);
@@ -741,54 +724,6 @@ public class PluginCorePluginImplTest {
                     }
                     return null;
                 });
-    }
-
-    private static class TestZrLogConfig extends ZrLogConfig {
-
-        private CacheService cacheService;
-
-        private TestZrLogConfig() {
-            super(0, null, "");
-        }
-
-        @Override
-        public <T> T getWebSetup(Class<T> capability) {
-            if (capability == WebSiteInfoProvider.class) {
-                CacheService cache = cacheForTest();
-                return cache == null ? null : capability.cast(
-                        (WebSiteInfoProvider) cache::getPublicWebSiteInfo);
-            }
-            return super.getWebSetup(capability);
-        }
-
-        private CacheService cacheForTest() {
-            return cacheService;
-        }
-
-        @Override
-        public boolean isInstalled() {
-            return false;
-        }
-
-        @Override
-        public DataSourceWrapper configDatabase() {
-            return null;
-        }
-
-        @Override
-        protected TokenService initTokenService() {
-            return null;
-        }
-
-        @Override
-        public List<IPlugin> getBasePluginList() {
-            return new Plugins();
-        }
-
-        @Override
-        public <T extends IPlugin> List<T> getPluginsByClazz(Class<T> pluginClass) {
-            return Collections.emptyList();
-        }
     }
 
     private static class CapturedHostResponse {

@@ -6,7 +6,6 @@ import com.hibegin.common.util.VersionComparator;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
 import com.zrlog.blog.web.util.WebTools;
-import com.zrlog.common.Constants;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
 
@@ -40,16 +39,15 @@ public class ZrLogUtil {
         return BeanUtil.convert(tempMap, clazz);
     }
 
-    public static String getHomeUrlWithHost(HttpRequest request) {
-        return "//" + getHomeUrlWithHostNotProtocol(request);
+    public static String getHomeUrlWithHost(HttpRequest request, String configuredHost) {
+        return "//" + getBlogHost(request, configuredHost) + WebTools.getHomeUrl(request);
     }
 
-    public static String getHomeUrlWithHostNotProtocol(HttpRequest request) {
-        return getBlogHost(request) + WebTools.getHomeUrl(request);
+    public static String getHomeUrlWithHostNotProtocol(HttpRequest request, String configuredHost) {
+        return getBlogHost(request, configuredHost) + WebTools.getHomeUrl(request);
     }
 
-    public static String getBlogHost(HttpRequest request) {
-        String websiteHost = getBlogHostByWebSite();
+    public static String getBlogHost(HttpRequest request, String websiteHost) {
         if (Objects.nonNull(websiteHost) && !websiteHost.trim().isEmpty()) {
             return websiteHost;
         }
@@ -59,12 +57,8 @@ public class ZrLogUtil {
         return request.getHeader("Host");
     }
 
-    public static String getBlogHostByWebSite() {
-        return Constants.getHost();
-    }
-
-    public static String getFullUrl(HttpRequest request) {
-        String host = Objects.toString(getBlogHost(request), "");
+    public static String getFullUrl(HttpRequest request, String configuredHost) {
+        String host = Objects.toString(getBlogHost(request, configuredHost), "");
         while (host.endsWith("/")) {
             host = host.substring(0, host.length() - 1);
         }
@@ -131,11 +125,10 @@ public class ZrLogUtil {
         return "true".equalsIgnoreCase(value);
     }
 
-    public static boolean isWarMode() {
+    public static boolean isWarMode(Updater updater) {
         if (EnvKit.isDevMode()) {
             return false;
         }
-        Updater updater = Constants.zrLogConfig.getUpdater();
         if (Objects.isNull(updater)) {
             return false;
         }

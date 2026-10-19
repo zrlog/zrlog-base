@@ -6,7 +6,6 @@ import com.hibegin.http.server.api.Interceptor;
 import com.zrlog.common.Constants;
 import com.zrlog.plugin.BaseStaticSitePlugin;
 import com.zrlog.util.BlogBuildInfoUtil;
-import com.zrlog.util.ZrLogUtil;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -19,7 +18,7 @@ public class GlobalBaseInterceptor implements Interceptor {
 
     private final Set<String> forbiddenUriExtSet = new HashSet<>();
 
-    public GlobalBaseInterceptor() {
+    public GlobalBaseInterceptor(boolean warMode) {
         //由于程序的.flt文件没有存放在conf目录，为了防止访问.ftl页面获得的没有数据的页面，或则是错误的页面。
         forbiddenUriExtSet.add(".ftl");
         //这主要用在主题目录下面的配置文件。
@@ -28,7 +27,7 @@ public class GlobalBaseInterceptor implements Interceptor {
         forbiddenUriExtSet.add(".ejs");
         forbiddenUriExtSet.add(".pug");
         forbiddenUriExtSet.add(".styl");
-        if (ZrLogUtil.isWarMode()) {
+        if (warMode) {
             forbiddenUriExtSet.add(".jsp");
         }
     }

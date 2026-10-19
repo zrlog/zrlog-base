@@ -19,9 +19,9 @@ import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TimerTask;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.function.Consumer;
 
 /**
  * 定时检查是否有新的更新包可用，比对服务器生成最新buildId和包的构建时间（与resources/build.properties对比，注意：开发环境没有这个文件）
@@ -115,7 +115,7 @@ public class UpdateVersionTimerTask extends TimerTask {
         catch (Exception e) { throw new IOException("Unable to check update manifest", e); }
         Version selected = result.getVersion();
         Map<String, Object> resources = I18nUtil.getBackend();
-        selected.setChangeLog(Constants.getLanguage() == null || resources == null ? ""
+        selected.setChangeLog(lang == null || resources == null ? ""
                 : getChangeLog(selected.getVersion(), selected.getBuildDate(), selected.getBuildId(), resources));
         return result;
     }

@@ -3,7 +3,6 @@ package com.zrlog.business.plugin;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.config.ResponseConfig;
 import com.hibegin.http.server.impl.SimpleHttpResponse;
-import com.zrlog.common.Constants;
 
 import java.io.*;
 import java.util.Objects;
@@ -22,15 +21,16 @@ public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseabl
     private final boolean requiredStatusCodeSuccess;
     private final int additionalAcceptedStatusCode;
 
-    public BodySaveResponse(HttpRequest request, ResponseConfig responseConfig, boolean requiredStatusCodeSuccess) {
-        this(request, responseConfig, requiredStatusCodeSuccess, 200);
+    public BodySaveResponse(HttpRequest request, ResponseConfig responseConfig, boolean requiredStatusCodeSuccess,
+                            StaticSitePlugin staticSitePlugin) {
+        this(request, responseConfig, requiredStatusCodeSuccess, 200, staticSitePlugin);
     }
 
     BodySaveResponse(HttpRequest request, ResponseConfig responseConfig, boolean requiredStatusCodeSuccess,
-                     int additionalAcceptedStatusCode) {
+                     int additionalAcceptedStatusCode, StaticSitePlugin staticSitePlugin) {
         super(request, responseConfig);
         this.additionalAcceptedStatusCode = additionalAcceptedStatusCode;
-        this.cacheFile = buildCacheFile();
+        this.cacheFile = buildCacheFile(staticSitePlugin);
         if (Objects.nonNull(cacheFile)) {
             if (cacheFile.exists()) {
                 cacheFile.delete();
@@ -40,8 +40,7 @@ public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseabl
         this.requiredStatusCodeSuccess = requiredStatusCodeSuccess;
     }
 
-    private File buildCacheFile() {
-        StaticSitePlugin staticSitePlugin = Constants.zrLogConfig.getPlugin(StaticSitePlugin.class);
+    private File buildCacheFile(StaticSitePlugin staticSitePlugin) {
         if (Objects.isNull(staticSitePlugin)) {
             return null;
         }

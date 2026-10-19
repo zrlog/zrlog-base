@@ -3,9 +3,9 @@ package com.zrlog.business.updater;
 import com.hibegin.common.util.EnvKit;
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
 import com.zrlog.business.service.WebsiteKvService;
-import com.zrlog.test.support.ZrLogTestDatabase;
-import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.common.vo.Version;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
 import org.junit.Test;
 import org.junit.experimental.theories.DataPoints;
 import org.junit.experimental.theories.Theories;
@@ -50,7 +50,7 @@ public class UpdateVersionInfoPluginTest {
 
     @Test
     public void shouldExposeLifecycleWithoutStartingNetworkTask() {
-        UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin();
+        UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin(new com.zrlog.business.service.UpgradeNoticeService(() -> false), () -> "zh_CN", null);
 
         assertEquals(!EnvKit.isFaaSMode(), plugin.autoStart());
         assertFalse(plugin.isStarted());
@@ -65,7 +65,7 @@ public class UpdateVersionInfoPluginTest {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
                     String.valueOf(AutoUpgradeVersionType.NEVER.getCycle()), "");
-            UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin();
+            UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin(new com.zrlog.business.service.UpgradeNoticeService(() -> false), () -> "zh_CN", null);
 
             assertTrue(plugin.start());
 
@@ -183,6 +183,7 @@ public class UpdateVersionInfoPluginTest {
         private Boolean upgradePreview;
 
         TestUpdateVersionInfoPlugin(UpdateVersionTimerTask task) {
+            super(new com.zrlog.business.service.UpgradeNoticeService(() -> false), () -> "zh_CN", null);
             this.task = task;
         }
 

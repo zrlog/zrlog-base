@@ -1,6 +1,5 @@
 package com.zrlog.business.plugin;
 
-import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.http.server.ApplicationContext;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
@@ -9,19 +8,14 @@ import com.hibegin.http.server.config.ServerConfig;
 import com.hibegin.http.server.util.PathUtil;
 import com.sun.net.httpserver.HttpServer;
 import com.zrlog.business.plugin.type.StaticSiteType;
-import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
-import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
-import com.zrlog.common.cache.dto.TagDTO;
-import com.zrlog.common.cache.dto.TypeDTO;
-import com.zrlog.common.cache.dto.UserBasicDTO;
-import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.plugin.BaseStaticSitePlugin;
-import com.zrlog.plugin.IPlugin;
-import com.zrlog.plugin.Plugins;
-import com.zrlog.web.WebSiteInfoProvider;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+
 import java.io.File;
 import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
@@ -29,7 +23,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,13 +30,11 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
 
 public class StaticSitePluginTest {
 
@@ -118,28 +109,30 @@ public class StaticSitePluginTest {
 
     @Test
     public void shouldResolveStaticSuffixFromRequestOrWebsiteConfig() throws Exception {
-        withConfig(false, "blog.example.com", () -> {
-            assertEquals("", StaticSitePlugin.getSuffix(request("/article", null, null)));
+        ZrLogConfig previous = Constants.zrLogConfig;
+        try {
+            Constants.zrLogConfig = null;
+            assertEquals("", StaticSitePlugin.getSuffix(request("/article", null, null), false));
             assertEquals(".html", StaticSitePlugin.getSuffix(
-                    request("/article", BaseStaticSitePlugin.STATIC_USER_AGENT, null)));
-        });
-
-        withConfig(true, "blog.example.com", () ->
-                assertEquals(".html", StaticSitePlugin.getSuffix(request("/article", null, null))));
+                    request("/article", BaseStaticSitePlugin.STATIC_USER_AGENT, null), false));
+            assertEquals(".html", StaticSitePlugin.getSuffix(request("/article", null, null), true));
+        } finally {
+            Constants.zrLogConfig = previous;
+        }
     }
 
     @Test
     public void shouldDetectDisabledStaticSiteByConfigAndHost() throws Exception {
-        withConfig(false, "blog.example.com", () -> assertTrue(StaticSitePlugin.isDisabled()));
-        withConfig(true, "", () -> assertTrue(StaticSitePlugin.isDisabled()));
-        withConfig(true, "blog.example.com", () -> assertFalse(StaticSitePlugin.isDisabled()));
+        assertTrue(StaticSitePlugin.isDisabled(false, "blog.example.com"));
+        assertTrue(StaticSitePlugin.isDisabled(true, ""));
+        assertFalse(StaticSitePlugin.isDisabled(true, "blog.example.com"));
     }
 
     @Test
     public void shouldTreatDisabledStaticSiteAsAlreadySynchronized() throws Exception {
         TestStaticSitePlugin plugin = new TestStaticSitePlugin();
 
-        withConfig(false, "blog.example.com", () -> assertTrue(plugin.isSynchronized("http")));
+        withSite(plugin, false, "blog.example.com", () -> assertTrue(plugin.isSynchronized("http")));
     }
 
     @Test
@@ -150,7 +143,7 @@ public class StaticSitePluginTest {
             unusedPort = serverSocket.getLocalPort();
         }
 
-        withConfig(true, "127.0.0.1:" + unusedPort, () ->
+        withSite(plugin, true, "127.0.0.1:" + unusedPort, () ->
                 assertFalse(plugin.isSynchronized("http")));
     }
 
@@ -170,7 +163,7 @@ public class StaticSitePluginTest {
         });
         server.start();
         try {
-            withConfig(true, "127.0.0.1:" + server.getAddress().getPort(), () -> {
+            withSite(plugin, true, "127.0.0.1:" + server.getAddress().getPort(), () -> {
                 assertTrue(plugin.isSynchronized("http"));
                 remoteVersion.set("different-version");
                 assertFalse(plugin.isSynchronized("http"));
@@ -188,8 +181,8 @@ public class StaticSitePluginTest {
         plugin.cacheFiles.add(cacheFile);
         String expectedVersion = plugin.getSiteVersion();
 
-        withConfig(true, "blog.example.com", () -> {
-            plugin.doFetch(null, null);
+        withSite(plugin, true, "blog.example.com", () -> {
+            plugin.doFetch(null);
 
             assertEquals(expectedVersion, Files.readString(plugin.getCacheFile(plugin.getVersionFileName()).toPath()));
         });
@@ -205,13 +198,12 @@ public class StaticSitePluginTest {
         StaticFetchInterceptor.pages.put("/next.html",
                 "<html><body><a href=\"/index.html\">home</a></body></html>");
 
-        withConfig(true, "blog.example.com", plugin, config -> {
-            ServerConfig serverConfig = config.getServerConfig();
+        withSite(plugin, true, "blog.example.com", serverConfig -> {
             serverConfig.addInterceptor(StaticFetchInterceptor.class);
             ApplicationContext applicationContext = new ApplicationContext(serverConfig);
             applicationContext.init();
 
-            plugin.doFetch(config, applicationContext);
+            plugin.doFetch(new StaticSiteRenderer(new com.hibegin.http.server.config.RequestConfig(), new com.hibegin.http.server.config.ResponseConfig(), applicationContext));
 
             assertEquals(StaticSitePlugin.HandleState.HANDLED, plugin.handleStatusPageMap.get("/index.html"));
             assertEquals(StaticSitePlugin.HandleState.HANDLED, plugin.handleStatusPageMap.get("/next.html"));
@@ -228,7 +220,7 @@ public class StaticSitePluginTest {
     public void shouldCopyExistingResourceToCacheFolderAndIgnoreMissingResource() throws Exception {
         TestStaticSitePlugin plugin = new TestStaticSitePlugin();
 
-        withConfig(true, "blog.example.com", () -> {
+        withSite(plugin, true, "blog.example.com", () -> {
             plugin.copyResourceToCacheFolder("/conf/error/404.html");
             plugin.copyResourceToCacheFolder("/conf/error/missing.html");
 
@@ -248,13 +240,12 @@ public class StaticSitePluginTest {
         StaticFetchInterceptor.pages.put(plugin.notFindFile(),
                 "<html><body><a href=\"/also-ignored.html\">ignored</a></body></html>");
 
-        withConfig(true, "blog.example.com", plugin, config -> {
-            ServerConfig serverConfig = config.getServerConfig();
+        withSite(plugin, true, "blog.example.com", serverConfig -> {
             serverConfig.addInterceptor(StaticFetchInterceptor.class);
             ApplicationContext applicationContext = new ApplicationContext(serverConfig);
             applicationContext.init();
 
-            plugin.doFetch(config, applicationContext);
+            plugin.doFetch(new StaticSiteRenderer(new com.hibegin.http.server.config.RequestConfig(), new com.hibegin.http.server.config.ResponseConfig(), applicationContext));
 
             assertEquals(StaticSitePlugin.HandleState.HANDLED, plugin.handleStatusPageMap.get("/admin/index"));
             assertEquals(StaticSitePlugin.HandleState.HANDLED, plugin.handleStatusPageMap.get(plugin.notFindFile()));
@@ -275,13 +266,12 @@ public class StaticSitePluginTest {
             plugin.handleStatusPageMap.put(plugin.notFindFile(), StaticSitePlugin.HandleState.NEW);
             StaticFetchInterceptor.pages.put("/error/404.html", "<html><body>Missing page"
                     + "<a href=\"/must-not-crawl.html\">ignored</a></body></html>");
-            withConfig(true, "blog.example.com", plugin, config -> {
-                ServerConfig serverConfig = config.getServerConfig();
-                serverConfig.setContextPath(contextPath);
+            withSite(plugin, true, "blog.example.com", serverConfig -> {
+                    serverConfig.setContextPath(contextPath);
                 serverConfig.addInterceptor(StaticFetchInterceptor.class);
                 ApplicationContext applicationContext = new ApplicationContext(serverConfig);
                 applicationContext.init();
-                plugin.doFetch(config, applicationContext);
+                plugin.doFetch(new StaticSiteRenderer(new com.hibegin.http.server.config.RequestConfig(), new com.hibegin.http.server.config.ResponseConfig(), applicationContext));
                 File output = plugin.getCacheFile("/error/404.html");
                 assertTrue(output.isFile());
                 assertTrue(Files.readString(output.toPath()).contains("Missing page"));
@@ -297,13 +287,12 @@ public class StaticSitePluginTest {
         TestStaticSitePlugin plugin = new TestStaticSitePlugin();
         plugin.handleStatusPageMap.put("/missing.html", StaticSitePlugin.HandleState.NEW);
 
-        withConfig(true, "blog.example.com", plugin, config -> {
-            ServerConfig serverConfig = config.getServerConfig();
+        withSite(plugin, true, "blog.example.com", serverConfig -> {
             serverConfig.addInterceptor(NoBodyInterceptor.class);
             ApplicationContext applicationContext = new ApplicationContext(serverConfig);
             applicationContext.init();
 
-            plugin.doFetch(config, applicationContext);
+            plugin.doFetch(new StaticSiteRenderer(new com.hibegin.http.server.config.RequestConfig(), new com.hibegin.http.server.config.ResponseConfig(), applicationContext));
 
             assertEquals(StaticSitePlugin.HandleState.RE_FETCH, plugin.handleStatusPageMap.get("/missing.html"));
             assertFalse(plugin.getCacheFile("/missing.html").exists());
@@ -313,7 +302,7 @@ public class StaticSitePluginTest {
     @Test
     public void shouldLoadLocalizedCacheFileAndFallbackToDefaultLanguage() throws Exception {
         TestStaticSitePlugin plugin = new TestStaticSitePlugin();
-        withConfig(true, "blog.example.com", () -> {
+        withSite(plugin, true, "blog.example.com", () -> {
             File defaultFile = PathUtil.getCacheFile("zh_CN/static/index.html");
             defaultFile.getParentFile().mkdirs();
             Files.writeString(defaultFile.toPath(), "default", StandardCharsets.UTF_8);
@@ -334,13 +323,13 @@ public class StaticSitePluginTest {
     public void shouldSaveCacheFilesOnlyWhenStaticHtmlIsEnabled() throws Exception {
         TestStaticSitePlugin plugin = new TestStaticSitePlugin();
 
-        withConfig(false, "blog.example.com", () -> {
+        withSite(plugin, false, "blog.example.com", () -> {
             plugin.saveToCacheFolder(input("disabled"), "/disabled.html");
             assertFalse(plugin.getCacheFile("/disabled.html").exists());
             assertTrue(plugin.cacheFiles.isEmpty());
         });
 
-        withConfig(true, "blog.example.com", () -> {
+        withSite(plugin, true, "blog.example.com", () -> {
             plugin.saveToCacheFolder(input("enabled"), "/enabled.html");
             assertEquals("enabled", Files.readString(plugin.getCacheFile("/enabled.html").toPath()));
             assertTrue(plugin.cacheFiles.contains(plugin.getCacheFile("/enabled.html")));
@@ -352,7 +341,7 @@ public class StaticSitePluginTest {
         TestStaticSitePlugin plugin = new TestStaticSitePlugin();
         String icon = Base64.getEncoder().encodeToString("icon".getBytes(StandardCharsets.UTF_8));
 
-        withConfig(true, "blog.example.com", () -> {
+        withSite(plugin, true, "blog.example.com", () -> {
             plugin.faviconHandle("data:image/png;base64," + icon, "/favicon.ico", true);
 
             assertEquals("icon", Files.readString(PathUtil.getStaticFile("/favicon.ico").toPath()));
@@ -365,7 +354,7 @@ public class StaticSitePluginTest {
     public void shouldIgnoreInvalidFaviconBase64WithoutWritingFiles() throws Exception {
         TestStaticSitePlugin plugin = new TestStaticSitePlugin();
 
-        withConfig(true, "blog.example.com", () -> {
+        withSite(plugin, true, "blog.example.com", () -> {
             plugin.faviconHandle("not-base64", "/bad-favicon.ico", true);
 
             assertFalse(PathUtil.getStaticFile("/bad-favicon.ico").exists());
@@ -373,18 +362,24 @@ public class StaticSitePluginTest {
         });
     }
 
-    private void withConfig(boolean staticHtmlStatus, String host, ThrowingRunnable runnable) throws Exception {
-        withConfig(staticHtmlStatus, host, null, config -> runnable.run());
+    private void withSite(TestStaticSitePlugin plugin, boolean staticHtmlStatus, String host,
+                          ThrowingRunnable runnable) throws Exception {
+        withSite(plugin, staticHtmlStatus, host, config -> runnable.run());
     }
 
-    private void withConfig(boolean staticHtmlStatus, String host, IPlugin plugin, ConfigThrowingRunnable runnable) throws Exception {
+    private void withSite(TestStaticSitePlugin plugin, boolean staticHtmlStatus, String host,
+                          ConfigThrowingRunnable runnable) throws Exception {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         String previousRootPath = System.getProperty("sws.root.path");
         try {
             System.setProperty("sws.root.path", temporaryFolder.newFolder().getAbsolutePath());
-            TestZrLogConfig config = new TestZrLogConfig(staticHtmlStatus, host, plugin);
-            Constants.zrLogConfig = config;
-            runnable.run(config);
+            plugin.site.setGenerator_html_status(staticHtmlStatus);
+            plugin.site.setHost(host);
+            Constants.zrLogConfig = null;
+            ServerConfig server = new ServerConfig();
+            server.setPort(18080);
+            server.setContextPath("");
+            runnable.run(server);
         } finally {
             Constants.zrLogConfig = previousConfig;
             restoreProperty("sws.root.path", previousRootPath);
@@ -432,7 +427,7 @@ public class StaticSitePluginTest {
     }
 
     private interface ConfigThrowingRunnable {
-        void run(TestZrLogConfig config) throws Exception;
+        void run(ServerConfig config) throws Exception;
     }
 
     public static class StaticFetchInterceptor implements Interceptor {
@@ -461,6 +456,9 @@ public class StaticSitePluginTest {
     }
 
     private static class TestStaticSitePlugin implements StaticSitePlugin {
+        private final PublicWebSiteInfo site = new PublicWebSiteInfo();
+        @Override public PublicWebSiteInfo getSiteInfo() { return site; }
+
 
         private final Map<String, HandleState> handleStatusPageMap = new ConcurrentHashMap<>();
         private final Lock parseLock = new ReentrantLock();
@@ -527,117 +525,4 @@ public class StaticSitePluginTest {
         }
     }
 
-    private static class TestZrLogConfig extends ZrLogConfig {
-
-        private final PublicWebSiteInfo publicWebSiteInfo;
-        private final IPlugin plugin;
-
-        TestZrLogConfig(boolean staticHtmlStatus, String host) {
-            this(staticHtmlStatus, host, null);
-        }
-
-        TestZrLogConfig(boolean staticHtmlStatus, String host, IPlugin plugin) {
-            super(18080, null, "");
-            this.plugin = plugin;
-            this.publicWebSiteInfo = new PublicWebSiteInfo();
-            this.publicWebSiteInfo.setGenerator_html_status(staticHtmlStatus);
-            this.publicWebSiteInfo.setHost(host);
-        }
-
-        @Override
-        public boolean isInstalled() {
-            return false;
-        }
-
-        @Override
-        public DataSourceWrapper configDatabase() {
-            return null;
-        }
-
-        @Override
-        public <T> T getWebSetup(Class<T> capability) {
-            if (capability == WebSiteInfoProvider.class) {
-                CacheService cache = cacheForTest();
-                return cache == null ? null : capability.cast(
-                        (WebSiteInfoProvider) cache::getPublicWebSiteInfo);
-            }
-            return super.getWebSetup(capability);
-        }
-
-        private CacheService cacheForTest() {
-            return new TestCacheService(publicWebSiteInfo);
-        }
-
-        @Override
-        protected TokenService initTokenService() {
-            return null;
-        }
-
-        @Override
-        public List<IPlugin> getBasePluginList() {
-            return new Plugins();
-        }
-
-        @Override
-        public <T extends IPlugin> T getPlugin(Class<T> pluginClass) {
-            if (pluginClass.isInstance(plugin)) {
-                return pluginClass.cast(plugin);
-            }
-            return super.getPlugin(pluginClass);
-        }
-    }
-
-    private static class TestCacheService implements CacheService {
-
-        private final PublicWebSiteInfo publicWebSiteInfo;
-
-        TestCacheService(PublicWebSiteInfo publicWebSiteInfo) {
-            this.publicWebSiteInfo = publicWebSiteInfo;
-        }
-
-        @Override
-        public long getCurrentSqlVersion() {
-            return 0;
-        }
-
-        @Override
-        public long getWebSiteVersion() {
-            return 0;
-        }
-
-        @Override
-        public BaseDataInitVO getInitData() {
-            return new BaseDataInitVO();
-        }
-
-        @Override
-        public BaseDataInitVO refreshInitData() {
-            return new BaseDataInitVO();
-        }
-
-        @Override
-        public PublicWebSiteInfo getPublicWebSiteInfo() {
-            return publicWebSiteInfo;
-        }
-
-        @Override
-        public List<TypeDTO> getArticleTypes() {
-            return Collections.emptyList();
-        }
-
-        @Override
-        public List<TagDTO> getTags() {
-            return Collections.emptyList();
-        }
-
-        @Override
-        public UserBasicDTO getUserInfoById(Long userId) {
-            return null;
-        }
-
-        @Override
-        public Map<String, Object> getTemplateConfigMapWithCache(String template) {
-            return Collections.emptyMap();
-        }
-    }
 }

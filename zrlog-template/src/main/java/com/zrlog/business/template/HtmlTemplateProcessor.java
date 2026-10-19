@@ -7,7 +7,6 @@ import com.hibegin.common.util.http.handle.CloseResponseHandle;
 import com.hibegin.http.HttpMethod;
 import com.hibegin.http.server.api.HttpRequest;
 import com.zrlog.business.plugin.PluginCorePlugin;
-import com.zrlog.common.Constants;
 import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.plugin.BaseStaticSitePlugin;
 import com.zrlog.util.StaticFileCacheUtils;
@@ -47,8 +46,11 @@ public class HtmlTemplateProcessor {
     private final AdminTokenVO adminTokenVO;
 
     private final String staticResourceBaseUrl;
+    private final PluginCorePlugin pluginCore;
 
-    public HtmlTemplateProcessor(HttpRequest request, AdminTokenVO adminTokenVO, String staticResourceBaseUrl) {
+    public HtmlTemplateProcessor(HttpRequest request, AdminTokenVO adminTokenVO, String staticResourceBaseUrl,
+                                 PluginCorePlugin pluginCore) {
+        this.pluginCore = pluginCore;
         this.baseUrl = request.getContextPath() + "/";
         this.request = request;
         this.adminTokenVO = adminTokenVO;
@@ -110,7 +112,7 @@ public class HtmlTemplateProcessor {
             }
 
             try {
-                CloseResponseHandle handle = Constants.zrLogConfig.getPlugin(PluginCorePlugin.class).getContext(url, HttpMethod.GET, request, adminTokenVO);
+                CloseResponseHandle handle = pluginCore.getContext(url, HttpMethod.GET, request, adminTokenVO);
                 try (InputStream in = handle.getT().body()) {
                     byte[] bytes = IOUtil.getByteByInputStream(in);
                     if (handle.getStatusCode() != 200) {

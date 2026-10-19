@@ -19,14 +19,15 @@ import com.zrlog.common.vo.Version;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.web.WebSiteInfoProvider;
-import java.lang.reflect.Field;
+import org.junit.After;
+import org.junit.Test;
+
 import java.lang.reflect.Proxy;
 import java.sql.SQLException;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import org.junit.After;
-import org.junit.Test;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -45,9 +46,9 @@ public class ServiceWebAndNoticeTest {
     @Test
     public void shouldBuildPublicInfoWithLightThemeColor() throws Exception {
         PublicWebSiteInfo info = siteInfo(false);
-        Constants.zrLogConfig = new TestZrLogConfig(info);
+        Constants.zrLogConfig = null;
 
-        PublicInfoVO publicInfo = new CommonService().getPublicInfo(request("/blog", "fallback.example.com"));
+        PublicInfoVO publicInfo = new CommonService(() -> info).getPublicInfo(request("/blog", "fallback.example.com"));
 
         assertNotNull(publicInfo.getCurrentVersion());
         assertEquals("ZrLog", publicInfo.getWebsiteTitle());
@@ -61,9 +62,9 @@ public class ServiceWebAndNoticeTest {
     @Test
     public void shouldBuildPublicInfoWithDarkThemeColor() throws Exception {
         PublicWebSiteInfo info = siteInfo(true);
-        Constants.zrLogConfig = new TestZrLogConfig(info);
+        Constants.zrLogConfig = null;
 
-        PublicInfoVO publicInfo = new CommonService().getPublicInfo(request("/", "fallback.example.com"));
+        PublicInfoVO publicInfo = new CommonService(() -> info).getPublicInfo(request("/", "fallback.example.com"));
 
         assertEquals("//example.com/", publicInfo.getHomeUrl());
         assertEquals(true, publicInfo.getAdmin_darkMode());
@@ -72,8 +73,8 @@ public class ServiceWebAndNoticeTest {
 
     @Test
     public void shouldBuildEmptyUpgradeNoticeWhenVersionIsMissing() {
-        CheckVersionResponse nullResponse = new UpgradeNoticeService().buildResponse(null);
-        CheckVersionResponse missingDate = new UpgradeNoticeService().buildResponse(new Version());
+        CheckVersionResponse nullResponse = new UpgradeNoticeService(() -> false).buildResponse(null);
+        CheckVersionResponse missingDate = new UpgradeNoticeService(() -> false).buildResponse(new Version());
 
         assertFalse(nullResponse.getUpgrade());
         assertNull(nullResponse.getVersion());
@@ -89,7 +90,7 @@ public class ServiceWebAndNoticeTest {
         version.setReleaseDate("2099-01-01 00:00");
         version.setBuildDate(new Date(System.currentTimeMillis() + 86_400_000L));
 
-        CheckVersionResponse response = new UpgradeNoticeService().buildResponse(version);
+        CheckVersionResponse response = new UpgradeNoticeService(() -> false).buildResponse(version);
 
         assertTrue(response.getUpgrade());
         assertEquals("99.0.0", response.getVersion().getVersion());
@@ -98,7 +99,7 @@ public class ServiceWebAndNoticeTest {
 
     @Test
     public void shouldReturnEmptyNoticeWhenKvStoreIsUnavailable() {
-        CheckVersionResponse response = new UpgradeNoticeService().getNotice();
+        CheckVersionResponse response = new UpgradeNoticeService(() -> false).getNotice();
 
         assertFalse(response.getUpgrade());
         assertNull(response.getVersion());
@@ -139,6 +140,7 @@ public class ServiceWebAndNoticeTest {
         FakeWebsiteKvService kvService = new FakeWebsiteKvService();
         UpgradeNoticeService service = noticeService(kvService);
 
+        Constants.zrLogConfig = null;
         service.sync(futureVersion());
 
         assertEquals("admin_message_center_upgrade_notice", kvService.putKey);
@@ -152,6 +154,7 @@ public class ServiceWebAndNoticeTest {
         FakeWebsiteKvService kvService = new FakeWebsiteKvService();
         UpgradeNoticeService service = noticeService(kvService);
 
+        Constants.zrLogConfig = null;
         service.sync(null);
 
         assertEquals("admin_message_center_upgrade_notice", kvService.removedKey);
@@ -165,6 +168,7 @@ public class ServiceWebAndNoticeTest {
         kvService.throwOnPut = true;
         UpgradeNoticeService service = noticeService(kvService);
 
+        Constants.zrLogConfig = null;
         service.sync(futureVersion());
 
         assertEquals(1, kvService.putAttempts);
@@ -225,12 +229,9 @@ public class ServiceWebAndNoticeTest {
                 });
     }
 
-    private static UpgradeNoticeService noticeService(FakeWebsiteKvService kvService) throws Exception {
-        UpgradeNoticeService service = new UpgradeNoticeService();
-        Field field = UpgradeNoticeService.class.getDeclaredField("kvService");
-        field.setAccessible(true);
-        field.set(service, kvService);
-        return service;
+    private static UpgradeNoticeService noticeService(FakeWebsiteKvService kvService) {
+        ZrLogConfig config = Constants.zrLogConfig;
+        return new UpgradeNoticeService(() -> config != null && config.isInstalled(), kvService);
     }
 
     private static Version futureVersion() {

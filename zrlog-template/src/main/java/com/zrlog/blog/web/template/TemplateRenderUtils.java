@@ -6,6 +6,7 @@ import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.StringUtils;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.util.PathUtil;
+import com.zrlog.blog.web.plugin.TemplateDownloadPlugin;
 import com.zrlog.blog.web.template.vo.ArticleDetailPageVO;
 import com.zrlog.blog.web.template.vo.ArticleListPageVO;
 import com.zrlog.blog.web.template.vo.BasePageInfo;
@@ -30,12 +31,13 @@ import com.zrlog.plugin.BaseStaticSitePlugin;
 import com.zrlog.util.I18nUtil;
 import com.zrlog.util.TemplateHelper;
 import com.zrlog.util.ZrLogUtil;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.*;
 
 public class TemplateRenderUtils {
 
@@ -49,13 +51,13 @@ public class TemplateRenderUtils {
      * @param url
      * @return
      */
-    public static String getNavUrl(HttpRequest request, String suffix, String url) {
+    public static String getNavUrl(HttpRequest request, String suffix, String url, String siteHost) {
         if ("/".equals(url)) {
-            return ZrLogUtil.getHomeUrlWithHost(request);
+            return ZrLogUtil.getHomeUrlWithHost(request, siteHost);
         }
         //文章页
         if (url.startsWith("/")) {
-            String nUrl = ZrLogUtil.getHomeUrlWithHost(request) + url.substring(1);
+            String nUrl = ZrLogUtil.getHomeUrlWithHost(request, siteHost) + url.substring(1);
             if (Objects.nonNull(suffix) && !suffix.trim().isEmpty() && nUrl.endsWith(suffix)) {
                 return nUrl;
             }
@@ -80,9 +82,9 @@ public class TemplateRenderUtils {
         return new NotFindPageVO(baseDataInitVO);
     }
 
-    public static BasePageInfo fullTemplateInfo(HttpRequest request, CacheService cacheService) {
-        String templatePath = TemplateHelper.getTemplatePath(request);
-        I18nVO i18nInfo = I18nUtil.addToRequestWithTemplatePath(templatePath, request);
+    public static BasePageInfo fullTemplateInfo(HttpRequest request, CacheService cacheService, TemplateDownloadPlugin templateDownloadPlugin) {
+        String templatePath = TemplateHelper.getTemplatePath(request, cacheService.getPublicWebSiteInfo().getTemplate(), templateDownloadPlugin);
+        I18nVO i18nInfo = I18nUtil.addToRequestWithTemplatePath(templatePath, request, cacheService.getPublicWebSiteInfo().getLanguage());
         BasePageInfo basePageInfo = buildBasePageInfo(request, cacheService);
         basePageInfo.setTemplate(templatePath);
         basePageInfo.setLang(i18nInfo.getLang());
@@ -98,7 +100,7 @@ public class TemplateRenderUtils {
 
     private static void fillInfo(HttpRequest request, BasePageInfo basePageInfo) {
         boolean staticBlog = BaseStaticSitePlugin.isStaticPluginRequest(request);
-        String suffix = StaticSitePlugin.getSuffix(request);
+        String suffix = StaticSitePlugin.getSuffix(request, Boolean.TRUE.equals(basePageInfo.getWebs().getGenerator_html_status()));
         basePageInfo.setStaticBlog(staticBlog);
         basePageInfo.setSuffix(suffix);
         basePageInfo.setKey((String) request.getAttr().get("key"));
@@ -110,12 +112,12 @@ public class TemplateRenderUtils {
         fullNavBar(request, suffix, basePageInfo.getInit());
         basePageInfo.getInit().setArchiveList(getConvertedArchives(suffix, request, basePageInfo.getInit().getArchives()));
         //set comment info
-        basePageInfo.setRequrl(ZrLogUtil.getFullUrl(request));
+        basePageInfo.setRequrl(ZrLogUtil.getFullUrl(request, webSite.getHost()));
         basePageInfo.setReqUriPath(request.getUri());
         basePageInfo.setReqQueryString(request.getQueryStr());
         basePageInfo.setBasePath(WebTools.getHomeUrl(request));
         basePageInfo.setContextPath(request.getContextPath());
-        basePageInfo.setBaseWithHostPath(ZrLogUtil.getHomeUrlWithHostNotProtocol(request));
+        basePageInfo.setBaseWithHostPath(ZrLogUtil.getHomeUrlWithHostNotProtocol(request, webSite.getHost()));
     }
 
     private static boolean isHomePage(HttpRequest request) {
@@ -153,7 +155,7 @@ public class TemplateRenderUtils {
         basePageInfo.setTemplateUrl(WebTools.buildEncodedUrl(request, templateUrl));
         basePageInfo.setRurl(baseUrl);
         basePageInfo.setBaseUrl(baseUrl);
-        basePageInfo.setHost(ZrLogUtil.getBlogHost(request));
+        basePageInfo.setHost(ZrLogUtil.getBlogHost(request, webSite.getHost()));
         basePageInfo.setSearchUrl(WebTools.buildEncodedUrl(request, Constants.getArticleUri() + "search"));
     }
 
@@ -196,7 +198,7 @@ public class TemplateRenderUtils {
             ((ArticleListPageVO) pageInfo).setYurl((String) request.getAttr().get("yurl"));
         } else if (pageInfo instanceof ArticleDetailPageVO) {
             ArticleDetailDTO objectMap = ((ArticleDetailPageVO) pageInfo).getLog();
-            objectMap.setContentProtectorHtml(ContentProtectorUtils.render(webSite, objectMap, ZrLogUtil.getFullUrl(request)));
+            objectMap.setContentProtectorHtml(ContentProtectorUtils.render(webSite, objectMap, ZrLogUtil.getFullUrl(request, webSite.getHost())));
             tryEnableArrangePlugin(objectMap.getArrange_plugin(), pageInfo);
             String articleTitle = objectMap.getTitle();
             if (StringUtils.isNotEmpty(articleTitle)) {
@@ -232,7 +234,7 @@ public class TemplateRenderUtils {
 
     private static void fillSocialPreview(HttpRequest request, BasePageInfo pageInfo, PublicWebSiteInfo webSite) {
         SocialPreviewDTO socialPreview;
-        String fullUrl = ZrLogUtil.getFullUrl(request);
+        String fullUrl = ZrLogUtil.getFullUrl(request, webSite.getHost());
         if (pageInfo instanceof ArticleDetailPageVO) {
             ArticleDetailDTO log = ((ArticleDetailPageVO) pageInfo).getLog();
             socialPreview = SocialPreviewUtils.article(webSite, log, pageInfo.getTitle(), fullUrl, log.getThumbnail());
@@ -255,7 +257,7 @@ public class TemplateRenderUtils {
             String url = logNav.getUrl();
             boolean current = "/".equals(url) && isHomePage(request);
             if (url.startsWith("/")) {
-                url = getNavUrl(request, suffix, url);
+                url = getNavUrl(request, suffix, url, baseDataInitVO.getWebSite().getHost());
                 logNav.setUrl(url);
                 if (!current) {
                     current = ignoreScheme(request.getUrl(), suffix).equals(ignoreScheme(url, suffix));

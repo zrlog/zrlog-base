@@ -14,6 +14,10 @@ import com.zrlog.common.updater.UpgradeProgressEvent;
 import com.zrlog.common.updater.UpgradeProgressListener;
 import com.zrlog.common.vo.Version;
 import com.zrlog.util.BlogBuildInfoUtil;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -22,9 +26,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -39,7 +41,7 @@ public class UpgradeServicePublicFlowTest {
 
     @Test
     public void shouldReturnNoUpgradeWhenPluginIsMissing() {
-        CheckVersionResponse response = new UpgradeService().getCheckVersionResponse(false, null);
+        CheckVersionResponse response = new UpgradeService(null, new UpgradeNoticeService(() -> false)).getCheckVersionResponse(false, null);
 
         assertFalse(response.getUpgrade());
         assertNull(response.getVersion());
@@ -49,7 +51,7 @@ public class UpgradeServicePublicFlowTest {
     public void shouldBuildPreCheckResponseWhenPluginHasNoVersion() {
         FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(null);
 
-        PreCheckVersionResponse response = new UpgradeService().getPreCheckVersionResponse(false, plugin);
+        PreCheckVersionResponse response = new UpgradeService(null, new UpgradeNoticeService(() -> false)).getPreCheckVersionResponse(false, plugin);
 
         assertFalse(response.getUpgrade());
         assertNull(response.getVersion());
@@ -77,7 +79,7 @@ public class UpgradeServicePublicFlowTest {
 
     @Test
     public void shouldExposeRuntimeModeHelpers() {
-        UpgradeService service = new UpgradeService();
+        UpgradeService service = new UpgradeService(null, new UpgradeNoticeService(() -> false));
 
         assertNotNull(Boolean.valueOf(service.isDockerMode()));
         assertNotNull(Boolean.valueOf(service.isSystemServiceMode()));
@@ -92,7 +94,7 @@ public class UpgradeServicePublicFlowTest {
         backend.put("upgrade.result.noChange", "No change");
         backend.put("upgrade.lambda.download", "download upgrade file");
 
-        UpgradeProcessResponse response = new UpgradeService().doUpgrade(plugin, UpgradeProgressListener.NONE,
+        UpgradeProcessResponse response = new UpgradeService(null, new UpgradeNoticeService(() -> false)).doUpgrade(plugin, UpgradeProgressListener.NONE,
                 backend);
 
         assertTrue(response.getFinish());
@@ -296,6 +298,7 @@ public class UpgradeServicePublicFlowTest {
         private int fetchFalseCount;
 
         FakeUpdateVersionInfoPlugin(Version version) {
+            super(new UpgradeNoticeService(() -> false), () -> "zh_CN", null);
             this.version = version;
         }
 
@@ -332,7 +335,7 @@ public class UpgradeServicePublicFlowTest {
 
         TestableUpgradeService(boolean dockerMode, boolean systemServiceMode, boolean faasMode,
                                boolean faasOnlineUpgradeSupported, boolean warMode, boolean backupReady) {
-            super(backupProtection(backupReady));
+            super(null, new UpgradeNoticeService(() -> false), backupProtection(backupReady));
             this.dockerMode = dockerMode;
             this.systemServiceMode = systemServiceMode;
             this.faasMode = faasMode;

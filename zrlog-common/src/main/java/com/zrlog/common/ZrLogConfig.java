@@ -17,18 +17,19 @@ import com.zrlog.common.web.ZrLogHttpJsonMessageConverter;
 import com.zrlog.common.web.ZrLogHttpRequestListener;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
+import com.zrlog.util.*;
 import com.zrlog.web.BaseWebSetup;
+import com.zrlog.web.TokenServiceProvider;
 import com.zrlog.web.WebSetup;
+
 import java.io.File;
 import java.lang.management.ManagementFactory;
+import java.util.*;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.sql.DataSource;
 import sun.misc.Signal;
-import com.zrlog.util.*;
-
-import java.util.*;
 
 /**
  * 全局服务配置，包含 数据库，插件，更新的实现者等
@@ -47,7 +48,6 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
     protected final ServerConfig serverConfig;
     private boolean webSetupsInitialized;
     private volatile boolean databaseInitialized;
-    protected TokenService tokenService;
     protected ZrLogHttpRequestListener zrLogHttpRequestListener = new ZrLogHttpRequestListener();
     private static final String TERM_SIGNAL = "TERM";
 
@@ -62,6 +62,7 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         this.webSetups = new ArrayList<>();
         this.updater = updater;
         this.serverConfig = initServerConfig(contextPath, port);
+        com.zrlog.common.adapter.UpdaterHosts.bindLifecycle(updater, serverConfig::getPort, this::stop);
         //init
         this.installLockFile = PathUtil.getConfFile("/" + Objects.requireNonNullElse(System.getenv("INSTALL_LOCK_FILE_NAME"), "install.lock"));
         this.dbPropertiesFile = DbUtils.initDbPropertiesFile(this);
@@ -143,14 +144,15 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         return updater;
     }
 
+    /** Session access for application assembly; the admin module owns the service instance. */
     public TokenService getTokenService() {
-        if (tokenService == null) {
-            this.tokenService = initTokenService();
-        }
-        return tokenService;
+        return initTokenService();
     }
 
-    protected abstract TokenService initTokenService();
+    protected TokenService initTokenService() {
+        TokenServiceProvider provider = getWebSetup(TokenServiceProvider.class);
+        return !isInstalled() || provider == null ? null : provider.getTokenService();
+    }
 
     public DataSource getDataSource() {
         return dataSource;

@@ -1,6 +1,5 @@
 package com.zrlog.admin.web.token;
 
-import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
 import com.hibegin.http.server.web.cookie.Cookie;
@@ -8,8 +7,6 @@ import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.vo.AdminFullTokenVO;
-import com.zrlog.plugin.IPlugin;
-import com.zrlog.plugin.Plugins;
 import org.junit.After;
 import org.junit.Test;
 
@@ -34,10 +31,18 @@ public class AdminTokenServiceTest {
 
     private final Map<Integer, Long> personalTimeouts = new HashMap<>();
     // Keep encrypted fixtures deterministic, including the wrong-key padding failure.
+    private boolean installed = true;
+    private boolean staticHtml;
+
+    @org.junit.Before
+    public void clearGlobalConfig() {
+        Constants.zrLogConfig = null;
+    }
+
     private long now = 1_700_000_000_000L;
 
     private AdminTokenService testService(long timeout) {
-        return new AdminTokenService(timeout) {
+        return new AdminTokenService(timeout, () -> installed, () -> staticHtml) {
             @Override protected long sessionTimeoutMinutes(int userId) { return personalTimeouts.getOrDefault(userId, timeout); }
             @Override protected long currentTimeMillis() { return now; }
             @Override protected com.zrlog.data.security.AccountAccess loadAccount(int userId) {
@@ -54,7 +59,7 @@ public class AdminTokenServiceTest {
 
     @Test
     public void shouldSetCookieAndParseTokenFromHeader() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(true);
+        installed = true;
         AdminTokenService service = testService(30);
         CapturedResponse capturedResponse = new CapturedResponse();
         HttpRequest request = request("/admin", new HashMap<>(), null, new HashMap<>());
@@ -81,7 +86,7 @@ public class AdminTokenServiceTest {
 
     @Test
     public void shouldParseTokenFromCookieWhenHeaderIsMissing() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(true);
+        installed = true;
         AdminTokenService service = testService(30);
         Cookie cookie = createAdminCookie(service, "secret-key");
         cacheSecretKey(service, 7, "secret-key");
@@ -96,7 +101,7 @@ public class AdminTokenServiceTest {
 
     @Test
     public void shouldFallbackToCookieWhenHeaderTokenIsInvalid() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(true);
+        installed = true;
         AdminTokenService service = testService(30);
         Cookie cookie = createAdminCookie(service, "secret-key");
         cacheSecretKey(service, 7, "secret-key");
@@ -112,7 +117,7 @@ public class AdminTokenServiceTest {
 
     @Test
     public void shouldRejectMalformedOrExpiredTokens() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(true);
+        installed = true;
         AdminTokenService service = testService(30);
         Cookie cookie = createAdminCookie(service, "secret-key");
         cacheSecretKey(service, 7, "wrong-secret");
@@ -129,7 +134,7 @@ public class AdminTokenServiceTest {
 
     @Test
     public void accountLifetimeIsPinnedAcrossPreferenceChangesAndRenewals() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(true);
+        installed = true;
         personalTimeouts.put(7, 10L);
         AdminTokenService service = testService(30);
         Cookie first = createAdminCookie(service, "secret-key");
@@ -153,7 +158,7 @@ public class AdminTokenServiceTest {
 
     @Test
     public void legacyTokensUseSiteTimeoutUntilRenewed() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(true);
+        installed = true;
         AdminTokenService service = testService(30);
         cacheSecretKey(service, 7, "secret-key");
         com.zrlog.common.vo.AdminTokenVO legacy = new com.zrlog.common.vo.AdminTokenVO();
@@ -177,7 +182,7 @@ public class AdminTokenServiceTest {
 
     @Test
     public void shouldReturnNullWhenCachedTokenPayloadCannotBeDecoded() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(true);
+        installed = true;
         AdminTokenService service = testService(30);
         cacheSecretKey(service, 7, "secret-key");
 
@@ -186,7 +191,7 @@ public class AdminTokenServiceTest {
 
     @Test
     public void shouldReturnNullWhenCookiesAreMissingOrNotAdminToken() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(true);
+        installed = true;
         AdminTokenService service = testService(30);
         Cookie cookie = new Cookie();
         cookie.setName("other-token");
@@ -197,8 +202,27 @@ public class AdminTokenServiceTest {
     }
 
     @Test
+    public void shouldFollowStaticModeForCookieAndLogoutWithoutGlobalConfig() throws Exception {
+        AdminTokenService service = testService(30);
+        HttpRequest request = request("/admin", Map.of("Referer", "https://site.example/admin/page"),
+                new Cookie[0], Map.of("sp", new String[]{"true"}));
+        CapturedResponse dynamic = new CapturedResponse();
+        service.setAdminToken(7, "secret-key", "session-id", "https", request, dynamic.response());
+        assertFalse("None".equals(dynamic.cookies.get(0).getSameSite()));
+        service.removeAdminToken(request, dynamic.response());
+        assertEquals(TokenService.ADMIN_LOGIN_URI_PATH, dynamic.redirects.get(0));
+        staticHtml = true;
+        CapturedResponse exported = new CapturedResponse();
+        service.setAdminToken(7, "secret-key", "session-id", "https", request, exported.response());
+        assertEquals("None", exported.cookies.get(0).getSameSite());
+        assertTrue(exported.cookies.get(0).isSecure());
+        service.removeAdminToken(request, exported.response());
+        assertEquals("https://site.example/admin/admin/login.html", exported.redirects.get(0));
+    }
+
+    @Test
     public void shouldMarkHttpsCookieSecureAndSameSiteForCrossOriginRequest() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(true);
+        installed = true;
         AdminTokenService service = testService(30);
         CapturedResponse capturedResponse = new CapturedResponse();
         Map<String, String> headers = new HashMap<>();
@@ -213,8 +237,22 @@ public class AdminTokenServiceTest {
     }
 
     @Test
+    public void shouldObserveInstallationWithoutRecreatingSessionService() throws Exception {
+        AdminTokenService service = testService(30);
+        Cookie cookie = createAdminCookie(service, "secret-key");
+        cacheSecretKey(service, 7, "secret-key");
+        HttpRequest request = request("/admin", header(cookie.getValue()), null, new HashMap<>());
+        installed = false;
+        assertNull(service.getAdminTokenVO(request));
+        installed = true;
+        assertNotNull(service.getAdminTokenVO(request));
+        installed = false;
+        assertNull(service.getAdminTokenVO(request));
+    }
+
+    @Test
     public void shouldReturnNullWhenSiteIsNotInstalled() {
-        Constants.zrLogConfig = new TestZrLogConfig(false);
+        installed = false;
 
         AdminFullTokenVO token = testService(30)
                 .getAdminTokenVO(request("/", new HashMap<>(), null, new HashMap<>()));
@@ -241,7 +279,7 @@ public class AdminTokenServiceTest {
 
     @Test
     public void shouldRedirectToLoginWhenRefererIsNotCrossOriginEnabled() {
-        Constants.zrLogConfig = new TestZrLogConfig(true);
+        installed = true;
         CapturedResponse capturedResponse = new CapturedResponse();
         Map<String, String> headers = new HashMap<>();
         headers.put("Referer", "https://example.com/admin/page");
@@ -255,7 +293,7 @@ public class AdminTokenServiceTest {
 
     @Test
     public void shouldRedirectToEncodedLoginUrlForCrossOriginReferer() {
-        Constants.zrLogConfig = new TestZrLogConfig(true);
+        installed = true;
         CapturedResponse capturedResponse = new CapturedResponse();
         Map<String, String> headers = new HashMap<>();
         headers.put("Referer", "https://example.com/admin/page");
@@ -361,33 +399,4 @@ public class AdminTokenServiceTest {
         }
     }
 
-    private static class TestZrLogConfig extends ZrLogConfig {
-
-        private final boolean installed;
-
-        TestZrLogConfig(boolean installed) {
-            super(18080, null, "/");
-            this.installed = installed;
-        }
-
-        @Override
-        public boolean isInstalled() {
-            return installed;
-        }
-
-        @Override
-        public DataSourceWrapper configDatabase() {
-            return null;
-        }
-
-        @Override
-        protected TokenService initTokenService() {
-            return null;
-        }
-
-        @Override
-        public List<IPlugin> getBasePluginList() {
-            return new Plugins();
-        }
-    }
 }

@@ -2,12 +2,9 @@ package com.zrlog.blog.web.template;
 
 import com.hibegin.http.server.api.HttpRequest;
 import com.zrlog.common.Constants;
-import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.cache.dto.LogNavDTO;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
-import com.zrlog.plugin.IPlugin;
-import com.zrlog.plugin.Plugins;
 import org.junit.Test;
 
 import java.lang.reflect.Proxy;
@@ -53,7 +50,7 @@ public class TemplateRenderUtilsTest {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
 
         try {
-            Constants.zrLogConfig = new TestZrLogConfig();
+            Constants.zrLogConfig = null;
             TemplateRenderUtils.fullNavBar(request("/blog", "example.com", "/"), "", init);
         } finally {
             Constants.zrLogConfig = previousConfig;
@@ -84,25 +81,4 @@ public class TemplateRenderUtilsTest {
                 });
     }
 
-    private static class TestZrLogConfig extends ZrLogConfig {
-
-        private TestZrLogConfig() {
-            super(19083, null, "/");
-        }
-
-        @Override
-        public boolean isInstalled() {
-            return false;
-        }
-
-        @Override
-        protected TokenService initTokenService() {
-            return null;
-        }
-
-        @Override
-        public List<IPlugin> getBasePluginList() {
-            return new Plugins();
-        }
-    }
 }

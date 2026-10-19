@@ -5,6 +5,7 @@ import com.hibegin.http.server.web.cookie.Cookie;
 import com.zrlog.blog.web.plugin.TemplateDownloadPlugin;
 import com.zrlog.business.service.TemplateInfoHelper;
 import com.zrlog.common.Constants;
+
 import java.util.Objects;
 
 public class TemplateHelper {
@@ -25,12 +26,11 @@ public class TemplateHelper {
     /**
      * 获取主题的相对于程序的路径，当Cookie中有值的情况下，优先使用Cookie里面的数据（仅当主题存在的情况下，否则返回默认的主题），
      */
-    public static String getTemplatePath(HttpRequest request) {
+    public static String getTemplatePath(HttpRequest request, String configuredTemplate, TemplateDownloadPlugin templateDownloadPlugin) {
         String templatePath = TemplateHelper.getTemplatePathByCookie(request.getCookies());
         if (Objects.isNull(templatePath)) {
-            templatePath = Constants.getPublicWebSiteInfo().getTemplate();
+            templatePath = configuredTemplate;
         }
-        TemplateDownloadPlugin templateDownloadPlugin = Constants.zrLogConfig.getPlugin(TemplateDownloadPlugin.class);
         if (Objects.nonNull(templateDownloadPlugin)) {
             templateDownloadPlugin.precheckTemplate(templatePath);
         }

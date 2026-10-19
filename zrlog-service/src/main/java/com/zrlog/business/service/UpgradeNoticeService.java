@@ -6,11 +6,11 @@ import com.hibegin.common.util.StringUtils;
 import com.zrlog.business.dto.StoredUpgradeNotice;
 import com.zrlog.business.rest.response.CheckVersionResponse;
 import com.zrlog.business.updater.UpdateVersionInfoPlugin;
-import com.zrlog.common.Constants;
 import com.zrlog.common.vo.Version;
 import com.zrlog.util.ZrLogUtil;
 
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import java.util.logging.Logger;
 
 public class UpgradeNoticeService {
@@ -18,14 +18,22 @@ public class UpgradeNoticeService {
     private static final Logger LOGGER = LoggerUtil.getLogger(UpgradeNoticeService.class);
     private static final String UPGRADE_NOTICE_KEY = "admin_message_center_upgrade_notice";
 
+    private final BooleanSupplier installed;
+
+    public UpgradeNoticeService(BooleanSupplier installed) {
+        this(installed, new WebsiteKvService());
+    }
+
+    UpgradeNoticeService(BooleanSupplier installed, WebsiteKvService kvService) {
+        this.installed = Objects.requireNonNull(installed);
+        this.kvService = Objects.requireNonNull(kvService);
+    }
+
     private final Gson gson = new Gson();
-    private final WebsiteKvService kvService = new WebsiteKvService();
+    private final WebsiteKvService kvService;
 
     public void sync(Version version) {
-        if (Objects.isNull(Constants.zrLogConfig)) {
-            return;
-        }
-        if (!Constants.zrLogConfig.isInstalled()) {
+        if (!installed.getAsBoolean()) {
             return;
         }
         try {

@@ -1,16 +1,13 @@
 package com.zrlog.business.plugin;
 
-import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.http.server.util.PathUtil;
-import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
-import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
-import com.zrlog.plugin.IPlugin;
-import com.zrlog.plugin.Plugins;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.NetworkProxy;
-import com.zrlog.web.WebSiteInfoProvider;
+import org.graalvm.nativeimage.ImageInfo;
+import org.junit.Test;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,8 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
-import org.graalvm.nativeimage.ImageInfo;
-import org.junit.Test;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -59,7 +55,7 @@ public class PluginCoreProcessImplTest {
 
     @Test
     public void pluginMasterPortShouldRotateWithinDedicatedRange() {
-        PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog");
+        PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog", () -> 19084);
         int previousPort = -1;
         for (int i = 0; i < 100; i++) {
             int port = process.nextPluginMasterPort(previousPort);
@@ -77,7 +73,7 @@ public class PluginCoreProcessImplTest {
         try {
             System.setProperty("sws.log.path", logDir.toString());
 
-            new PluginCoreProcessImpl(null, "");
+            new PluginCoreProcessImpl(null, "", () -> 19084);
 
             try (Stream<Path> paths = Files.list(logDir)) {
                 assertFalse(paths.anyMatch(path -> path.getFileName().toString().startsWith("plugin-core-")));
@@ -93,7 +89,7 @@ public class PluginCoreProcessImplTest {
         Path root = Files.createTempDirectory("zrlog-plugin-core-root");
         try {
             PathUtil.setRootPath(root.toString());
-            PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog");
+            PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog", () -> 19084);
 
             String javaProgram = process.programName(new File("plugin-core.jar"));
             String workerPath = process.getPluginWorkerPath(new File(root + "/conf/plugins"));
@@ -147,7 +143,7 @@ public class PluginCoreProcessImplTest {
 
     @Test
     public void shouldUsePluginCoreFileAsProgramInNativeImage() throws Exception {
-        PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog");
+        PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog", () -> 19084);
         File pluginCore = new File("plugin-core-Linux-x86_64.bin");
         try {
             ImageInfo.setInImageRuntimeCode(true);
@@ -186,9 +182,9 @@ public class PluginCoreProcessImplTest {
             Files.createDirectories(nativeProgram.getParent());
             Files.writeString(nativeProgram, "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsFile + "\n");
             assertTrue(nativeProgram.toFile().setExecutable(true));
-            Constants.zrLogConfig = new TestZrLogConfig();
+            Constants.zrLogConfig = null;
             ImageInfo.setInImageRuntimeCode(true);
-            Process process = new PluginCoreProcessImpl(null, "/blog").startPluginCore(nativeProgram.toFile(),
+            Process process = new PluginCoreProcessImpl(null, "/blog", () -> 19084).startPluginCore(nativeProgram.toFile(),
                     "db=ok", "-Xmx64m", root.toString(), "4.0.1", "test-token", 21000, 41000, 51000);
             assertNotNull(process);
             assertTrue(process.waitFor(5, TimeUnit.SECONDS));
@@ -220,9 +216,9 @@ public class PluginCoreProcessImplTest {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
             System.setProperty("sws.root.path", root.toString());
-            Constants.zrLogConfig = new TestZrLogConfig();
+            Constants.zrLogConfig = null;
             ImageInfo.setInImageRuntimeCode(true);
-            PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog");
+            PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog", () -> 19084);
 
             Process started = process.startPluginCore(pluginCore.toFile(), "db=ok",
                     "-Xmx64m", root.resolve("static").toString(), "3.6.0", "token-123",
@@ -279,8 +275,8 @@ public class PluginCoreProcessImplTest {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
             System.setProperty("sws.root.path", root.toString());
-            Constants.zrLogConfig = new TestZrLogConfig();
-            PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog");
+            Constants.zrLogConfig = null;
+            PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog", () -> 19084);
 
             Process started = process.startPluginCore(root.resolve("missing.jar").toFile(),
                     "db=ok", "-Xmx64m", root.resolve("static").toString(), "3.6.0", "token-123",
@@ -308,9 +304,9 @@ public class PluginCoreProcessImplTest {
         ZrLogConfig previousConfig = Constants.zrLogConfig;
         try {
             System.setProperty("sws.root.path", root.toString());
-            Constants.zrLogConfig = new TestZrLogConfig();
+            Constants.zrLogConfig = null;
             ImageInfo.setInImageRuntimeCode(true);
-            PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/");
+            PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/", () -> 19084);
 
             Process started = process.startPluginCore(pluginCore.toFile(), "db=ok",
                     "-Xmx64m", root.resolve("static").toString(), "3.6.0", "token-123",
@@ -341,7 +337,7 @@ public class PluginCoreProcessImplTest {
         String previousFileArch = setFileArch("Linux-x86_64");
         try {
             System.setProperty("sws.root.path", root.toString());
-            Constants.zrLogConfig = new TestZrLogConfig();
+            Constants.zrLogConfig = null;
             ImageInfo.setInImageRuntimeCode(true);
             TestablePluginCoreProcessImpl process = new TestablePluginCoreProcessImpl(null, "/blog", argsFile);
 
@@ -698,7 +694,7 @@ public class PluginCoreProcessImplTest {
     @Test
     public void stopPluginCoreShouldCloseHandleAndRunCallbackOnlyOnce() throws Exception {
         AtomicInteger stopCallbacks = new AtomicInteger();
-        PluginCoreProcessImpl process = new PluginCoreProcessImpl(stopCallbacks::incrementAndGet, "/blog");
+        PluginCoreProcessImpl process = new PluginCoreProcessImpl(stopCallbacks::incrementAndGet, "/blog", () -> 19084);
         TestPluginCoreProcessHandle handle = new TestPluginCoreProcessHandle();
         Field field = PluginCoreProcessImpl.class.getDeclaredField("pluginCoreProcessHandle");
         field.setAccessible(true);
@@ -714,7 +710,7 @@ public class PluginCoreProcessImplTest {
     @Test
     public void stopPluginCoreShouldRetryHandleCloseAfterFailure() throws Exception {
         AtomicInteger stopCallbacks = new AtomicInteger();
-        PluginCoreProcessImpl process = new PluginCoreProcessImpl(stopCallbacks::incrementAndGet, "/blog");
+        PluginCoreProcessImpl process = new PluginCoreProcessImpl(stopCallbacks::incrementAndGet, "/blog", () -> 19084);
         TestPluginCoreProcessHandle handle = new TestPluginCoreProcessHandle(1);
         Field field = PluginCoreProcessImpl.class.getDeclaredField("pluginCoreProcessHandle");
         field.setAccessible(true);
@@ -853,7 +849,7 @@ public class PluginCoreProcessImplTest {
         RestartTrackingPluginCoreProcessImpl(ControlledProcess oldProcess, ControlledProcess replacementProcess,
                                              int failedWatcherConnections, int stopAfterWatcherAttempts,
                                              long watcherRetryElapsedMillis) {
-            super(null, "/blog");
+            super(null, "/blog", () -> 19084);
             this.oldProcess = oldProcess;
             this.replacementProcess = replacementProcess;
             this.failedWatcherConnections = failedWatcherConnections;
@@ -933,7 +929,7 @@ public class PluginCoreProcessImplTest {
         private final ControlledProcess successfulProcess = new ControlledProcess(true, true);
 
         private InitialLaunchRetryPluginCoreProcessImpl() {
-            super(null, "/blog");
+            super(null, "/blog", () -> 19084);
         }
 
         @Override
@@ -996,7 +992,7 @@ public class PluginCoreProcessImplTest {
                 new ControlledProcess(true, true), new ControlledProcess(true, true));
 
         private RecoverableWatcherFailurePluginCoreProcessImpl() {
-            super(null, "/blog");
+            super(null, "/blog", () -> 19084);
         }
 
         @Override
@@ -1140,7 +1136,7 @@ public class PluginCoreProcessImplTest {
 
         private CrashLoopPluginCoreProcessImpl(boolean runAsync, int restartLaunchFailures,
                                                 long... runtimesBeforeCrashMillis) {
-            super(null, "/blog");
+            super(null, "/blog", () -> 19084);
             this.runAsync = runAsync;
             this.restartLaunchFailures = restartLaunchFailures;
             this.runtimesBeforeCrashMillis = runtimesBeforeCrashMillis;
@@ -1221,7 +1217,7 @@ public class PluginCoreProcessImplTest {
         private final AtomicInteger watcherCount = new AtomicInteger();
 
         TestablePluginCoreProcessImpl(Runnable onStopRunnable, String contextPath, Path launchMarker) {
-            super(onStopRunnable, contextPath);
+            super(onStopRunnable, contextPath, () -> 19084);
             this.launchMarker = launchMarker;
         }
 
@@ -1264,44 +1260,5 @@ public class PluginCoreProcessImplTest {
         }
     }
 
-    private static class TestZrLogConfig extends ZrLogConfig {
 
-        TestZrLogConfig() {
-            super(19084, null, "/blog");
-        }
-
-        @Override
-        public boolean isInstalled() {
-            return false;
-        }
-
-        @Override
-        public DataSourceWrapper configDatabase() {
-            return null;
-        }
-
-        @Override
-        protected TokenService initTokenService() {
-            return null;
-        }
-
-        @Override
-        public <T> T getWebSetup(Class<T> capability) {
-            if (capability == WebSiteInfoProvider.class) {
-                CacheService cache = cacheForTest();
-                return cache == null ? null : capability.cast(
-                        (WebSiteInfoProvider) cache::getPublicWebSiteInfo);
-            }
-            return super.getWebSetup(capability);
-        }
-
-        private CacheService cacheForTest() {
-            return null;
-        }
-
-        @Override
-        public List<IPlugin> getBasePluginList() {
-            return new Plugins();
-        }
-    }
 }

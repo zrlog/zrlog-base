@@ -14,9 +14,11 @@ import java.util.Set;
  */
 public class MyI18nInterceptor implements HandleAbleInterceptor {
 
+    private final java.util.function.Supplier<String> siteLanguage;
     private final Set<String> ignoreExt = new HashSet<>();
 
-    public MyI18nInterceptor() {
+    public MyI18nInterceptor(java.util.function.Supplier<String> siteLanguage) {
+        this.siteLanguage = Objects.requireNonNull(siteLanguage);
         ignoreExt.add(".css");
         ignoreExt.add(".js");
         //image
@@ -34,7 +36,7 @@ public class MyI18nInterceptor implements HandleAbleInterceptor {
 
     @Override
     public boolean doInterceptor(HttpRequest request, HttpResponse response) {
-        I18nUtil.addToRequest(request);
+        I18nUtil.addToRequest(request, siteLanguage.get());
         return true;
     }
 

@@ -1,8 +1,10 @@
 package com.zrlog.web;
 
+import com.hibegin.common.util.EnvKit;
 import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.http.server.api.Interceptor;
 import com.zrlog.common.Constants;
+import com.zrlog.common.UpdaterTypeEnum;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.util.ThreadUtils;
 import com.zrlog.util.ZrLogBaseNativeImageUtils;
@@ -32,6 +34,16 @@ public class BaseWebSetup implements WebSetup {
 
     @Override
     public void setup() {
+        zrLogConfig.getServerConfig().getBindings()
+                .interceptor(MyI18nInterceptor.class, r -> new MyI18nInterceptor(() -> {
+                    var provider = zrLogConfig.getWebSetup(WebSiteInfoProvider.class);
+                    var site = provider == null ? null : provider.getPublicWebSiteInfo();
+                    return site == null ? Constants.DEFAULT_LANGUAGE : site.getLanguage();
+                }))
+                .interceptor(InstallStatusInterceptor.class, r -> new InstallStatusInterceptor(
+                        zrLogConfig::isInstalled, zrLogConfig::isMissingConfig))
+                .interceptor(GlobalBaseInterceptor.class, r -> new GlobalBaseInterceptor(!EnvKit.isDevMode()
+                        && zrLogConfig.getUpdater() != null && zrLogConfig.getUpdater().getType() == UpdaterTypeEnum.WAR));
         if (ThreadUtils.isEnableLoom() && Constants.debugLoggerPrintAble()) {
             LOGGER.info("Java VirtualThread(loom) enabled");
         }

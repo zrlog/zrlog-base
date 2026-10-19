@@ -1,25 +1,14 @@
 package com.zrlog.business.util;
 
-import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.dto.PageData;
-import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
-import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
-import com.zrlog.common.cache.dto.TagDTO;
-import com.zrlog.common.cache.dto.TypeDTO;
-import com.zrlog.common.cache.dto.UserBasicDTO;
-import com.zrlog.common.cache.vo.BaseDataInitVO;
-import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.dto.ArticleBasicDTO;
-import com.zrlog.plugin.IPlugin;
-import com.zrlog.plugin.Plugins;
-import com.zrlog.web.WebSiteInfoProvider;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
 import org.junit.After;
 import org.junit.Test;
+
+import java.util.Arrays;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
@@ -37,7 +26,7 @@ public class ArticleHelpersTest {
         ArticleBasicDTO article = article("ZrLog title", "digest", "<p>content</p>");
         PageData<ArticleBasicDTO> pageData = new PageData<>(1L, Arrays.asList(article));
 
-        ArticleHelpers.wrapperSearchKeyword(pageData, "");
+        ArticleHelpers.wrapperSearchKeyword(pageData, "", 120);
 
         assertEquals("ZrLog title", article.getTitle());
         assertEquals("digest", article.getDigest());
@@ -47,17 +36,17 @@ public class ArticleHelpersTest {
     public void shouldSkipEmptyRowsWithoutRequiringGlobalConfig() {
         PageData<ArticleBasicDTO> pageData = new PageData<>(0L, null);
 
-        ArticleHelpers.wrapperSearchKeyword(pageData, "zrlog");
+        ArticleHelpers.wrapperSearchKeyword(pageData, "zrlog", 120);
 
         assertNull(pageData.getRows());
     }
 
     @Test
     public void shouldHighlightTitleAndDigestWhenDigestContainsKeyword() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(120);
+        Constants.zrLogConfig = null;
         ArticleBasicDTO article = article("About ZrLog", "ZrLog digest", "<p>body</p>");
 
-        ArticleHelpers.wrapperSearchKeyword(new PageData<>(1L, Arrays.asList(article)), "ZrLog");
+        ArticleHelpers.wrapperSearchKeyword(new PageData<>(1L, Arrays.asList(article)), "ZrLog", 120);
 
         assertEquals("About <font color=\"#CC0000\">ZrLog</font>", article.getTitle());
         assertEquals("<font color=\"#CC0000\">ZrLog</font> digest", article.getDigest());
@@ -65,10 +54,10 @@ public class ArticleHelpersTest {
 
     @Test
     public void shouldFallbackToPlainContentWhenDigestDoesNotContainKeyword() throws Exception {
-        Constants.zrLogConfig = new TestZrLogConfig(120);
+        Constants.zrLogConfig = null;
         ArticleBasicDTO article = article("Plain title", "short digest", "<p>Hello <strong>ZrLog</strong></p>");
 
-        ArticleHelpers.wrapperSearchKeyword(new PageData<>(1L, Arrays.asList(article)), "ZrLog");
+        ArticleHelpers.wrapperSearchKeyword(new PageData<>(1L, Arrays.asList(article)), "ZrLog", 120);
 
         assertEquals("Plain title", article.getTitle());
         assertEquals("Hello <font color=\"#CC0000\">ZrLog</font>", article.getDigest());
@@ -82,92 +71,4 @@ public class ArticleHelpersTest {
         return article;
     }
 
-    private static class TestZrLogConfig extends ZrLogConfig {
-        private CacheService cacheService;
-
-        @Override
-        public <T> T getWebSetup(Class<T> capability) {
-            if (capability == WebSiteInfoProvider.class) {
-                return capability.cast((WebSiteInfoProvider) cacheService::getPublicWebSiteInfo);
-            }
-            return super.getWebSetup(capability);
-        }
-
-
-        TestZrLogConfig(long digestLength) throws Exception {
-            super(18080, null, "/");
-            PublicWebSiteInfo info = new PublicWebSiteInfo();
-            info.setArticle_auto_digest_length(digestLength);
-            this.cacheService = new TestCacheService(info);
-        }
-
-        @Override
-        public DataSourceWrapper configDatabase() {
-            return null;
-        }
-
-        @Override
-        protected TokenService initTokenService() {
-            return null;
-        }
-
-        @Override
-        public List<IPlugin> getBasePluginList() {
-            return new Plugins();
-        }
-    }
-
-    private static class TestCacheService implements CacheService {
-
-        private final PublicWebSiteInfo publicWebSiteInfo;
-
-        TestCacheService(PublicWebSiteInfo publicWebSiteInfo) {
-            this.publicWebSiteInfo = publicWebSiteInfo;
-        }
-
-        @Override
-        public long getCurrentSqlVersion() {
-            return 0;
-        }
-
-        @Override
-        public long getWebSiteVersion() {
-            return 0;
-        }
-
-        @Override
-        public BaseDataInitVO getInitData() {
-            return null;
-        }
-
-        @Override
-        public BaseDataInitVO refreshInitData() {
-            return null;
-        }
-
-        @Override
-        public PublicWebSiteInfo getPublicWebSiteInfo() {
-            return publicWebSiteInfo;
-        }
-
-        @Override
-        public List<TypeDTO> getArticleTypes() {
-            return null;
-        }
-
-        @Override
-        public List<TagDTO> getTags() {
-            return null;
-        }
-
-        @Override
-        public UserBasicDTO getUserInfoById(Long userId) {
-            return null;
-        }
-
-        @Override
-        public Map<String, Object> getTemplateConfigMapWithCache(String template) {
-            return null;
-        }
-    }
 }

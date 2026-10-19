@@ -6,7 +6,6 @@ import com.hibegin.common.util.ZipUtil;
 import com.hibegin.http.server.config.ConfigKit;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.util.PluginCoreUtils;
-import com.zrlog.common.Constants;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.ThreadUtils;
 import com.zrlog.util.ZrLogUtil;
@@ -19,6 +18,7 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.IntSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -52,6 +52,7 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
     private final File pluginsFolder;
     private boolean unzipped = false;
     private final String contextPath;
+    private final IntSupplier hostPort;
 
 
     private File getLogFile(boolean error) {
@@ -60,8 +61,9 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
         return logFile;
     }
 
-    public PluginCoreProcessImpl(Runnable onStopRunnable, String contextPath) {
+    public PluginCoreProcessImpl(Runnable onStopRunnable, String contextPath, IntSupplier hostPort) {
         this.contextPath = contextPath;
+        this.hostPort = Objects.requireNonNull(hostPort);
         this.onStopRunnable = onStopRunnable;
         if (EnvKit.isFaaSMode()) {
             this.pluginsFolder = new File(ZrLogUtil.getFaaSRoot() + "/conf/plugins/");
@@ -135,7 +137,7 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
         args.add(randomWatcherListenPort + "");
         args.add(runtimePath);
         args.add(runTimeVersion);
-        args.add(Constants.zrLogConfig.getServerConfig().getPort() + "");
+        args.add(Integer.toString(hostPort.getAsInt()));
         args.add(token);
         if (EnvKit.isNativeImage()) {
             args.add(BlogBuildInfoUtil.getFileArch());

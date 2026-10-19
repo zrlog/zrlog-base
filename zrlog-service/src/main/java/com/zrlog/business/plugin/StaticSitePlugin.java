@@ -5,21 +5,15 @@ import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.SecurityUtils;
 import com.hibegin.common.util.StringUtils;
 import com.hibegin.common.util.http.HttpUtil;
-import com.hibegin.http.HttpMethod;
-import com.hibegin.http.server.ApplicationContext;
 import com.hibegin.http.server.api.HttpRequest;
-import com.hibegin.http.server.config.AbstractServerConfig;
-import com.hibegin.http.server.config.RequestConfig;
-import com.hibegin.http.server.config.ResponseConfig;
-import com.hibegin.http.server.handler.HttpRequestHandlerRunnable;
-import com.hibegin.http.server.util.HttpRequestBuilder;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.plugin.type.StaticSiteType;
 import com.zrlog.common.Constants;
+import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.cache.CacheServiceImpl;
 import com.zrlog.plugin.BaseStaticSitePlugin;
 import com.zrlog.util.I18nUtil;
-import com.zrlog.util.ZrLogUtil;
+
 import java.io.*;
 import java.time.Duration;
 import java.util.*;
@@ -33,8 +27,8 @@ import static com.zrlog.plugin.BaseStaticSitePlugin.isStaticPluginRequest;
 
 public interface StaticSitePlugin extends BaseStaticSitePlugin {
 
-    static String getSuffix(HttpRequest request) {
-        if (isStaticPluginRequest(request) || Constants.isStaticHtmlStatus()) {
+    static String getSuffix(HttpRequest request, boolean staticHtml) {
+        if (isStaticPluginRequest(request) || staticHtml) {
             return ".html";
         }
         return "";
@@ -74,11 +68,20 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
         saveToCacheFolder(inputStream, resourceName);
     }
 
-    static boolean isDisabled() {
-        if (!Constants.isStaticHtmlStatus()) {
-            return true;
-        }
-        return StringUtils.isEmpty(ZrLogUtil.getBlogHostByWebSite());
+    PublicWebSiteInfo getSiteInfo();
+
+    default boolean isStaticHtmlEnabled() {
+        PublicWebSiteInfo site = getSiteInfo();
+        return site != null && Boolean.TRUE.equals(site.getGenerator_html_status());
+    }
+
+    static boolean isDisabled(boolean staticHtml, String host) {
+        return !staticHtml || StringUtils.isEmpty(host);
+    }
+
+    default boolean isDisabled() {
+        PublicWebSiteInfo site = getSiteInfo();
+        return site == null || isDisabled(Boolean.TRUE.equals(site.getGenerator_html_status()), site.getHost());
     }
 
     default String getSiteVersion() {
@@ -98,7 +101,7 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
             if (isDisabled()) {
                 return true;
             }
-            String versionFile = (Objects.nonNull(scheme) ? scheme : "https") + "://" + Constants.getHost() + getContextPath() + "/" + getVersionFileName();
+            String versionFile = (Objects.nonNull(scheme) ? scheme : "https") + "://" + getSiteInfo().getHost() + getContextPath() + "/" + getVersionFileName();
             String remoteSiteVersion = HttpUtil.getInstance().getSuccessTextByUrl(versionFile + "?_t=" + System.currentTimeMillis());
             return Objects.equals(getSiteVersion(), remoteSiteVersion);
         } catch (Exception e) {
@@ -141,7 +144,7 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
     }
 
     default void saveToCacheFolder(InputStream inputStream, String uri) {
-        if (!Constants.isStaticHtmlStatus()) {
+        if (!isStaticHtmlEnabled()) {
             return;
         }
         File file = getCacheFile(uri);
@@ -161,14 +164,10 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
 
     Lock getParseLock();
 
-    private HttpRequest buildMockRequest(HttpMethod method, String uri, RequestConfig requestConfig, ApplicationContext applicationContext) throws Exception {
-        return HttpRequestBuilder.buildRequest(method, uri, ZrLogUtil.getBlogHostByWebSite(), STATIC_USER_AGENT, requestConfig, applicationContext);
-    }
-
     private void doParseHtml(File file) throws IOException {
         getParseLock().lock();
         try {
-            StaticSiteHtmlLinks.parseInto(file, ZrLogUtil.getBlogHostByWebSite(), getHandleStatusPageMap());
+            StaticSiteHtmlLinks.parseInto(file, getSiteInfo().getHost(), getHandleStatusPageMap());
         } finally {
             getParseLock().unlock();
         }
@@ -178,33 +177,22 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
         return getContextPath() + "/error/404.html";
     }
 
-    private CompletableFuture<Void> doAsyncFetch(String key, AbstractServerConfig serverConfig, ApplicationContext applicationContext, Executor executor) {
+    private CompletableFuture<Void> doAsyncFetch(String key, StaticSiteRenderer renderer, Executor executor) {
         getHandleStatusPageMap().put(key, HandleState.HANDING);
         return CompletableFuture.runAsync(() -> {
             boolean error = false;
-            ResponseConfig responseConfig = serverConfig.getResponseConfig();
-            responseConfig.setEnableGzip(false);
-            HttpRequest httpRequest;
-            try {
-                httpRequest = buildMockRequest(HttpMethod.GET, key, serverConfig.getRequestConfig(), applicationContext);
-            } catch (Exception e) {
-                LOGGER.warning("Build mock request " + key + " error: " + e.getMessage());
-                return;
-            }
-            String uri = httpRequest.getUri();
             boolean notFoundDocument = Objects.equals(key, notFindFile());
-            try (BodySaveResponse bodySaveResponse = new BodySaveResponse(httpRequest,
-                    serverConfig.getResponseConfig(), true, notFoundDocument ? 404 : 200)) {
-                new HttpRequestHandlerRunnable(httpRequest, bodySaveResponse).run();
-                File file = bodySaveResponse.getCacheFile();
+            try {
+                StaticSiteRenderer.RenderedPage page = renderer.render(key, getSiteInfo().getHost(), this);
+                File file = page.file;
                 if (Objects.nonNull(file)) {
                     getCacheFiles().add(file);
                 }
-                if (httpRequest.getUri().startsWith(Constants.ADMIN_URI_BASE_PATH + "/")) {
+                if (page.uri.startsWith(Constants.ADMIN_URI_BASE_PATH + "/")) {
                     return;
                 }
                 if (Objects.isNull(file) || !file.exists()) {
-                    LOGGER.warning("Generator " + uri + " error: missing static file");
+                    LOGGER.warning("Generator " + key + " error: missing static file");
                     error = true;
                     return;
                 }
@@ -212,14 +200,14 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
                     doParseHtml(file);
                 }
             } catch (Exception ex) {
-                LOGGER.warning("Generator " + uri + " error: " + ex.getMessage());
+                LOGGER.warning("Generator " + key + " error: " + ex.getMessage());
             } finally {
                 if (error) {
                     //如果抓取错误了，需要暂停一下，避免重新获取过快
                     try {
                         Thread.sleep(2000);
                     } catch (InterruptedException ex) {
-                        LOGGER.warning("Generator " + uri + " error: " + ex.getMessage());
+                        LOGGER.warning("Generator " + key + " error: " + ex.getMessage());
                     }
                 }
                 getHandleStatusPageMap().put(key, error ? HandleState.RE_FETCH : HandleState.HANDLED);
@@ -231,13 +219,13 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
 
     List<File> getCacheFiles();
 
-    default void doFetch(AbstractServerConfig serverConfig, ApplicationContext applicationContext) {
+    default void doFetch(StaticSiteRenderer renderer) {
         long start = System.currentTimeMillis();
 
         try {
             while (getHandleStatusPageMap().values().stream().anyMatch(e -> e == HandleState.NEW)) {
                 CompletableFuture.allOf(getHandleStatusPageMap().entrySet().stream().filter(e -> Arrays.asList(HandleState.NEW, HandleState.RE_FETCH).contains(e.getValue())).map(e -> {
-                    return doAsyncFetch(e.getKey(), serverConfig, applicationContext, getExecutorService());
+                    return doAsyncFetch(e.getKey(), renderer, getExecutorService());
                 }).toArray(CompletableFuture[]::new)).join();
             }
             String version = saveCacheVersion();

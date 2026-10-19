@@ -2,10 +2,10 @@ package com.zrlog.blog.web.plugin;
 
 import com.hibegin.common.BaseLockObject;
 import com.hibegin.common.dao.ResultValueConvertUtils;
-import com.hibegin.http.server.ApplicationContext;
-import com.hibegin.http.server.config.AbstractServerConfig;
+import com.hibegin.common.util.*;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.plugin.StaticSitePlugin;
+import com.zrlog.business.plugin.StaticSiteRenderer;
 import com.zrlog.business.plugin.type.StaticSiteType;
 import com.zrlog.business.service.TemplateInfoHelper;
 import com.zrlog.business.template.util.BlogResourceUtils;
@@ -14,6 +14,7 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.common.vo.TemplateVO;
 import com.zrlog.data.dto.FaviconBase64DTO;
 import com.zrlog.model.WebSite;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -21,18 +22,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.*;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import com.hibegin.common.util.*;
-
-import java.util.concurrent.*;
 
 public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSitePlugin {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(BlogPageStaticSitePlugin.class);
-    private final AbstractServerConfig serverConfig;
-    private final ApplicationContext applicationContext;
+    private final StaticSiteRenderer renderer;
+    private final Supplier<PublicWebSiteInfo> site;
     private final Map<String, HandleState> handleStatusPageMap = new ConcurrentHashMap<>();
     private final String contextPath;
     private final PageService pageService;
@@ -42,10 +42,9 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
     private final List<File> cacheFiles = new CopyOnWriteArrayList<>();
     private final String favicon = "/favicon.ico";
 
-    public BlogPageStaticSitePlugin(AbstractServerConfig abstractServerConfig, String contextPath) {
-        this.applicationContext = new ApplicationContext(abstractServerConfig.getServerConfig());
-        this.applicationContext.init();
-        this.serverConfig = abstractServerConfig;
+    public BlogPageStaticSitePlugin(StaticSiteRenderer renderer, Supplier<PublicWebSiteInfo> site, String contextPath) {
+        this.renderer = Objects.requireNonNull(renderer);
+        this.site = Objects.requireNonNull(site);
         this.contextPath = contextPath;
         this.defaultLang = Constants.DEFAULT_LANGUAGE;
         this.pageService = new PageService(this);
@@ -53,6 +52,11 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
         if (cacheFolder.exists()) {
             FileUtils.deleteFile(cacheFolder.toString());
         }
+    }
+
+    @Override
+    public PublicWebSiteInfo getSiteInfo() {
+        return site.get();
     }
 
     @Override
@@ -161,10 +165,10 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
     }
 
     private void doGenerator() {
-        if (StaticSitePlugin.isDisabled()) {
+        if (isDisabled()) {
             return;
         }
-        PublicWebSiteInfo webSite = Constants.getPublicWebSiteInfo();
+        PublicWebSiteInfo webSite = site.get();
         refreshFavicon();
         handleRobotsTxt(webSite);
         copyAssetsFiles();
@@ -176,7 +180,7 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
         //生成 404 页面，用于配置第三方 cdn，或者云存储的错误页面
         handleStatusPageMap.put(notFindFile(), HandleState.NEW);
         pageService.saveRedirectRules(notFindFile());
-        doFetch(serverConfig, applicationContext);
+        doFetch(renderer);
     }
 
     @Override
@@ -196,7 +200,7 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
         if (EnvKit.isFaaSMode()) {
             return false;
         }
-        return !StaticSitePlugin.isDisabled();
+        return !isDisabled();
     }
 
     @Override

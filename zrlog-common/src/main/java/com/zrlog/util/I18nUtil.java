@@ -1,13 +1,12 @@
 package com.zrlog.util;
 
-import com.zrlog.theme.spi.BundledThemes;
-
 import com.hibegin.common.util.*;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.common.Constants;
 import com.zrlog.common.exception.NotImplementException;
 import com.zrlog.common.vo.I18nVO;
+import com.zrlog.theme.spi.BundledThemes;
 
 import java.io.*;
 import java.util.HashMap;
@@ -100,7 +99,7 @@ public class I18nUtil {
         }
     }
 
-    public static I18nVO addToRequestWithTemplatePath(String templatePath, HttpRequest request) {
+    public static I18nVO addToRequestWithTemplatePath(String templatePath, HttpRequest request, String siteLanguage) {
         if (StringUtils.isNotEmpty(templatePath)) {
             if (BundledThemes.getInstance().contains(templatePath)) {
                 File enUSPropertiesFile = new File(templatePath + "/language/i18n_en_US.properties");
@@ -121,10 +120,10 @@ public class I18nUtil {
                 }
             }
         }
-        return addToRequest(request);
+        return addToRequest(request, siteLanguage);
     }
 
-    public static I18nVO addToRequest(HttpRequest request) {
+    public static I18nVO addToRequest(HttpRequest request, String siteLanguage) {
         if (EnvKit.isDevMode()) {
             reloadSystemI18N();
         }
@@ -135,11 +134,11 @@ public class I18nUtil {
                     || request.getUri().contains(Constants.API_PUBLIC_VERSION)
                     || request.getUri().contains(Constants.API_PUBLIC_ADMIN_RESOURCE)
             ) {
-                locale = Constants.getLanguage();
+                locale = siteLanguage;
             } else {
                 String referer = request.getHeader("referer");
                 if (StringUtils.isNotEmpty(referer) && referer.contains(Constants.ADMIN_URI_BASE_PATH + "/")) {
-                    locale = Constants.getLanguage();
+                    locale = siteLanguage;
                 } else {
                     //try to get locale info from HTTP header
                     locale = getAcceptLocal(request);
@@ -227,6 +226,13 @@ public class I18nUtil {
         return Objects.requireNonNullElse(local.get(key), "").toString();
     }
 
+    public static String getAdminBackendStringFromRes(String key, String locale) {
+        I18nVO request = threadLocal.get();
+        Map<String, Map<String, Object>> translations = request == null ? i18nVOCache.getAdminBackend() : request.getAdminBackend();
+        Map<String, Object> local = translations.get(Objects.requireNonNullElse(locale, DEFAULT_LANG));
+        return local == null ? "" : Objects.toString(local.get(key), "");
+    }
+
     public static String getBackendStringFromRes(String key) {
         Map<String, Object> local = getBackend();
         if (Objects.isNull(local)) {
@@ -237,16 +243,12 @@ public class I18nUtil {
 
 
     public static String getCurrentLocale() {
+        return getCurrentLocale(DEFAULT_LANG);
+    }
+
+    public static String getCurrentLocale(String fallbackLanguage) {
         I18nVO i18nVO = threadLocal.get();
-        String locale = null;
-        if (i18nVO != null) {
-            locale = i18nVO.getLocale();
-        } else {
-            String lang = Constants.getLanguage();
-            if (Objects.nonNull(lang)) {
-                locale = lang;
-            }
-        }
+        String locale = i18nVO == null ? fallbackLanguage : i18nVO.getLocale();
         if (StringUtils.isNotEmpty(locale)) {
             return locale;
         }

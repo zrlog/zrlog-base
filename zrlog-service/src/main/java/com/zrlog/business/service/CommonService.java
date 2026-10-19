@@ -6,12 +6,17 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.ZrLogUtil;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
 import java.util.Objects;
 import java.util.function.Supplier;
 
+@Singleton
 public class CommonService {
     private final Supplier<PublicWebSiteInfo> site;
 
+    @Inject
     public CommonService(Supplier<PublicWebSiteInfo> site) {
         this.site = Objects.requireNonNull(site);
     }

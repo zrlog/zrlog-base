@@ -9,10 +9,14 @@ import com.zrlog.business.updater.UpdateVersionInfoPlugin;
 import com.zrlog.common.vo.Version;
 import com.zrlog.util.ZrLogUtil;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 import java.util.logging.Logger;
 
+@Singleton
 public class UpgradeNoticeService {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(UpgradeNoticeService.class);
@@ -24,7 +28,8 @@ public class UpgradeNoticeService {
         this(installed, new WebsiteKvService());
     }
 
-    UpgradeNoticeService(BooleanSupplier installed, WebsiteKvService kvService) {
+    @Inject
+    public UpgradeNoticeService(BooleanSupplier installed, WebsiteKvService kvService) {
         this.installed = Objects.requireNonNull(installed);
         this.kvService = Objects.requireNonNull(kvService);
     }

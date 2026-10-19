@@ -3,6 +3,9 @@ package com.zrlog.business.service;
 import com.hibegin.common.util.StringUtils;
 import com.zrlog.business.rest.response.BackupProtectionStatus;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -11,6 +14,7 @@ import java.util.Objects;
 import java.util.function.LongSupplier;
 import java.util.regex.Pattern;
 
+@Singleton
 public class BackupProtectionService {
 
     static final long BACKUP_MAX_AGE_MILLIS = 36L * 60 * 60 * 1000;
@@ -43,6 +47,11 @@ public class BackupProtectionService {
 
     public BackupProtectionService() {
         this(new WebsiteKvService(), System::currentTimeMillis);
+    }
+
+    @Inject
+    public BackupProtectionService(WebsiteKvService websiteKvService) {
+        this(websiteKvService, System::currentTimeMillis);
     }
 
     BackupProtectionService(WebsiteKvService websiteKvService, LongSupplier currentTimeMillis) {

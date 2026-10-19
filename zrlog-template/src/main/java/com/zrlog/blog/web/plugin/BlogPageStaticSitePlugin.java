@@ -13,8 +13,8 @@ import com.zrlog.common.Constants;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.common.vo.TemplateVO;
 import com.zrlog.data.dto.FaviconBase64DTO;
-import com.zrlog.model.WebSite;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -32,22 +32,26 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
 
     private static final Logger LOGGER = LoggerUtil.getLogger(BlogPageStaticSitePlugin.class);
     private final StaticSiteRenderer renderer;
+    private final Supplier<FaviconBase64DTO> faviconSource;
     private final Supplier<PublicWebSiteInfo> site;
     private final Map<String, HandleState> handleStatusPageMap = new ConcurrentHashMap<>();
     private final String contextPath;
-    private final PageService pageService;
     private final String defaultLang;
     private final ReentrantLock parseLock = new ReentrantLock();
     private final ExecutorService executorService = Executors.newFixedThreadPool(4);
     private final List<File> cacheFiles = new CopyOnWriteArrayList<>();
     private final String favicon = "/favicon.ico";
 
-    public BlogPageStaticSitePlugin(StaticSiteRenderer renderer, Supplier<PublicWebSiteInfo> site, String contextPath) {
+    public BlogPageStaticSitePlugin(
+            StaticSiteRenderer renderer,
+            Supplier<PublicWebSiteInfo> site,
+            String contextPath,
+            Supplier<FaviconBase64DTO> faviconSource) {
         this.renderer = Objects.requireNonNull(renderer);
+        this.faviconSource = Objects.requireNonNull(faviconSource);
         this.site = Objects.requireNonNull(site);
         this.contextPath = contextPath;
         this.defaultLang = Constants.DEFAULT_LANGUAGE;
-        this.pageService = new PageService(this);
         File cacheFolder = getCacheFile("/");
         if (cacheFolder.exists()) {
             FileUtils.deleteFile(cacheFolder.toString());
@@ -70,7 +74,7 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
     }
 
     private void refreshFavicon() {
-        FaviconBase64DTO faviconBase64DTO = new WebSite().faviconBase64DTO();
+        FaviconBase64DTO faviconBase64DTO = faviconSource.get();
         faviconHandle(faviconBase64DTO.getFavicon_ico_base64(), favicon, ResultValueConvertUtils.toBoolean(faviconBase64DTO.getGenerator_html_status()));
     }
 
@@ -179,7 +183,7 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
         handleStatusPageMap.put(contextPath + "/", HandleState.NEW);
         //生成 404 页面，用于配置第三方 cdn，或者云存储的错误页面
         handleStatusPageMap.put(notFindFile(), HandleState.NEW);
-        pageService.saveRedirectRules(notFindFile());
+        saveToCacheFolder(new ByteArrayInputStream(("/* " + notFindFile() + " 404").getBytes()), "/_redirects");
         doFetch(renderer);
     }
 

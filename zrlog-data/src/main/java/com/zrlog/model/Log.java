@@ -1,6 +1,8 @@
 package com.zrlog.model;
 
 import com.hibegin.common.dao.BasePageableDAO;
+import com.hibegin.common.dao.DAO;
+import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.ResultBeanUtils;
 import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.hibegin.common.dao.dto.OrderBy;
@@ -14,6 +16,8 @@ import com.zrlog.data.dto.ArticleDetailDTO;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.util.ParseUtil;
 import com.zrlog.util.ThreadUtils;
+
+import jakarta.inject.Inject;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -29,9 +33,18 @@ import java.util.concurrent.ExecutorService;
  */
 public class Log extends BasePageableDAO implements Serializable {
 
+    private final DataSourceWrapper dataSource;
+
     public static final String TABLE_NAME = "log";
 
     public Log() {
+        this(DAO.getDefaultDataSource());
+    }
+
+    @Inject
+    public Log(DataSourceWrapper dataSource) {
+        super(dataSource);
+        this.dataSource = dataSource;
         this.tableName = TABLE_NAME;
         this.pk = "logId";
     }
@@ -75,13 +88,19 @@ public class Log extends BasePageableDAO implements Serializable {
         }
         try {
             if (ResultValueConvertUtils.toBoolean(detail.getCanComment()) && !commentsDisabled) {
-                futures.add(CompletableFuture.runAsync(() -> {
-                    try {
-                        detail.setComments(new Comment().visitorFindAllByLogId(detail.getId().intValue()));
-                    } catch (SQLException e) {
-                        throw new DAOException(e);
-                    }
-                }, executor));
+                futures.add(
+                        CompletableFuture.runAsync(
+                                () -> {
+                                    try {
+                                        detail.setComments(
+                                                new Comment(dataSource)
+                                                        .visitorFindAllByLogId(
+                                                                detail.getId().intValue()));
+                                    } catch (SQLException e) {
+                                        throw new DAOException(e);
+                                    }
+                                },
+                                executor));
             } else {
                 detail.setComments(new ArrayList<>());
             }

@@ -1,7 +1,11 @@
 package com.zrlog.model;
 
 import com.hibegin.common.dao.BasePageableDAO;
+import com.hibegin.common.dao.DAO;
+import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.common.cache.dto.UserBasicDTO;
+
+import jakarta.inject.Inject;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -12,14 +16,23 @@ import java.util.Map;
  */
 public class User extends BasePageableDAO {
 
+    private final DataSourceWrapper dataSource;
 
     public User() {
+        this(DAO.getDefaultDataSource());
+    }
+
+    @Inject
+    public User(DataSourceWrapper dataSource) {
+        super(dataSource);
+        this.dataSource = dataSource;
         this.tableName = "user";
         this.pk = "userId";
     }
 
     public List<UserBasicDTO> findBasicAll() throws SQLException {
-        return doConvertList(new User().queryList("userName", "userId", "header"), UserBasicDTO.class);
+        return doConvertList(
+                new User(dataSource).queryList("userName", "userId", "header"), UserBasicDTO.class);
     }
 
     public Map<String, Object> getUserByUserName(String userName) throws SQLException {

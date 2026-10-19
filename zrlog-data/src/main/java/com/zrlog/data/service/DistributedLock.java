@@ -5,8 +5,13 @@ import com.hibegin.common.util.LoggerUtil;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.model.WebSite;
 
+import dagger.assisted.Assisted;
+import dagger.assisted.AssistedFactory;
+import dagger.assisted.AssistedInject;
+
 import java.sql.SQLException;
 import java.util.Date;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -23,9 +28,22 @@ public class DistributedLock implements Lock {
     private final String lockKey;
     private final String rawLockKey;
 
+    private final jakarta.inject.Provider<WebSite> websites;
+
     public DistributedLock(String lockKey) {
+        this(WebSite::new, lockKey);
+    }
+
+    @AssistedInject
+    public DistributedLock(jakarta.inject.Provider<WebSite> websites, @Assisted String lockKey) {
+        this.websites = Objects.requireNonNull(websites);
         this.lockKey = LOCK_PREFIX + lockKey;
         this.rawLockKey = lockKey;
+    }
+
+    @AssistedFactory
+    public interface Factory {
+        DistributedLock create(String lockKey);
     }
 
     @Override
@@ -64,7 +82,15 @@ public class DistributedLock implements Lock {
     @Override
     public boolean tryLock() {
         try {
-            return new WebSite().set("name", lockKey).set("remark", "Created at " + ResultValueConvertUtils.formatDate(new Date(), "yyyy-MM-dd HH:mm:ss")).set("value", "locked").save();
+            return websites.get()
+                    .set("name", lockKey)
+                    .set(
+                            "remark",
+                            "Created at "
+                                    + ResultValueConvertUtils.formatDate(
+                                            new Date(), "yyyy-MM-dd HH:mm:ss"))
+                    .set("value", "locked")
+                    .save();
         } catch (SQLException e) {
             LOGGER.warning("tryLock " + rawLockKey + " error " + e.getMessage());
             //throw new RuntimeException(e);
@@ -75,7 +101,7 @@ public class DistributedLock implements Lock {
     @Override
     public void unlock() {
         try {
-            new WebSite().set("name", lockKey).delete();
+            websites.get().set("name", lockKey).delete();
         } catch (SQLException e) {
             throw new DAOException(e);
         }

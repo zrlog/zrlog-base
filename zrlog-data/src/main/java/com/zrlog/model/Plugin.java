@@ -1,8 +1,11 @@
 package com.zrlog.model;
 
-
 import com.hibegin.common.dao.BasePageableDAO;
+import com.hibegin.common.dao.DAO;
+import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.common.cache.dto.PluginDTO;
+
+import jakarta.inject.Inject;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -13,6 +16,12 @@ import java.util.List;
 public class Plugin extends BasePageableDAO {
 
     public Plugin() {
+        this(DAO.getDefaultDataSource());
+    }
+
+    @Inject
+    public Plugin(DataSourceWrapper dataSource) {
+        super(dataSource);
         this.tableName = "plugin";
     }
 

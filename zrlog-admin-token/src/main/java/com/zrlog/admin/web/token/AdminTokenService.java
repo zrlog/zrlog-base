@@ -15,6 +15,7 @@ import com.zrlog.common.TokenService;
 import com.zrlog.common.vo.AdminFullTokenVO;
 import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.data.security.AccountAccess;
+import com.zrlog.data.service.UserPreferenceStore;
 import com.zrlog.model.User;
 import com.zrlog.util.CrossUtils;
 import com.zrlog.util.ParseUtil;
@@ -29,6 +30,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 import java.util.logging.Logger;
+
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -43,10 +45,23 @@ public class AdminTokenService implements TokenService {
     private final IvParameterSpec iv;
     private volatile long sessionTimeout;
     private final BooleanSupplier installed;
+    private final jakarta.inject.Provider<User> users;
+    private final jakarta.inject.Provider<UserPreferenceStore> preferences;
     private final BooleanSupplier staticHtml;
     private final Map<Integer, String> userSecretKeyCacheMap = new ConcurrentHashMap<>();
 
     public AdminTokenService(long sessionTimeoutInMinutes, BooleanSupplier installed, BooleanSupplier staticHtml) {
+        this(sessionTimeoutInMinutes, installed, staticHtml, User::new, UserPreferenceStore::new);
+    }
+
+    public AdminTokenService(
+            long sessionTimeoutInMinutes,
+            BooleanSupplier installed,
+            BooleanSupplier staticHtml,
+            jakarta.inject.Provider<User> users,
+            jakarta.inject.Provider<UserPreferenceStore> preferences) {
+        this.users = Objects.requireNonNull(users);
+        this.preferences = Objects.requireNonNull(preferences);
         this.installed = Objects.requireNonNull(installed);
         this.staticHtml = Objects.requireNonNull(staticHtml);
         //字符长度必须要大于16个字符
@@ -56,7 +71,7 @@ public class AdminTokenService implements TokenService {
     }
 
     protected AccountAccess loadAccount(int userId) throws SQLException {
-        return AccountAccess.load(userId);
+        return AccountAccess.from(users.get().loadById(userId));
     }
 
     @Override
@@ -65,7 +80,7 @@ public class AdminTokenService implements TokenService {
     }
 
     protected long sessionTimeoutMinutes(int userId) throws SQLException {
-        return new com.zrlog.data.service.UserPreferenceStore().sessionTimeoutMinutes(userId, sessionTimeout / 60000);
+        return preferences.get().sessionTimeoutMinutes(userId, sessionTimeout / 60000);
     }
 
     protected long currentTimeMillis() { return System.currentTimeMillis(); }
@@ -132,7 +147,7 @@ public class AdminTokenService implements TokenService {
             if (!account.isEnabled()) return null;
             String sk = userSecretKeyCacheMap.get(userId);
             if (Objects.isNull(sk)) {
-                sk = (String) new User().set("userId", userId).queryFirst("secretKey");
+                sk = (String) users.get().set("userId", userId).queryFirst("secretKey");
                 if (Objects.isNull(sk)) {
                     return null;
                 }

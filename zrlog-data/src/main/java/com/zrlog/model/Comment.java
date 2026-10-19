@@ -1,6 +1,8 @@
 package com.zrlog.model;
 
 import com.hibegin.common.dao.BasePageableDAO;
+import com.hibegin.common.dao.DAO;
+import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequest;
 import com.hibegin.common.util.SecurityUtils;
@@ -8,6 +10,8 @@ import com.zrlog.data.dto.CommentDTO;
 import com.zrlog.data.dto.VisitorCommentDTO;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.util.DateValueFormatUtils;
+
+import jakarta.inject.Inject;
 
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
@@ -21,9 +25,18 @@ import java.util.Objects;
  */
 public class Comment extends BasePageableDAO {
 
+    private final DataSourceWrapper dataSource;
+
     public static final String TABLE_NAME = "comment";
 
     public Comment() {
+        this(DAO.getDefaultDataSource());
+    }
+
+    @Inject
+    public Comment(DataSourceWrapper dataSource) {
+        super(dataSource);
+        this.dataSource = dataSource;
         this.tableName = TABLE_NAME;
         this.pk = "commentId";
     }
@@ -82,7 +95,7 @@ public class Comment extends BasePageableDAO {
 
     public void doRead(long id) {
         try {
-            new Comment().set("have_read", true).updateById(id);
+            new Comment(dataSource).set("have_read", true).updateById(id);
         } catch (SQLException e) {
             throw new DAOException(e);
         }

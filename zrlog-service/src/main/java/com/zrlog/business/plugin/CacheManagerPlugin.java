@@ -2,11 +2,15 @@ package com.zrlog.business.plugin;
 
 import com.hibegin.common.util.EnvKit;
 import com.hibegin.common.util.StringUtils;
+import com.zrlog.business.service.WebsiteKvService;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
-import com.zrlog.model.WebSite;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.util.ThreadUtils;
+
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
 import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -15,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * 当超过指定时间后，删除缓存数据，避免缓存到脏数据一直存在。
  */
+@Singleton
 public class CacheManagerPlugin implements IPlugin {
 
     private ScheduledExecutorService scheduledThreadPoolExecutor;
@@ -23,7 +28,11 @@ public class CacheManagerPlugin implements IPlugin {
 
     private final CacheService cacheService;
 
-    public CacheManagerPlugin(CacheService cacheService) {
+    private final WebsiteKvService settings;
+
+    @Inject
+    public CacheManagerPlugin(CacheService cacheService, WebsiteKvService settings) {
+        this.settings = settings;
         this.cacheService = cacheService;
     }
 
@@ -48,7 +57,7 @@ public class CacheManagerPlugin implements IPlugin {
     }
 
     private int getInitDataMaxCacheTimeout() {
-        String dbSettingSize = new WebSite().getStringValueByName("cache_timeout_minutes");
+        String dbSettingSize = settings.getString("cache_timeout_minutes");
         if (StringUtils.isEmpty(dbSettingSize)) {
             dbSettingSize = "5";
         }

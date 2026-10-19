@@ -14,6 +14,9 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.model.WebSite;
 import com.zrlog.util.ThreadUtils;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Objects;
@@ -26,13 +29,25 @@ import java.util.stream.Collectors;
 /**
  * 应用内缓存刷新，协调程序缓存、插件缓存和静态发布
  */
+@Singleton
 public class CacheRefreshService {
     private final CacheService cacheService;
+    private final jakarta.inject.Provider<WebSite> websites;
     private final Supplier<PluginCorePlugin> pluginCore;
     private final Supplier<List<StaticSitePlugin>> staticSites;
 
     public CacheRefreshService(CacheService cacheService, Supplier<PluginCorePlugin> pluginCore,
                                Supplier<List<StaticSitePlugin>> staticSites) {
+        this(cacheService, pluginCore, staticSites, WebSite::new);
+    }
+
+    @Inject
+    public CacheRefreshService(
+            CacheService cacheService,
+            Supplier<PluginCorePlugin> pluginCore,
+            Supplier<List<StaticSitePlugin>> staticSites,
+            jakarta.inject.Provider<WebSite> websites) {
+        this.websites = Objects.requireNonNull(websites);
         this.cacheService = Objects.requireNonNull(cacheService);
         this.pluginCore = Objects.requireNonNull(pluginCore);
         this.staticSites = Objects.requireNonNull(staticSites);
@@ -97,7 +112,7 @@ public class CacheRefreshService {
         for (; ; ) {
             if (staticSitePlugin.isSynchronized(request.getScheme())) {
                 try {
-                    new WebSite().updateByKV(staticSitePlugin.getDbCacheKey(), version);
+                    websites.get().updateByKV(staticSitePlugin.getDbCacheKey(), version);
                 } catch (SQLException e) {
                     LOGGER.log(Level.SEVERE, "update site version " + version + " cache error", e);
                 }

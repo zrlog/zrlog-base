@@ -1,19 +1,23 @@
 package com.zrlog.data.web;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.http.server.ApplicationContext;
 import com.hibegin.http.server.di.SwsBindings;
 import com.zrlog.common.CacheService;
+import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.test.support.ZrLogTestDatabase;
-import java.util.Collections;
-import java.util.List;
+
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import static org.junit.Assert.*;
+
+import java.util.Collections;
+import java.util.List;
 
 public class DataWebSetupTest {
     @Rule
@@ -29,10 +33,10 @@ public class DataWebSetupTest {
             setup.setup();
             new ApplicationContext(config.getServerConfig()).init();
             SwsBindings.Container container = config.getServerConfig().getBindings().build();
-            assertEquals(com.zrlog.common.Constants.DEFAULT_LANGUAGE, setup.getPublicWebSiteInfo().getLanguage());
+            assertEquals(Constants.DEFAULT_LANGUAGE, setup.getPublicWebSiteInfo().getLanguage());
             SwsBindings.CreationException error = assertThrows(SwsBindings.CreationException.class,
                     () -> container.get(CacheService.class));
-            assertEquals("CacheService requires an initialized database", error.getCause().getMessage());
+            assertEquals("Application database is not ready", error.getCause().getMessage());
 
             db.putWebsite("title", "Shared cache site");
             config.attachDatabase(db.dataSource());

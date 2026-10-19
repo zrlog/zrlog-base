@@ -1,6 +1,5 @@
 package com.zrlog.common;
 
-import com.hibegin.common.dao.DAO;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.util.EnvKit;
 import com.hibegin.common.util.LoggerUtil;
@@ -11,6 +10,7 @@ import com.hibegin.http.server.config.RequestConfig;
 import com.hibegin.http.server.config.ResponseConfig;
 import com.hibegin.http.server.config.ServerConfig;
 import com.hibegin.http.server.util.PathUtil;
+import com.zrlog.common.adapter.UpdaterHosts;
 import com.zrlog.common.hooks.TermSignalHandler;
 import com.zrlog.common.web.ZrLogErrorHandle;
 import com.zrlog.common.web.ZrLogHttpJsonMessageConverter;
@@ -22,14 +22,16 @@ import com.zrlog.web.BaseWebSetup;
 import com.zrlog.web.TokenServiceProvider;
 import com.zrlog.web.WebSetup;
 
+import sun.misc.Signal;
+
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.util.*;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import javax.sql.DataSource;
-import sun.misc.Signal;
 
 /**
  * 全局服务配置，包含 数据库，插件，更新的实现者等
@@ -62,7 +64,7 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         this.webSetups = new ArrayList<>();
         this.updater = updater;
         this.serverConfig = initServerConfig(contextPath, port);
-        com.zrlog.common.adapter.UpdaterHosts.bindLifecycle(updater, serverConfig::getPort, this::stop);
+        UpdaterHosts.bindLifecycle(updater, serverConfig::getPort, this::stop);
         //init
         this.installLockFile = PathUtil.getConfFile("/" + Objects.requireNonNullElse(System.getenv("INSTALL_LOCK_FILE_NAME"), "install.lock"));
         this.dbPropertiesFile = DbUtils.initDbPropertiesFile(this);
@@ -97,7 +99,6 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         if (dataSource == null) {
             Properties dbProperties = DbUtils.getDbProp(dbPropertiesFile);
             dataSource = DataSourceUtil.buildDataSource(dbProperties);
-            DAO.setDs(dataSource);
         }
         if (webSetupsInitialized && !databaseInitialized) {
             for (WebSetup webSetup : webSetups) {

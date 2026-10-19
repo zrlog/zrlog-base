@@ -19,6 +19,7 @@
 
     <properties>
         <java.version>11</java.version>
+        <dagger.version>2.60.1</dagger.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -164,7 +165,7 @@
             <dependency>
                 <groupId>com.hibegin</groupId>
                 <artifactId>common-dao</artifactId>
-                <version>1.1.15</version>
+                <version>1.1.16</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

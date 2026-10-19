@@ -1,19 +1,20 @@
 package com.zrlog.business.service;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
+import com.zrlog.business.updater.AutoUpgradeVersionType;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
-import com.zrlog.business.updater.AutoUpgradeVersionType;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 @RunWith(Parameterized.class)
 public class WebsiteKvServiceDatabaseTest {
@@ -53,6 +54,32 @@ public class WebsiteKvServiceDatabaseTest {
 
             assertTrue(service.removeQuietly("feature.alpha"));
             assertEquals("", service.getString("feature.alpha"));
+        }
+    }
+
+    @Test
+    public void explicitDataSourcesKeepReadsAndWritesOnTheirOwnDatabase() throws Exception {
+        try (ZrLogTestDatabase first = ZrLogTestDatabase.open(databaseType)) {
+            WebsiteKvService firstService = new WebsiteKvService(first.dataSource());
+            assertTrue(firstService.putString("isolated.setting", "first"));
+            try (ZrLogTestDatabase second = ZrLogTestDatabase.open(databaseType)) {
+                WebsiteKvService secondService = new WebsiteKvService(second.dataSource());
+                assertTrue(secondService.putString("isolated.setting", "second"));
+                assertEquals("first", firstService.getString("isolated.setting"));
+                assertEquals(
+                        "first",
+                        firstService
+                                .getByNames(List.of("isolated.setting"))
+                                .get("isolated.setting"));
+                assertEquals("first", firstService.listByPrefix("isolated.").get(0).get("value"));
+
+                assertTrue(firstService.putString("isolated.setting", "updated-first"));
+                assertEquals("updated-first", firstService.getString("isolated.setting"));
+                assertEquals("second", secondService.getString("isolated.setting"));
+                assertTrue(firstService.remove("isolated.setting"));
+                assertEquals("", firstService.getString("isolated.setting"));
+                assertEquals("second", secondService.getString("isolated.setting"));
+            }
         }
     }
 

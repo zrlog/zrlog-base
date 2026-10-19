@@ -21,8 +21,12 @@ import com.zrlog.model.Type;
 import com.zrlog.model.User;
 import com.zrlog.model.WebSite;
 import com.zrlog.util.ThreadUtils;
+
+import jakarta.inject.Inject;
+
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -30,7 +34,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.*;
 
 /**
  * 对缓存数据的操作
@@ -43,13 +46,44 @@ public class CacheServiceImpl implements CacheService {
     private final String CACHE_KEY = "base_data_init_cache_v3";
     private final long sqlVersion;
     private final BooleanSupplier installed;
-    private final Lock lock = new DistributedLock("base-data-init-cache");
+    private final Lock lock;
+    private final jakarta.inject.Provider<WebSite> websites;
+    private final jakarta.inject.Provider<Type> types;
+    private final jakarta.inject.Provider<Tag> tags;
+    private final jakarta.inject.Provider<User> users;
+    private final BaseDataDbService baseData;
 
     public CacheServiceImpl(BooleanSupplier installed) {
+        this(
+                installed,
+                WebSite::new,
+                Type::new,
+                Tag::new,
+                User::new,
+                new BaseDataDbService(),
+                DistributedLock::new);
+    }
+
+    @Inject
+    public CacheServiceImpl(
+            BooleanSupplier installed,
+            jakarta.inject.Provider<WebSite> websites,
+            jakarta.inject.Provider<Type> types,
+            jakarta.inject.Provider<Tag> tags,
+            jakarta.inject.Provider<User> users,
+            BaseDataDbService baseData,
+            DistributedLock.Factory locks) {
+        this.websites = Objects.requireNonNull(websites);
+        this.types = Objects.requireNonNull(types);
+        this.tags = Objects.requireNonNull(tags);
+        this.users = Objects.requireNonNull(users);
+        this.baseData = Objects.requireNonNull(baseData);
+        this.lock = locks.create("base-data-init-cache");
         this.installed = Objects.requireNonNull(installed, "installed");
         long versionStart = Long.parseLong(new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()) + "00000");
         this.version = new AtomicLong(versionStart);
-        Map<String, Object> baseInfo = new WebSite().getWebSiteByNameIn(Arrays.asList(CACHE_KEY, ZRLOG_SQL_VERSION_KEY));
+        Map<String, Object> baseInfo =
+                websites.get().getWebSiteByNameIn(Arrays.asList(CACHE_KEY, ZRLOG_SQL_VERSION_KEY));
         String dbCache = (String) baseInfo.get(CACHE_KEY);
         if (StringUtils.isNotEmpty(dbCache)) {
             try {
@@ -121,10 +155,10 @@ public class CacheServiceImpl implements CacheService {
             long start = System.currentTimeMillis();
             ExecutorService executor = ThreadUtils.newFixedThreadPool(10);
             try {
-                cacheInit = new BaseDataDbService().queryCacheInit(executor);
+                cacheInit = baseData.queryCacheInit(executor);
                 cacheInit.setVersion(expectVersion);
                 try {
-                    new WebSite().updateByKV(CACHE_KEY, new Gson().toJson(cacheInit));
+                    websites.get().updateByKV(CACHE_KEY, new Gson().toJson(cacheInit));
                 } catch (SQLException e) {
                     LOGGER.log(Level.SEVERE, "save cache error " + e.getMessage(), e);
                 }
@@ -146,7 +180,7 @@ public class CacheServiceImpl implements CacheService {
             return cacheInit.getTypes();
         }
         try {
-            return new Type().findAll();
+            return types.get().findAll();
         } catch (SQLException e) {
             throw new DAOException(e);
         }
@@ -158,7 +192,7 @@ public class CacheServiceImpl implements CacheService {
             return cacheInit.getTags();
         }
         try {
-            return new Tag().findAll();
+            return tags.get().findAll();
         } catch (SQLException e) {
             throw new DAOException(e);
         }
@@ -173,7 +207,7 @@ public class CacheServiceImpl implements CacheService {
             }
         }
         try {
-            return ResultBeanUtils.convert(new User().loadById(userId), UserBasicDTO.class);
+            return ResultBeanUtils.convert(users.get().loadById(userId), UserBasicDTO.class);
         } catch (SQLException e) {
             throw new DAOException(e);
         }
@@ -190,7 +224,7 @@ public class CacheServiceImpl implements CacheService {
                 }
             }
         }
-        return new WebSite().getTemplateConfigMap(template);
+        return websites.get().getTemplateConfigMap(template);
     }
 
     @Override
@@ -222,7 +256,7 @@ public class CacheServiceImpl implements CacheService {
                 return db;
             }
         }
-        return new WebSite().getPublicWebSite();
+        return websites.get().getPublicWebSite();
     }
 
 }

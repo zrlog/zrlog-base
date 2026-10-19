@@ -1,5 +1,9 @@
 package com.zrlog.business.plugin;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.business.service.WebsiteKvService;
 import com.zrlog.common.CacheService;
@@ -12,6 +16,13 @@ import com.zrlog.plugin.Plugins;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.web.WebSiteInfoProvider;
+
+import org.junit.Test;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
+import org.junit.runner.RunWith;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.OutputStream;
@@ -26,14 +37,6 @@ import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
-import org.junit.Test;
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.Theories;
-import org.junit.experimental.theories.Theory;
-import org.junit.runner.RunWith;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 @RunWith(Theories.class)
 public class PluginLifecycleContractTest {
@@ -271,7 +274,9 @@ public class PluginLifecycleContractTest {
 
     @Test
     public void shouldExposeCacheManagerLifecycleWithoutStartingScheduler() throws Exception {
-        CacheManagerPlugin plugin = new CacheManagerPlugin(countingCacheService(new java.util.concurrent.atomic.AtomicInteger()));
+        CacheManagerPlugin plugin =
+                new CacheManagerPlugin(
+                        countingCacheService(new AtomicInteger()), new WebsiteKvService());
 
         assertTrue(plugin.autoStart());
         assertFalse(plugin.isStarted());
@@ -285,7 +290,9 @@ public class PluginLifecycleContractTest {
         AtomicInteger refreshCount = new AtomicInteger();
         try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
             new WebsiteKvService().putString("cache_timeout_minutes", "0.001");
-            CacheManagerPlugin plugin = new CacheManagerPlugin(countingCacheService(refreshCount));
+            CacheManagerPlugin plugin =
+                    new CacheManagerPlugin(
+                            countingCacheService(refreshCount), new WebsiteKvService());
             try {
                 Constants.setLastAccessTime(System.currentTimeMillis() - 1_000);
 

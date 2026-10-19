@@ -1,9 +1,13 @@
 package com.zrlog.model;
 
 import com.hibegin.common.dao.BasePageableDAO;
+import com.hibegin.common.dao.DAO;
+import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequest;
 import com.zrlog.common.cache.dto.LogNavDTO;
+
+import jakarta.inject.Inject;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -14,6 +18,12 @@ import java.util.List;
 public class LogNav extends BasePageableDAO {
 
     public LogNav() {
+        this(DAO.getDefaultDataSource());
+    }
+
+    @Inject
+    public LogNav(DataSourceWrapper dataSource) {
+        super(dataSource);
         this.pk = "navId";
         this.tableName = "lognav";
     }

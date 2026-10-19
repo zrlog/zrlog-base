@@ -1,6 +1,5 @@
 package com.zrlog.model;
 
-
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.hibegin.common.dao.DAO;
@@ -13,6 +12,8 @@ import com.zrlog.data.dto.FaviconBase64DTO;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.util.WebSiteUtils;
 
+import jakarta.inject.Inject;
+
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,6 +22,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * 存放全局的设置，比如网站标题，关键字，插件，主题的配置信息等，当字典表处理即可，对应数据库的 website 表
  */
 public class WebSite extends DAO {
+
+    private final DataSourceWrapper dataSource;
 
     private static final List<String> websitePublicQueryKeys;
     private static final List<String> websitePublicQueryStrKeys;
@@ -75,12 +78,13 @@ public class WebSite extends DAO {
     }
 
     public WebSite() {
-        this.tableName = "website";
-        this.pk = "siteId";
+        this(DAO.getDefaultDataSource());
     }
 
+    @Inject
     public WebSite(DataSourceWrapper dataSource) {
         super(dataSource);
+        this.dataSource = dataSource;
         this.tableName = "website";
         this.pk = "siteId";
     }
@@ -150,7 +154,8 @@ public class WebSite extends DAO {
 
 
     public Map<String, Object> getTemplateConfigMap(String templateName) {
-        String dbJsonStr = new WebSite().getStringValueByName(templateName + TEMPLATE_CONFIG_SUFFIX);
+        String dbJsonStr =
+                new WebSite(dataSource).getStringValueByName(templateName + TEMPLATE_CONFIG_SUFFIX);
         if (StringUtils.isNotEmpty(dbJsonStr)) {
             return new Gson().fromJson(dbJsonStr, Map.class);
         }
@@ -158,7 +163,10 @@ public class WebSite extends DAO {
     }
 
     public Map<String, Object> updateTemplateConfigMap(String templateName, Map<String, Object> settingMap) throws SQLException {
-        new WebSite().updateByKV(templateName + TEMPLATE_CONFIG_SUFFIX, new GsonBuilder().serializeNulls().create().toJson(settingMap));
+        new WebSite(dataSource)
+                .updateByKV(
+                        templateName + TEMPLATE_CONFIG_SUFFIX,
+                        new GsonBuilder().serializeNulls().create().toJson(settingMap));
         return settingMap;
     }
 

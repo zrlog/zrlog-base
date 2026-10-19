@@ -1,6 +1,9 @@
 package com.zrlog.business.service;
 
 import com.hibegin.common.dao.DataSourceWrapper;
+import com.hibegin.common.dao.DAO;
+import com.zrlog.business.di.DaggerServiceComponent;
+import com.zrlog.data.di.DaggerDataComponent;
 import com.hibegin.common.dao.SqlConvertUtils;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
@@ -46,13 +49,20 @@ public class DbUpgradeServiceDatabaseTest {
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
+    private DbUpgradeService upgradeService(DataSourceWrapper source, long version) {
+        return DaggerServiceComponent.factory().create(
+                DaggerDataComponent.factory().create(() -> source, () -> true),
+                () -> true, () -> null, () -> null, java.util.Collections::emptyList)
+                .databaseUpgrades().create(version);
+    }
+
     @Test
     public void shouldSkipUpgradeWhenDatabaseIsAlreadyAtLatestSqlVersion() throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     CacheService.ZRLOG_SQL_VERSION_KEY, String.valueOf(UpgradeVersionHandler.SQL_VERSION), "");
 
-            new DbUpgradeService(db.dataSource(), UpgradeVersionHandler.SQL_VERSION).tryDoUpgrade();
+            upgradeService(db.dataSource(), UpgradeVersionHandler.SQL_VERSION).tryDoUpgrade();
 
             assertEquals(String.valueOf(UpgradeVersionHandler.SQL_VERSION),
                     db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
@@ -62,7 +72,7 @@ public class DbUpgradeServiceDatabaseTest {
     @Test
     public void shouldSkipUpgradeWhenCurrentSqlVersionIsUnknown() throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-            new DbUpgradeService(db.dataSource(), -1).tryDoUpgrade();
+            upgradeService(db.dataSource(), -1).tryDoUpgrade();
 
             assertNull(db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
         }
@@ -77,11 +87,41 @@ public class DbUpgradeServiceDatabaseTest {
         try {
             System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
             try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-                new DbUpgradeService(db.dataSource(), UpgradeVersionHandler.SQL_VERSION - 1).tryDoUpgrade();
+                upgradeService(db.dataSource(), UpgradeVersionHandler.SQL_VERSION - 1).tryDoUpgrade();
 
                 assertEquals("ok", db.scalar("select value from website where name=?", "db.upgrade.marker"));
                 assertEquals(String.valueOf(UpgradeVersionHandler.SQL_VERSION),
                         db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+            }
+        } finally {
+            restoreProperty("sws.conf.path", previousConfPath);
+        }
+    }
+
+    @Test
+    public void shouldUpgradeOnlyTheOwningDatabaseWithoutADefaultSource() throws Exception {
+        String previousConfPath = System.getProperty("sws.conf.path");
+        File confFolder = writeUpgradeSql("isolated-upgrade-conf",
+                "insert into website(name, value, remark) values('db.upgrade.marker', 'isolated', '');",
+                UpgradeVersionHandler.SQL_VERSION);
+        try {
+            System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
+            try (ZrLogTestDatabase first = ZrLogTestDatabase.open(databaseType);
+                 ZrLogTestDatabase second = ZrLogTestDatabase.open(databaseType)) {
+                DAO.setDs(null);
+                upgradeService(first.dataSource(), UpgradeVersionHandler.SQL_VERSION - 1).tryDoUpgrade();
+                assertEquals("isolated", first.scalar(
+                        "select value from website where name=?", "db.upgrade.marker"));
+                assertEquals(String.valueOf(UpgradeVersionHandler.SQL_VERSION), first.scalar(
+                        "select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+                assertNull(second.scalar("select value from website where name=?", "db.upgrade.marker"));
+                assertNull(second.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+
+                upgradeService(second.dataSource(), UpgradeVersionHandler.SQL_VERSION - 1).tryDoUpgrade();
+                assertEquals("isolated", second.scalar(
+                        "select value from website where name=?", "db.upgrade.marker"));
+                assertEquals(String.valueOf(UpgradeVersionHandler.SQL_VERSION), second.scalar(
+                        "select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
             }
         } finally {
             restoreProperty("sws.conf.path", previousConfPath);
@@ -103,7 +143,7 @@ public class DbUpgradeServiceDatabaseTest {
                 db.update("alter table log drop column sticky");
                 dropPasskeySchema(db);
 
-                new DbUpgradeService(db.dataSource(), 23).tryDoUpgrade();
+                upgradeService(db.dataSource(), 23).tryDoUpgrade();
 
                 assertEquals(0L, ((Number) db.scalar(
                         "select count(extensions) from log")).longValue());
@@ -132,7 +172,7 @@ public class DbUpgradeServiceDatabaseTest {
                 dropPasskeySchema(db);
                 db.update("insert into log(logId, alias) values(?, ?)", 1, "legacy-article");
 
-                new DbUpgradeService(db.dataSource(), 23).tryDoUpgrade();
+                upgradeService(db.dataSource(), 23).tryDoUpgrade();
 
                 assertEquals(0L, ((Number) db.scalar(
                         "select sticky from log where logId=?", 1)).longValue());
@@ -153,7 +193,7 @@ public class DbUpgradeServiceDatabaseTest {
             try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 dropPasskeySchema(db);
 
-                new DbUpgradeService(db.dataSource(), 25).tryDoUpgrade();
+                upgradeService(db.dataSource(), 25).tryDoUpgrade();
 
                 assertEquals(0L, ((Number) db.scalar("select count(passkeyUserHandle) from user")).longValue());
                 assertEquals(0L, ((Number) db.scalar("select count(1) from user_passkey")).longValue());
@@ -213,7 +253,7 @@ public class DbUpgradeServiceDatabaseTest {
                 dropPasskeySchema(db);
                 preparePartiallyAppliedPasskeySchemaForWebApi(db);
 
-                new DbUpgradeService(asWebApi(db.dataSource()), 23).tryDoUpgrade();
+                upgradeService(asWebApi(db.dataSource()), 23).tryDoUpgrade();
 
                 assertEquals(0L, ((Number) db.scalar("select count(extensions) from log")).longValue());
                 assertEquals(0L, ((Number) db.scalar("select count(1) from log_extension_index")).longValue());
@@ -281,14 +321,14 @@ public class DbUpgradeServiceDatabaseTest {
                 db.update("alter table log drop column sticky");
                 dropPasskeySchema(db);
 
-                new DbUpgradeService(db.dataSource(), 23).tryDoUpgrade();
+                upgradeService(db.dataSource(), 23).tryDoUpgrade();
 
                 assertEquals("24",
                         db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
                 assertEquals(0L, ((Number) db.scalar("select count(extensions) from log")).longValue());
 
                 writeUpgradeSql(confFolder, bundledUpgradeSql(25), 25);
-                new DbUpgradeService(db.dataSource(), 24).tryDoUpgrade();
+                upgradeService(db.dataSource(), 24).tryDoUpgrade();
 
                 assertEquals(0L, ((Number) db.scalar("select count(sticky) from log")).longValue());
                 assertEquals(String.valueOf(UpgradeVersionHandler.SQL_VERSION),
@@ -306,7 +346,7 @@ public class DbUpgradeServiceDatabaseTest {
         try {
             System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
             try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-                new DbUpgradeService(db.dataSource(), UpgradeVersionHandler.SQL_VERSION - 1).tryDoUpgrade();
+                upgradeService(db.dataSource(), UpgradeVersionHandler.SQL_VERSION - 1).tryDoUpgrade();
 
                 assertNull(db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
             }
@@ -390,7 +430,7 @@ public class DbUpgradeServiceDatabaseTest {
                 dropAccountSchema(db);
                 db.update("insert into user(userId,userName) values(?,?)", 1, "existing");
                 db.update("insert into user(userId,userName) values(?,?)", 2, "second");
-                new DbUpgradeService(db.dataSource(), 26).tryDoUpgrade();
+                upgradeService(db.dataSource(), 26).tryDoUpgrade();
                 assertEquals("owner", db.scalar("select role from user where userId=1"));
                 assertEquals("admin", db.scalar("select role from user where userId=2"));
                 assertEquals(0, ((Number) db.scalar("select authVersion from user where userId=1")).intValue());
@@ -411,12 +451,12 @@ public class DbUpgradeServiceDatabaseTest {
                 dropUserColumnIfPresent(db, "preferences");
                 db.update("drop table if exists user_access_token");
                 db.update("insert into user(userId,userName,role,authVersion) values(?,?,?,?)", 1, "existing", "author", 7);
-                new DbUpgradeService(db.dataSource(), 27).tryDoUpgrade();
+                upgradeService(db.dataSource(), 27).tryDoUpgrade();
                 assertNull(db.scalar("select preferences from user where userId=1"));
                 assertEquals("author", db.scalar("select role from user where userId=1"));
                 assertEquals(7, ((Number) db.scalar("select authVersion from user where userId=1")).intValue());
                 db.update("update user set preferences=? where userId=1", "{\"language\":\"en_US\"}");
-                new DbUpgradeService(db.dataSource(), 28).tryDoUpgrade();
+                upgradeService(db.dataSource(), 28).tryDoUpgrade();
                 assertEquals("{\"language\":\"en_US\"}", db.scalar("select preferences from user where userId=1"));
             }
         } finally { restoreProperty("sws.conf.path", previous); }
@@ -431,14 +471,14 @@ public class DbUpgradeServiceDatabaseTest {
             try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 db.update("drop table if exists user_access_token");
                 db.update("insert into user(userId,userName,role,authVersion) values(?,?,?,?)", 1, "existing", "author", 7);
-                new DbUpgradeService(db.dataSource(), 28).tryDoUpgrade();
+                upgradeService(db.dataSource(), 28).tryDoUpgrade();
                 assertEquals("29", db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
                 assertEquals(7, ((Number) db.scalar("select authVersion from user where userId=1")).intValue());
                 db.update("insert into user_access_token(id,userId,name,tokenHash,scope,resource,authVersion,createdAt,expiresAt) values(?,?,?,?,?,?,?,?,?)",
                         "token-id", 1, "Assistant", "hash", "articles:read", "https://example.com/mcp", 7, 1L, 100L);
                 assertThrows(SQLException.class, () -> db.update("insert into user_access_token(id,userId,name,tokenHash,scope,resource,authVersion,createdAt,expiresAt) values(?,?,?,?,?,?,?,?,?)",
                         "other-id", 1, "Other", "hash", "articles:read", "https://example.com/mcp", 7, 1L, 100L));
-                new DbUpgradeService(db.dataSource(), 29).tryDoUpgrade();
+                upgradeService(db.dataSource(), 29).tryDoUpgrade();
                 assertEquals("Assistant", db.scalar("select name from user_access_token where id=?", "token-id"));
             }
         } finally { restoreProperty("sws.conf.path", previous); }

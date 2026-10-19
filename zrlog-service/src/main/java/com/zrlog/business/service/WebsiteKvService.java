@@ -1,10 +1,15 @@
 package com.zrlog.business.service;
 
-import com.hibegin.common.util.LoggerUtil;
+import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.ResultBeanUtils;
+import com.hibegin.common.util.LoggerUtil;
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
 import com.zrlog.business.updater.AutoUpgradeVersionType;
 import com.zrlog.model.WebSite;
+
+import jakarta.inject.Inject;
+import jakarta.inject.Provider;
+import jakarta.inject.Singleton;
 
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -15,15 +20,34 @@ import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+@Singleton
 public class WebsiteKvService {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(WebsiteKvService.class);
     public static final String AUTO_UPGRADE_VERSION_KEY = "autoUpgradeVersion";
     public static final String UPGRADE_PREVIEW_KEY = "upgradePreview";
 
+    private final Provider<WebSite> websites;
+
+    @Inject
+    public WebsiteKvService(Provider<WebSite> websites) {
+        this.websites = Objects.requireNonNull(websites, "websites");
+    }
+
+    /** Existing callers resolve the default database when an operation starts. */
+    public WebsiteKvService() {
+        this.websites = WebSite::new;
+    }
+
+    /** Keep all operations on this application's database, including after another app starts. */
+    public WebsiteKvService(DataSourceWrapper dataSource) {
+        Objects.requireNonNull(dataSource, "dataSource");
+        this.websites = () -> new WebSite(dataSource);
+    }
+
     public String getString(String key) {
         try {
-            return new WebSite().getStringValueByName(key);
+            return websites.get().getStringValueByName(key);
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Read website KV failed, key=" + key, e);
             return null;
@@ -32,7 +56,7 @@ public class WebsiteKvService {
 
     public Map<String, Object> getByNames(List<String> keys) {
         try {
-            return new WebSite().getWebSiteByNameIn(keys);
+            return websites.get().getWebSiteByNameIn(keys);
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Read website KV list failed", e);
             return Collections.emptyMap();
@@ -41,10 +65,10 @@ public class WebsiteKvService {
 
     public List<Map<String, Object>> listByPrefix(String prefix) {
         try {
-            return new WebSite().queryListWithParams(
-                    "SELECT `name`, `value`, length(`value`) AS `size` FROM `website` WHERE `name` LIKE ? ORDER BY `name`",
-                    prefix + "%"
-            );
+            return websites.get()
+                    .queryListWithParams(
+                            "SELECT `name`, `value`, length(`value`) AS `size` FROM `website` WHERE `name` LIKE ? ORDER BY `name`",
+                            prefix + "%");
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "List website KV by prefix failed, prefix=" + prefix, e);
             return Collections.emptyList();
@@ -52,7 +76,7 @@ public class WebsiteKvService {
     }
 
     public boolean putString(String key, String value) throws SQLException {
-        return new WebSite().updateByKV(key, value);
+        return websites.get().updateByKV(key, value);
     }
 
     public boolean putStringQuietly(String key, String value) {

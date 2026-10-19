@@ -4,7 +4,8 @@ import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.vo.PublicWebSiteInfo;
-import com.zrlog.data.cache.CacheServiceImpl;
+import com.zrlog.data.di.DaggerDataComponent;
+import com.zrlog.data.di.DataComponent;
 import com.zrlog.data.util.WebSiteUtils;
 import com.zrlog.web.WebSetup;
 import com.zrlog.web.WebSiteInfoProvider;
@@ -20,12 +21,15 @@ public final class DataWebSetup implements WebSetup, WebSiteInfoProvider {
 
     @Override
     public void setup() {
-        config.getServerConfig().getBindings().singleton(CacheService.class, resolver -> {
-            if (config.getDataSource() == null) {
-                throw new IllegalStateException("CacheService requires an initialized database");
-            }
-            return new CacheServiceImpl(config::isInstalled);
-        });
+        DataComponent data =
+                DaggerDataComponent.factory()
+                        .create(
+                                () -> (DataSourceWrapper) config.getDataSource(),
+                                config::isInstalled);
+        config.getServerConfig()
+                .getBindings()
+                .instance(DataComponent.class, data)
+                .singleton(CacheService.class, resolver -> data.cache());
     }
 
     @Override

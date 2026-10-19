@@ -34,10 +34,20 @@ public class UpdateVersionInfoPlugin implements IPlugin {
     private static final Logger LOGGER = LoggerUtil.getLogger(UpdateVersionInfoPlugin.class);
 
     private final UpgradeNoticeService notices;
+    private final WebsiteKvService websiteKv;
     private final Supplier<String> language;
     private final CommandLineUpgradeNotice commandLineNotice;
 
     public UpdateVersionInfoPlugin(UpgradeNoticeService notices, Supplier<String> language, Updater updater) {
+        this(notices, language, updater, new WebsiteKvService());
+    }
+
+    public UpdateVersionInfoPlugin(
+            UpgradeNoticeService notices,
+            Supplier<String> language,
+            Updater updater,
+            WebsiteKvService websiteKv) {
+        this.websiteKv = Objects.requireNonNull(websiteKv);
         this.notices = Objects.requireNonNull(notices);
         this.language = Objects.requireNonNull(language);
         this.commandLineNotice = new CommandLineUpgradeNotice(updater);
@@ -119,7 +129,7 @@ public class UpdateVersionInfoPlugin implements IPlugin {
         if (isStarted()) {
             return true;
         }
-        UpgradeWebSiteInfo upgradeWebSiteInfo = new WebsiteKvService().upgradeWebSiteInfo();
+        UpgradeWebSiteInfo upgradeWebSiteInfo = websiteKv.upgradeWebSiteInfo();
         AutoUpgradeVersionType autoUpgradeVersionType = AutoUpgradeVersionType.cycle(upgradeWebSiteInfo.getAutoUpgradeVersion());
         if (scheduledExecutorService != null) {
             scheduledExecutorService.shutdown();
@@ -165,7 +175,7 @@ public class UpdateVersionInfoPlugin implements IPlugin {
      */
     public Version getLastVersion(boolean fetch) {
         if (updateVersionTimerTask == null) {
-            UpgradeWebSiteInfo upgradeWebSiteInfo = new WebsiteKvService().upgradeWebSiteInfo();
+            UpgradeWebSiteInfo upgradeWebSiteInfo = websiteKv.upgradeWebSiteInfo();
             updateVersionTimerTask = newUpdateVersionTimerTask(upgradeWebSiteInfo);
         }
         if (fetch) {

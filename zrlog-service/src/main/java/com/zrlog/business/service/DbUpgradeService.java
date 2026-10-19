@@ -12,6 +12,10 @@ import com.zrlog.business.version.UpgradeVersionHandlerHelpers;
 import com.zrlog.common.CacheService;
 import com.zrlog.model.WebSite;
 
+import dagger.assisted.Assisted;
+import dagger.assisted.AssistedFactory;
+import dagger.assisted.AssistedInject;
+
 import java.io.InputStream;
 import java.net.URI;
 import java.util.*;
@@ -34,11 +38,22 @@ public class DbUpgradeService {
 
     public DbUpgradeService(DataSourceWrapper dataSource,
                             long currentSqlVersion) {
+        this(dataSource, new DAO(dataSource), new WebSite(dataSource), currentSqlVersion);
+    }
+
+    @AssistedInject
+    public DbUpgradeService(DataSourceWrapper dataSource, DAO dao, WebSite webSite,
+                            @Assisted long currentSqlVersion) {
         this.dataSource = dataSource;
-        this.dao = new DAO(dataSource);
-        this.webSite = new WebSite(dataSource);
+        this.dao = dao;
+        this.webSite = webSite;
         this.dbName = resolveDbName(dataSource.getDataSourceProperties().getProperty("jdbcUrl"));
         this.currentSqlVersion = currentSqlVersion;
+    }
+
+    @AssistedFactory
+    public interface Factory {
+        DbUpgradeService create(long currentSqlVersion);
     }
 
     static String resolveDbName(String jdbcUrl) {

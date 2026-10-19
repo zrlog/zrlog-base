@@ -16,14 +16,20 @@ import com.zrlog.updater.spi.*;
 import com.zrlog.util.I18nUtil;
 import com.zrlog.util.ZrLogUtil;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
 import java.io.File;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 
+@Singleton
 public class UpgradeService {
 
     private final UpgradeNoticeService upgradeNoticeService;
     private final Updater updater;
+    private final WebsiteKvService websiteKv;
     private final BackupProtectionService backupProtectionService;
 
     public UpgradeService(Updater updater, UpgradeNoticeService upgradeNoticeService) {
@@ -31,7 +37,17 @@ public class UpgradeService {
     }
 
     UpgradeService(Updater updater, UpgradeNoticeService upgradeNoticeService, BackupProtectionService backupProtectionService) {
-        this.updater = updater;
+        this(() -> updater, upgradeNoticeService, backupProtectionService, new WebsiteKvService());
+    }
+
+    @Inject
+    public UpgradeService(
+            Supplier<Updater> updater,
+            UpgradeNoticeService upgradeNoticeService,
+            BackupProtectionService backupProtectionService,
+            WebsiteKvService websiteKv) {
+        this.websiteKv = Objects.requireNonNull(websiteKv);
+        this.updater = updater.get();
         this.upgradeNoticeService = Objects.requireNonNull(upgradeNoticeService);
         this.backupProtectionService = backupProtectionService;
     }
@@ -108,7 +124,7 @@ public class UpgradeService {
     private File downloadUpgradePackage(Version version, UpgradeProgressListener progressListener, Map<String,Object> backend, Updater updater) {
         try {
             UpdateContext.Builder b = new UpdateContext.Builder(UpdaterHosts.context(updater));
-            b.packageSource = new WebsiteKvService().upgradeWebSiteInfo().getUpgradePackageSource();
+            b.packageSource = websiteKv.upgradeWebSiteInfo().getUpgradePackageSource();
             UpdaterTypeEnum type = isFaaSMode() ? UpdaterTypeEnum.FAAS : updater == null ? UpdaterTypeEnum.ZIP : updater.getType();
             return UpdateProviders.get(type).download(b.build(), new UpdateRequest(null, version, buildUpgradeKey(version), UpdaterHosts.unwrap(updater), progressListener, UpdaterHosts.text(backend)));
         } catch (Exception e) { throw new DownloadUpgradeFileException(e); }

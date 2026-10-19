@@ -3,14 +3,30 @@ package com.zrlog.data.service;
 import com.google.gson.*;
 import com.zrlog.common.exception.ArgsException;
 import com.zrlog.model.User;
+
+import jakarta.inject.Inject;
+
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
+import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /** Account JSON persistence shared by personal settings and browser session issuance. */
 public class UserPreferenceStore {
+
+    private final jakarta.inject.Provider<User> userProvider;
+
+    @Inject
+    public UserPreferenceStore(jakarta.inject.Provider<User> userProvider) {
+        this.userProvider = Objects.requireNonNull(userProvider);
+    }
+
+    public UserPreferenceStore() {
+        this(User::new);
+    }
+
     private static final Gson GSON = new Gson();
     private static final long UPDATE_RETRY_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(5);
     public static final long MIN_SESSION_MINUTES = 6;
@@ -34,7 +50,10 @@ public class UserPreferenceStore {
     }
 
     public String raw(int userId) throws SQLException {
-        Object value = new User().queryFirstObj("select preferences from user where userId=?", userId);
+        Object value =
+                userProvider
+                        .get()
+                        .queryFirstObj("select preferences from user where userId=?", userId);
         return value == null ? null : value.toString();
     }
 
@@ -56,9 +75,21 @@ public class UserPreferenceStore {
             String updated = GSON.toJson(root);
             if (updated.getBytes(StandardCharsets.UTF_8).length > 60000) throw new ArgsException("preferences");
             if (updated.equals(previous)) return;
-            boolean saved = previous == null
-                    ? new User().execute("update user set preferences=? where userId=? and preferences is null", updated, userId)
-                    : new User().execute("update user set preferences=? where userId=? and preferences=?", updated, userId, previous);
+            boolean saved =
+                    previous == null
+                            ? userProvider
+                                    .get()
+                                    .execute(
+                                            "update user set preferences=? where userId=? and preferences is null",
+                                            updated,
+                                            userId)
+                            : userProvider
+                                    .get()
+                                    .execute(
+                                            "update user set preferences=? where userId=? and preferences=?",
+                                            updated,
+                                            userId,
+                                            previous);
             if (saved) return;
             // A burst of writes can exhaust a small attempt count before the other writer finishes.
             // Back off, then read and merge again; the conditional write also protects other instances.

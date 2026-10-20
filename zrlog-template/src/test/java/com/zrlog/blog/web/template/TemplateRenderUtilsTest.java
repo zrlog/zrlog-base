@@ -9,11 +9,30 @@ import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.StringJoiner;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class TemplateRenderUtilsTest {
+
+    private static HttpRequest request(String contextPath, String host, String uri) {
+        return (HttpRequest) Proxy.newProxyInstance(
+                TemplateRenderUtilsTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    if ("getContextPath".equals(method.getName())) {
+                        return contextPath;
+                    }
+                    if ("getHeader".equals(method.getName()) && "Host".equals(args[0])) {
+                        return host;
+                    }
+                    if ("getUri".equals(method.getName())) {
+                        return uri;
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "HttpRequestProxy";
+                    }
+                    return null;
+                });
+    }
 
     @Test
     public void shouldAppendListTypeAndNameToTitle() {
@@ -51,27 +70,6 @@ public class TemplateRenderUtilsTest {
 
         assertEquals("//example.com/blog/", home.getUrl());
         assertTrue(home.getCurrent());
-    }
-
-    private static HttpRequest request(String contextPath, String host, String uri) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                TemplateRenderUtilsTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getContextPath".equals(method.getName())) {
-                        return contextPath;
-                    }
-                    if ("getHeader".equals(method.getName()) && "Host".equals(args[0])) {
-                        return host;
-                    }
-                    if ("getUri".equals(method.getName())) {
-                        return uri;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
     }
 
 }

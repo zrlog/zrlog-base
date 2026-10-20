@@ -11,7 +11,9 @@ public interface WebSetup {
 
     void setup();
 
-    /** Runs after all modules have registered and the database is available, including after installation. */
+    /**
+     * Runs after all modules have registered and the database is available, including after installation.
+     */
     default void onDatabaseReady(DataSourceWrapper dataSource) throws Exception {
     }
 

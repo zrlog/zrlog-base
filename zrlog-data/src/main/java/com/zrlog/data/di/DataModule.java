@@ -4,11 +4,9 @@ import com.hibegin.common.dao.DAO;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.common.CacheService;
 import com.zrlog.data.cache.CacheServiceImpl;
-
 import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
-
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 

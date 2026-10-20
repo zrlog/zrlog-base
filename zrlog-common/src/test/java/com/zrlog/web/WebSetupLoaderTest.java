@@ -1,8 +1,5 @@
 package com.zrlog.web;
 
-import com.zrlog.web.WebSetup;
-import com.zrlog.web.WebSetupContext;
-import com.zrlog.web.WebSetupProvider;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -10,13 +7,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.*;
 
 public class WebSetupLoaderTest {
+
+    private static FakeProvider dependent(String name, int order, String dependency) {
+        return new FakeProvider(name, order) {
+            @Override
+            public Set<String> requiredModules() {
+                return Set.of(dependency);
+            }
+        };
+    }
 
     @Test
     public void disablingHostCascadesButDisablingAiLeavesAccessAvailable() {
@@ -40,22 +42,21 @@ public class WebSetupLoaderTest {
                 List.of(child, new FakeProvider("admin", 150)), Set.of(), true));
     }
 
-    private static FakeProvider dependent(String name, int order, String dependency) {
-        return new FakeProvider(name, order) {
-            @Override public Set<String> requiredModules() { return Set.of(dependency); }
-        };
-    }
-
     @Test
     public void disabledProviderIsNeverCreatedAndNamesAreExact() {
-        WebSetup enabled = () -> { };
+        WebSetup enabled = () -> {
+        };
         WebSetupProvider disabled = new FakeProvider("admin-ai", 10) {
-            @Override public WebSetup create(WebSetupContext context) {
+            @Override
+            public WebSetup create(WebSetupContext context) {
                 throw new AssertionError("Disabled feature must not initialize");
             }
         };
         WebSetupProvider mcp = new FakeProvider("admin-mcp", 20) {
-            @Override public WebSetup create(WebSetupContext context) { return enabled; }
+            @Override
+            public WebSetup create(WebSetupContext context) {
+                return enabled;
+            }
         };
         assertEquals(List.of(enabled), WebSetupLoader.create(null, List.of(disabled, mcp), Set.of("admin-ai"), true));
         assertEquals(List.of(enabled), WebSetupLoader.create(null, List.of(mcp), Set.of("admin"), true));
@@ -64,10 +65,16 @@ public class WebSetupLoaderTest {
     @Test
     public void providerCreationFailureHonorsStrictMode() {
         WebSetupProvider broken = new FakeProvider("broken", 10) {
-            @Override public WebSetup create(WebSetupContext context) { throw new IllegalArgumentException("broken"); }
+            @Override
+            public WebSetup create(WebSetupContext context) {
+                throw new IllegalArgumentException("broken");
+            }
         };
         WebSetupProvider empty = new FakeProvider("empty", 20) {
-            @Override public WebSetup create(WebSetupContext context) { return null; }
+            @Override
+            public WebSetup create(WebSetupContext context) {
+                return null;
+            }
         };
         assertTrue(WebSetupLoader.create(null, List.of(broken, empty), Set.of(), false).isEmpty());
         assertThrows(IllegalStateException.class, () -> WebSetupLoader.create(null, List.of(broken), Set.of(), true));

@@ -1,7 +1,5 @@
 package com.zrlog.business.service;
 
-import com.zrlog.theme.spi.BundledThemes;
-
 import com.google.gson.Gson;
 import com.hibegin.common.util.IOUtil;
 import com.hibegin.common.util.LoggerUtil;
@@ -12,6 +10,7 @@ import com.zrlog.common.Constants;
 import com.zrlog.common.resource.ZrLogResourceLoader;
 import com.zrlog.common.vo.TemplatePackageJson;
 import com.zrlog.common.vo.TemplateVO;
+import com.zrlog.theme.spi.BundledThemes;
 import com.zrlog.util.I18nUtil;
 import com.zrlog.util.StaticFileCacheUtils;
 
@@ -24,8 +23,8 @@ import static com.zrlog.common.Constants.TEMPLATE_BASE_PATH;
 
 public class TemplateInfoHelper {
 
-    private static final Logger LOGGER = LoggerUtil.getLogger(TemplateInfoHelper.class);
     public static final String ADMIN_PREVIEW_IMAGE_URI = Constants.ADMIN_URI_BASE_PATH + "/template/preview-image";
+    private static final Logger LOGGER = LoggerUtil.getLogger(TemplateInfoHelper.class);
 
     public static List<TemplateVO> getClassPathTemplates() {
         List<TemplateVO> templateVOList = new ArrayList<>();

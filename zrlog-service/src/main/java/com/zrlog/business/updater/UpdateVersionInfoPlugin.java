@@ -37,6 +37,8 @@ public class UpdateVersionInfoPlugin implements IPlugin {
     private final WebsiteKvService websiteKv;
     private final Supplier<String> language;
     private final CommandLineUpgradeNotice commandLineNotice;
+    private ScheduledExecutorService scheduledExecutorService;
+    private UpdateVersionTimerTask updateVersionTimerTask;
 
     public UpdateVersionInfoPlugin(
             UpgradeNoticeService notices,
@@ -48,10 +50,6 @@ public class UpdateVersionInfoPlugin implements IPlugin {
         this.language = Objects.requireNonNull(language);
         this.commandLineNotice = new CommandLineUpgradeNotice(updater);
     }
-
-    private ScheduledExecutorService scheduledExecutorService;
-
-    private UpdateVersionTimerTask updateVersionTimerTask;
 
     private static boolean isPreviewVersion(Version version) {
         return Objects.nonNull(version) && StringUtils.isNotEmpty(version.getVersion())
@@ -68,11 +66,6 @@ public class UpdateVersionInfoPlugin implements IPlugin {
         //不在页面展示SNAPSHOT
         copyVersion.setVersion(version.getVersion().replaceAll("-SNAPSHOT", ""));
         return copyVersion;
-    }
-
-    @Override
-    public boolean autoStart() {
-        return !EnvKit.isFaaSMode();
     }
 
     public static String getCurrentChangeLog(Map<String, Object> res) {
@@ -101,10 +94,9 @@ public class UpdateVersionInfoPlugin implements IPlugin {
                 version + "-" + buildId + ".md?lang=" + locale + "&v=" + buildId);
     }
 
-    @FunctionalInterface
-    interface ChangeLogFetcher {
-        String fetch(String version, String buildId, String locale)
-                throws IOException, InterruptedException, URISyntaxException;
+    @Override
+    public boolean autoStart() {
+        return !EnvKit.isFaaSMode();
     }
 
     private void initExecutorService() {
@@ -182,5 +174,11 @@ public class UpdateVersionInfoPlugin implements IPlugin {
             }
         }
         return normalizeVersionForDisplay(updateVersionTimerTask.getVersion());
+    }
+
+    @FunctionalInterface
+    interface ChangeLogFetcher {
+        String fetch(String version, String buildId, String locale)
+                throws IOException, InterruptedException, URISyntaxException;
     }
 }

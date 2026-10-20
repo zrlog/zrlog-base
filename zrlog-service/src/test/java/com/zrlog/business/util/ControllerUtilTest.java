@@ -15,6 +15,32 @@ import static org.junit.Assert.assertEquals;
 
 public class ControllerUtilTest {
 
+    private static Controller controller(Map<String, String[]> params) {
+        return new Controller(request(params), null);
+    }
+
+    private static HttpRequest request(Map<String, String[]> params) {
+        return (HttpRequest) Proxy.newProxyInstance(
+                ControllerUtilTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    if ("decodeParamMap".equals(method.getName())) {
+                        return params;
+                    }
+                    if ("getParaToInt".equals(method.getName())) {
+                        String[] values = params.get(args[0].toString());
+                        if (values == null || values.length == 0) {
+                            return args[1];
+                        }
+                        return Integer.parseInt(values[0]);
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "HttpRequestProxy";
+                    }
+                    return null;
+                });
+    }
+
     @Test
     public void shouldDefaultToIdDescendingWhenSortIsMissing() throws Exception {
         PageRequest pageRequest = ControllerUtil.getPageRequest(controller(new HashMap<>()));
@@ -87,31 +113,5 @@ public class ControllerUtilTest {
         assertEquals(Long.valueOf(10), pageRequest.getSize());
         assertEquals("id", pageRequest.getSorts().get(0).getSortKey());
         assertEquals(Direction.DESC, pageRequest.getSorts().get(0).getDirection());
-    }
-
-    private static Controller controller(Map<String, String[]> params) {
-        return new Controller(request(params), null);
-    }
-
-    private static HttpRequest request(Map<String, String[]> params) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                ControllerUtilTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("decodeParamMap".equals(method.getName())) {
-                        return params;
-                    }
-                    if ("getParaToInt".equals(method.getName())) {
-                        String[] values = params.get(args[0].toString());
-                        if (values == null || values.length == 0) {
-                            return args[1];
-                        }
-                        return Integer.parseInt(values[0]);
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
     }
 }

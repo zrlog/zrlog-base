@@ -21,7 +21,6 @@ import com.zrlog.model.Type;
 import com.zrlog.model.User;
 import com.zrlog.model.WebSite;
 import com.zrlog.util.ThreadUtils;
-
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;
@@ -42,7 +41,6 @@ public class CacheServiceImpl implements CacheService {
     private static final Logger LOGGER = LoggerUtil.getLogger(CacheServiceImpl.class);
 
     private final AtomicLong version;
-    private volatile BaseDataInitVO cacheInit;
     private final String CACHE_KEY = "base_data_init_cache_v3";
     private final long sqlVersion;
     private final BooleanSupplier installed;
@@ -52,6 +50,7 @@ public class CacheServiceImpl implements CacheService {
     private final jakarta.inject.Provider<Tag> tags;
     private final jakarta.inject.Provider<User> users;
     private final BaseDataDbService baseData;
+    private volatile BaseDataInitVO cacheInit;
 
     @Inject
     public CacheServiceImpl(

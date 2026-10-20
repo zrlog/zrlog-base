@@ -1,8 +1,13 @@
 package com.zrlog.data.security;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
-/** Fixed product roles. This catalog is the authoritative role/action matrix, not an editable RBAC model. */
+/**
+ * Fixed product roles. This catalog is the authoritative role/action matrix, not an editable RBAC model.
+ */
 public enum AccountAction {
     SESSION("account.session", null, "owner", "admin", "editor", "author", "contributor"),
     ACCOUNT_SELF("account.self", null, "owner", "admin", "editor", "author", "contributor"),
@@ -33,11 +38,26 @@ public enum AccountAction {
     private final String id;
     private final String scope;
     private final Set<String> roles;
+
     AccountAction(String id, String scope, String... roles) {
-        this.id = id; this.scope = scope; this.roles = Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList(roles)));
+        this.id = id;
+        this.scope = scope;
+        this.roles = Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList(roles)));
     }
-    public String getId() { return id; }
-    public String getScope() { return scope; }
-    public Set<String> getRoles() { return roles; }
-    public boolean allowed(AccountAccess account) { return account.isEnabled() && roles.contains(account.getRole()) && account.permitsAction(id); }
+
+    public String getId() {
+        return id;
+    }
+
+    public String getScope() {
+        return scope;
+    }
+
+    public Set<String> getRoles() {
+        return roles;
+    }
+
+    public boolean allowed(AccountAccess account) {
+        return account.isEnabled() && roles.contains(account.getRole()) && account.permitsAction(id);
+    }
 }

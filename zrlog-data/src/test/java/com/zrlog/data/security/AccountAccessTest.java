@@ -1,15 +1,20 @@
 package com.zrlog.data.security;
 
 import org.junit.Test;
+
 import java.util.Map;
 import java.util.Set;
-import static org.junit.Assert.*;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class AccountAccessTest {
     private AccountAccess account(String role) {
         return AccountAccess.from(Map.of("userId", 1, "role", role, "enabled", true, "authVersion", 0));
     }
-    @Test public void delegationIntersectsRolesAndCannotBeWidened() {
+
+    @Test
+    public void delegationIntersectsRolesAndCannotBeWidened() {
         AccountAccess owner = account("owner");
         AccountAccess reader = owner.restrictActions(Set.of("article.read"));
         assertTrue(AccountAction.ARTICLE_READ.allowed(reader));
@@ -22,7 +27,9 @@ public class AccountAccessTest {
         assertTrue(author.canPublish());
         assertFalse(author.canAccessArticle(2));
     }
-    @Test public void scopeAdapterReflectsDelegationAndPreservesAccountContentBoundaries() {
+
+    @Test
+    public void scopeAdapterReflectsDelegationAndPreservesAccountContentBoundaries() {
         AccountAccess editor = account("editor").restrictActions(Set.of("article.read"));
         assertTrue(editor.scopes().containsAll(Set.of("articles:read", "articles:read_drafts", "articles:all")));
         assertFalse(editor.scopes().contains("articles:write"));

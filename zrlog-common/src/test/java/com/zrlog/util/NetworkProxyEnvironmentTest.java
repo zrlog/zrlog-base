@@ -12,7 +12,23 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.*;
 
 public class NetworkProxyEnvironmentTest {
-    @Rule public TemporaryFolder temporary = new TemporaryFolder();
+    @Rule
+    public TemporaryFolder temporary = new TemporaryFolder();
+
+    public static void main(String[] args) throws Exception {
+        PathUtil.setRootPath(args[0]);
+        NetworkProxy.Settings active = NetworkProxy.initialize();
+        assertEquals("http://plain.example:8080", active.getUrl());
+        assertEquals("http://secure.example:3128", active.getHttpsUrl());
+        assertEquals("plain.example", System.getProperty("http.proxyHost"));
+        assertEquals("secure.example", System.getProperty("https.proxyHost"));
+        NetworkProxy.save("http://edited.example:8081", ".edited.example");
+        assertEquals("http://edited.example:8081", NetworkProxy.fileSettings().getUrl());
+        assertEquals(".edited.example", NetworkProxy.fileSettings().getNoProxy());
+        assertTrue(active.samePolicy(NetworkProxy.configured()));
+        assertTrue(active.samePolicy(NetworkProxy.preview("http://unsaved.example:8082", "")));
+        assertSame(active, NetworkProxy.initialize());
+    }
 
     @Test
     public void standardProcessEnvironmentWinsWhileTheFileRemainsEditable() throws Exception {
@@ -35,21 +51,8 @@ public class NetworkProxyEnvironmentTest {
         try {
             assertTrue(process.waitFor(10, TimeUnit.SECONDS));
             assertEquals(Files.readString(output), 0, process.exitValue());
-        } finally { process.destroyForcibly(); }
-    }
-
-    public static void main(String[] args) throws Exception {
-        PathUtil.setRootPath(args[0]);
-        NetworkProxy.Settings active = NetworkProxy.initialize();
-        assertEquals("http://plain.example:8080", active.getUrl());
-        assertEquals("http://secure.example:3128", active.getHttpsUrl());
-        assertEquals("plain.example", System.getProperty("http.proxyHost"));
-        assertEquals("secure.example", System.getProperty("https.proxyHost"));
-        NetworkProxy.save("http://edited.example:8081", ".edited.example");
-        assertEquals("http://edited.example:8081", NetworkProxy.fileSettings().getUrl());
-        assertEquals(".edited.example", NetworkProxy.fileSettings().getNoProxy());
-        assertTrue(active.samePolicy(NetworkProxy.configured()));
-        assertTrue(active.samePolicy(NetworkProxy.preview("http://unsaved.example:8082", "")));
-        assertSame(active, NetworkProxy.initialize());
+        } finally {
+            process.destroyForcibly();
+        }
     }
 }

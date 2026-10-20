@@ -15,13 +15,13 @@ public class HttpResponseJsonHandle<T> extends HttpHandle<T> {
     private final Class<T> clazz;
     private int statusCode;
 
+    public HttpResponseJsonHandle(Class<T> clazz) {
+        this.clazz = clazz;
+    }
+
     @Override
     public int getStatusCode() {
         return statusCode;
-    }
-
-    public HttpResponseJsonHandle(Class<T> clazz) {
-        this.clazz = clazz;
     }
 
     @Override

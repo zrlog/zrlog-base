@@ -4,7 +4,6 @@ import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.hibegin.common.util.LoggerUtil;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.model.WebSite;
-
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
@@ -35,11 +34,6 @@ public class DistributedLock implements Lock {
         this.websites = Objects.requireNonNull(websites);
         this.lockKey = LOCK_PREFIX + lockKey;
         this.rawLockKey = lockKey;
-    }
-
-    @AssistedFactory
-    public interface Factory {
-        DistributedLock create(String lockKey);
     }
 
     @Override
@@ -84,7 +78,7 @@ public class DistributedLock implements Lock {
                             "remark",
                             "Created at "
                                     + ResultValueConvertUtils.formatDate(
-                                            new Date(), "yyyy-MM-dd HH:mm:ss"))
+                                    new Date(), "yyyy-MM-dd HH:mm:ss"))
                     .set("value", "locked")
                     .save();
         } catch (SQLException e) {
@@ -106,5 +100,10 @@ public class DistributedLock implements Lock {
     @Override
     public Condition newCondition() {
         throw new UnsupportedOperationException();
+    }
+
+    @AssistedFactory
+    public interface Factory {
+        DistributedLock create(String lockKey);
     }
 }

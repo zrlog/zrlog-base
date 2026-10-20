@@ -18,22 +18,48 @@ import org.junit.Test;
 import java.io.File;
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.jar.JarFile;
-import java.util.jar.Manifest;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class CommonWebTest {
+
+    private static HttpRequest request(long createTime) {
+        return (HttpRequest) Proxy.newProxyInstance(
+                CommonWebTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    if ("getCreateTime".equals(method.getName())) {
+                        return createTime;
+                    }
+                    if ("getMethod".equals(method.getName())) {
+                        return HttpMethod.GET;
+                    }
+                    if ("getUri".equals(method.getName())) {
+                        return "/admin";
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "HttpRequestProxy";
+                    }
+                    return null;
+                });
+    }
+
+    private static HttpResponse response() {
+        return (HttpResponse) Proxy.newProxyInstance(
+                CommonWebTest.class.getClassLoader(),
+                new Class[]{HttpResponse.class},
+                (proxy, method, args) -> null);
+    }
+
+    private static void restoreProperty(String key, String value) {
+        if (value == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, value);
+        }
+    }
 
     @Test
     public void shouldSerializeLocalDateTimeWithAdapterAndConverter() throws Exception {
@@ -149,42 +175,6 @@ public class CommonWebTest {
         assertEquals("", updater.backup());
         assertTrue(plugin.autoStart());
         assertEquals(100, setupProvider.order());
-    }
-
-    private static HttpRequest request(long createTime) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                CommonWebTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getCreateTime".equals(method.getName())) {
-                        return createTime;
-                    }
-                    if ("getMethod".equals(method.getName())) {
-                        return HttpMethod.GET;
-                    }
-                    if ("getUri".equals(method.getName())) {
-                        return "/admin";
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
-    }
-
-    private static HttpResponse response() {
-        return (HttpResponse) Proxy.newProxyInstance(
-                CommonWebTest.class.getClassLoader(),
-                new Class[]{HttpResponse.class},
-                (proxy, method, args) -> null);
-    }
-
-    private static void restoreProperty(String key, String value) {
-        if (value == null) {
-            System.clearProperty(key);
-        } else {
-            System.setProperty(key, value);
-        }
     }
 
     private static class TimeHolder {

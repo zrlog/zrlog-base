@@ -12,34 +12,83 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.di.DaggerDataComponent;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
-import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import sun.misc.Unsafe;
+
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import sun.misc.Unsafe;
 
 @RunWith(Parameterized.class)
 public class CacheServiceImplDatabaseTest {
 
+    private final DatabaseType databaseType;
     private com.zrlog.common.ZrLogConfig applicationConfig;
+
+    public CacheServiceImplDatabaseTest(DatabaseType databaseType) {
+        this.databaseType = databaseType;
+    }
 
     @Parameterized.Parameters(name = "{0}")
     public static DatabaseType[] databases() {
         return DatabaseType.values();
     }
 
-    private final DatabaseType databaseType;
+    private static BaseDataInitVO cachedInit() {
+        BaseDataInitVO init = new BaseDataInitVO();
+        init.setVersion(123L);
+        init.setWebSiteVersion(99L);
+        PublicWebSiteInfo webSite = new PublicWebSiteInfo();
+        webSite.setTitle("Cached Site");
+        init.setWebSite(webSite);
+        TypeDTO type = new TypeDTO();
+        type.setId(7L);
+        type.setAlias("cached");
+        type.setTypeName("Cached Type");
+        TagDTO tag = new TagDTO();
+        tag.setId(7L);
+        tag.setText("cached");
+        tag.setCount(1L);
+        UserBasicDTO user = new UserBasicDTO();
+        user.setUserId(7L);
+        user.setUserName("cached-user");
+        init.setTypes(List.of(type));
+        init.setTags(List.of(tag));
+        init.setUsers(List.of(user));
+        init.setTemplateConfigCacheMap(Map.of("default", Map.of("color", "red")));
+        return init;
+    }
 
-    public CacheServiceImplDatabaseTest(DatabaseType databaseType) {
-        this.databaseType = databaseType;
+    private static void seedLookupTables(ZrLogTestDatabase db) throws Exception {
+        db.update("insert into user(userId, email, password, userName, header) values(?, ?, ?, ?, ?)",
+                1, "db@example.com", "password", "db-user", "/avatar.png");
+        db.update("insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
+                1, "db", "Db Type", "Db posts");
+        db.update("insert into tag(tagId, text, count) values(?, ?, ?)",
+                1, "db-tag", 2);
+    }
+
+    private static ZrLogConfig testConfig(boolean installed) throws Exception {
+        TestZrLogConfig config = allocate(TestZrLogConfig.class);
+        Field installedField = TestZrLogConfig.class.getDeclaredField("installed");
+        installedField.setAccessible(true);
+        installedField.set(config, installed);
+        return config;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T allocate(Class<T> type) throws Exception {
+        Field field = Unsafe.class.getDeclaredField("theUnsafe");
+        field.setAccessible(true);
+        return (T) ((Unsafe) field.get(null)).allocateInstance(type);
     }
 
     @Test
@@ -104,55 +153,6 @@ public class CacheServiceImplDatabaseTest {
             assertEquals("Installed Site", info.getTitle());
             assertEquals("Installed Author", info.getAuthor());
         }
-    }
-
-    private static BaseDataInitVO cachedInit() {
-        BaseDataInitVO init = new BaseDataInitVO();
-        init.setVersion(123L);
-        init.setWebSiteVersion(99L);
-        PublicWebSiteInfo webSite = new PublicWebSiteInfo();
-        webSite.setTitle("Cached Site");
-        init.setWebSite(webSite);
-        TypeDTO type = new TypeDTO();
-        type.setId(7L);
-        type.setAlias("cached");
-        type.setTypeName("Cached Type");
-        TagDTO tag = new TagDTO();
-        tag.setId(7L);
-        tag.setText("cached");
-        tag.setCount(1L);
-        UserBasicDTO user = new UserBasicDTO();
-        user.setUserId(7L);
-        user.setUserName("cached-user");
-        init.setTypes(List.of(type));
-        init.setTags(List.of(tag));
-        init.setUsers(List.of(user));
-        init.setTemplateConfigCacheMap(Map.of("default", Map.of("color", "red")));
-        return init;
-    }
-
-    private static void seedLookupTables(ZrLogTestDatabase db) throws Exception {
-        db.update("insert into user(userId, email, password, userName, header) values(?, ?, ?, ?, ?)",
-                1, "db@example.com", "password", "db-user", "/avatar.png");
-        db.update("insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
-                1, "db", "Db Type", "Db posts");
-        db.update("insert into tag(tagId, text, count) values(?, ?, ?)",
-                1, "db-tag", 2);
-    }
-
-    private static ZrLogConfig testConfig(boolean installed) throws Exception {
-        TestZrLogConfig config = allocate(TestZrLogConfig.class);
-        Field installedField = TestZrLogConfig.class.getDeclaredField("installed");
-        installedField.setAccessible(true);
-        installedField.set(config, installed);
-        return config;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <T> T allocate(Class<T> type) throws Exception {
-        Field field = Unsafe.class.getDeclaredField("theUnsafe");
-        field.setAccessible(true);
-        return (T) ((Unsafe) field.get(null)).allocateInstance(type);
     }
 
     private static class TestZrLogConfig extends ZrLogConfig {

@@ -1,32 +1,31 @@
 package com.zrlog.data.di;
 
-import static org.junit.Assert.*;
-
 import com.hibegin.common.dao.DAO;
 import com.zrlog.data.service.DistributedLock;
 import com.zrlog.test.support.ZrLogTestDatabase;
-
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import static org.junit.Assert.*;
+
 @RunWith(Parameterized.class)
 public class DataComponentDatabaseTest {
-    @Parameterized.Parameters(name = "{0}")
-    public static ZrLogTestDatabase.DatabaseType[] databases() {
-        return ZrLogTestDatabase.DatabaseType.values();
-    }
-
     private final ZrLogTestDatabase.DatabaseType type;
 
     public DataComponentDatabaseTest(ZrLogTestDatabase.DatabaseType type) {
         this.type = type;
     }
 
+    @Parameterized.Parameters(name = "{0}")
+    public static ZrLogTestDatabase.DatabaseType[] databases() {
+        return ZrLogTestDatabase.DatabaseType.values();
+    }
+
     @Test
     public void graphsOwnTheirDatabaseCacheAndLocksWithoutADefaultSource() throws Exception {
         try (ZrLogTestDatabase first = ZrLogTestDatabase.open(type);
-                ZrLogTestDatabase second = ZrLogTestDatabase.open(type)) {
+             ZrLogTestDatabase second = ZrLogTestDatabase.open(type)) {
             DataComponent a = DaggerDataComponent.factory().create(first::dataSource, () -> true);
             DataComponent b = DaggerDataComponent.factory().create(second::dataSource, () -> true);
             org.junit.Assert.assertNull(DAO.getDefaultDataSource());

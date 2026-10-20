@@ -12,8 +12,8 @@ import java.util.logging.Logger;
  */
 class PluginGhostWatcher {
 
-    private static final Logger LOGGER = LoggerUtil.getLogger(PluginGhostWatcher.class);
     static final int READ_BUFFER_SIZE = 8 * 1024;
+    private static final Logger LOGGER = LoggerUtil.getLogger(PluginGhostWatcher.class);
     private final int port;
     private final String host;
     private final long waitMillis;
@@ -26,6 +26,13 @@ class PluginGhostWatcher {
         this.host = host;
         this.port = port;
         this.waitMillis = waitMillis;
+    }
+
+    static void drainUntilEof(InputStream inputStream) throws IOException {
+        byte[] buffer = new byte[READ_BUFFER_SIZE];
+        while (inputStream.read(buffer) >= 0) {
+            // The watcher protocol uses only EOF as a lifecycle signal.
+        }
     }
 
     public boolean doWatch() {
@@ -46,13 +53,6 @@ class PluginGhostWatcher {
         } catch (Exception e) {
             LOGGER.warning("Plugin exception stop " + e.getMessage());
             return connected;
-        }
-    }
-
-    static void drainUntilEof(InputStream inputStream) throws IOException {
-        byte[] buffer = new byte[READ_BUFFER_SIZE];
-        while (inputStream.read(buffer) >= 0) {
-            // The watcher protocol uses only EOF as a lifecycle signal.
         }
     }
 }

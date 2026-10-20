@@ -11,14 +11,40 @@ import java.lang.reflect.Proxy;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class CrossAndStaticRequestTest {
 
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
+    private static HttpRequest request(String userAgent, String origin) {
+        return (HttpRequest) Proxy.newProxyInstance(
+                CrossAndStaticRequestTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    if ("getHeader".equals(method.getName())) {
+                        if ("User-Agent".equals(args[0])) {
+                            return userAgent;
+                        }
+                        if ("Origin".equals(args[0])) {
+                            return origin;
+                        }
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "HttpRequestProxy";
+                    }
+                    return null;
+                });
+    }
+
+    private static void restoreProperty(String key, String value) {
+        if (value == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, value);
+        }
+    }
 
     @Test
     public void shouldDetectStaticPluginRequestsByUserAgent() {
@@ -58,34 +84,6 @@ public class CrossAndStaticRequestTest {
             runnable.run();
         } finally {
             restoreProperty("sws.root.path", previousRootPath);
-        }
-    }
-
-    private static HttpRequest request(String userAgent, String origin) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                CrossAndStaticRequestTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getHeader".equals(method.getName())) {
-                        if ("User-Agent".equals(args[0])) {
-                            return userAgent;
-                        }
-                        if ("Origin".equals(args[0])) {
-                            return origin;
-                        }
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
-    }
-
-    private static void restoreProperty(String key, String value) {
-        if (value == null) {
-            System.clearProperty(key);
-        } else {
-            System.setProperty(key, value);
         }
     }
 

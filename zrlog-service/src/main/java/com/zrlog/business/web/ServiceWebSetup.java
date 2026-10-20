@@ -6,11 +6,7 @@ import com.zrlog.business.di.ServiceComponent;
 import com.zrlog.business.plugin.PluginCorePlugin;
 import com.zrlog.business.plugin.PluginCorePluginImpl;
 import com.zrlog.business.plugin.StaticSitePlugin;
-import com.zrlog.business.service.CacheRefreshService;
-import com.zrlog.business.service.CommonService;
-import com.zrlog.business.service.UpgradeNoticeService;
-import com.zrlog.business.service.UpgradeService;
-import com.zrlog.business.service.WebsiteKvService;
+import com.zrlog.business.service.*;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.data.di.DataComponent;
@@ -20,7 +16,9 @@ import com.zrlog.web.WebSetupContext;
 
 import java.io.File;
 
-/** Owns shared service plugins and database upgrades. */
+/**
+ * Owns shared service plugins and database upgrades.
+ */
 public final class ServiceWebSetup implements WebSetup {
     private final ZrLogConfig config;
     private final File dbPropertiesFile;

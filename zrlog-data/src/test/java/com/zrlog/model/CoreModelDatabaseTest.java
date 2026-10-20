@@ -5,48 +5,83 @@ import com.hibegin.common.dao.dto.Direction;
 import com.hibegin.common.dao.dto.OrderBy;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequestImpl;
-import com.zrlog.common.cache.dto.LinkDTO;
-import com.zrlog.common.cache.dto.LogNavDTO;
-import com.zrlog.common.cache.dto.PluginDTO;
-import com.zrlog.common.cache.dto.TagDTO;
-import com.zrlog.common.cache.dto.TypeDTO;
-import com.zrlog.common.cache.dto.UserBasicDTO;
+import com.zrlog.common.cache.dto.*;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
 import com.zrlog.data.dto.CommentDTO;
 import com.zrlog.data.dto.VisitorCommentDTO;
-import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class CoreModelDatabaseTest {
+
+    private final DatabaseType databaseType;
+
+    public CoreModelDatabaseTest(DatabaseType databaseType) {
+        this.databaseType = databaseType;
+    }
 
     @Parameterized.Parameters(name = "{0}")
     public static DatabaseType[] databases() {
         return DatabaseType.values();
     }
 
-    private final DatabaseType databaseType;
+    private static PageRequestImpl page() {
+        return new PageRequestImpl(1L, 10L);
+    }
 
-    public CoreModelDatabaseTest(DatabaseType databaseType) {
-        this.databaseType = databaseType;
+    private static void seedContent(ZrLogTestDatabase db) throws Exception {
+        db.update("insert into user(userId, email, password, userName, header) values(?, ?, ?, ?, ?)",
+                1, "admin@example.com", "password", "admin", "/avatar.png");
+        db.update("insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
+                1, "tech", "Tech", "Tech posts");
+        db.update("insert into link(linkId, linkName, url, sort, alt, icon, status) values(?, ?, ?, ?, ?, ?, ?)",
+                1, "ZrLog", "https://www.zrlog.com", 1, "ZrLog", "link", true);
+        db.update("insert into lognav(navId, navName, url, sort, icon) values(?, ?, ?, ?, ?)",
+                1, "Home", "/", 1, "home");
+        db.update("insert into plugin(pluginId, content, isSystem, pTitle, sort, pluginName, level)"
+                        + " values(?, ?, ?, ?, ?, ?, ?)",
+                1, "{}", false, "Plugin", 1, "Plugin", 1);
+        insertArticle(db, 1, "first", "First", "First content", "java,zrlog",
+                "2026-01-15 10:00:00", 5, false, false);
+        insertArticle(db, 2, "second", "Second", "Second content", "java",
+                "2026-01-20 11:00:00", 7, false, false);
+        insertArticle(db, 3, "draft", "Draft", "Draft content", "draft",
+                "2026-02-01 09:00:00", 0, true, false);
+        db.update("insert into comment(commentId, commTime, have_read, userComment, userMail, userHome, userIp,"
+                        + " userName, hide, logId, header) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                1, todayAt("09:00:00"), false, "Nice post", "reader@example.com", "https://reader.example.com",
+                "127.0.0.1", "Reader", false, 1, "/reader.png");
+        db.update("insert into comment(commentId, commTime, have_read, userComment, userMail, userHome, userIp,"
+                        + " userName, hide, logId, header) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                2, "2026-01-15 12:00:00", true, "Old post", null, "",
+                "127.0.0.2", "Old", false, 2, "");
+    }
+
+    private static String todayAt(String time) {
+        return new SimpleDateFormat("yyyy-MM-dd").format(new Date()) + " " + time;
+    }
+
+    private static void insertArticle(ZrLogTestDatabase db, int id, String alias, String title, String content,
+                                      String keywords, String releaseTime, int click, boolean rubbish,
+                                      boolean privacy) throws Exception {
+        db.update("insert into log(logId, alias, canComment, click, version, content, plain_content, markdown,"
+                        + " digest, keywords, recommended, releaseTime, last_update_date, title, typeId, userId,"
+                        + " hot, rubbish, privacy, editor_type) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
+                        + " ?, ?, ?, ?, ?, ?)",
+                id, alias, true, click, 1, content, content, content, "Digest", keywords, false,
+                releaseTime, releaseTime, title, 1, 1, false, rubbish, privacy, "markdown");
     }
 
     @Test
@@ -275,53 +310,6 @@ public class CoreModelDatabaseTest {
             assertTrue(texts.contains("t12"));
             assertEquals(14L, new Tag(db.dataSource()).find(page()).getTotalElements());
         }
-    }
-
-    private static PageRequestImpl page() {
-        return new PageRequestImpl(1L, 10L);
-    }
-
-    private static void seedContent(ZrLogTestDatabase db) throws Exception {
-        db.update("insert into user(userId, email, password, userName, header) values(?, ?, ?, ?, ?)",
-                1, "admin@example.com", "password", "admin", "/avatar.png");
-        db.update("insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
-                1, "tech", "Tech", "Tech posts");
-        db.update("insert into link(linkId, linkName, url, sort, alt, icon, status) values(?, ?, ?, ?, ?, ?, ?)",
-                1, "ZrLog", "https://www.zrlog.com", 1, "ZrLog", "link", true);
-        db.update("insert into lognav(navId, navName, url, sort, icon) values(?, ?, ?, ?, ?)",
-                1, "Home", "/", 1, "home");
-        db.update("insert into plugin(pluginId, content, isSystem, pTitle, sort, pluginName, level)"
-                        + " values(?, ?, ?, ?, ?, ?, ?)",
-                1, "{}", false, "Plugin", 1, "Plugin", 1);
-        insertArticle(db, 1, "first", "First", "First content", "java,zrlog",
-                "2026-01-15 10:00:00", 5, false, false);
-        insertArticle(db, 2, "second", "Second", "Second content", "java",
-                "2026-01-20 11:00:00", 7, false, false);
-        insertArticle(db, 3, "draft", "Draft", "Draft content", "draft",
-                "2026-02-01 09:00:00", 0, true, false);
-        db.update("insert into comment(commentId, commTime, have_read, userComment, userMail, userHome, userIp,"
-                        + " userName, hide, logId, header) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                1, todayAt("09:00:00"), false, "Nice post", "reader@example.com", "https://reader.example.com",
-                "127.0.0.1", "Reader", false, 1, "/reader.png");
-        db.update("insert into comment(commentId, commTime, have_read, userComment, userMail, userHome, userIp,"
-                        + " userName, hide, logId, header) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                2, "2026-01-15 12:00:00", true, "Old post", null, "",
-                "127.0.0.2", "Old", false, 2, "");
-    }
-
-    private static String todayAt(String time) {
-        return new SimpleDateFormat("yyyy-MM-dd").format(new Date()) + " " + time;
-    }
-
-    private static void insertArticle(ZrLogTestDatabase db, int id, String alias, String title, String content,
-                                      String keywords, String releaseTime, int click, boolean rubbish,
-                                      boolean privacy) throws Exception {
-        db.update("insert into log(logId, alias, canComment, click, version, content, plain_content, markdown,"
-                        + " digest, keywords, recommended, releaseTime, last_update_date, title, typeId, userId,"
-                        + " hot, rubbish, privacy, editor_type) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
-                        + " ?, ?, ?, ?, ?, ?)",
-                id, alias, true, click, 1, content, content, content, "Digest", keywords, false,
-                releaseTime, releaseTime, title, 1, 1, false, rubbish, privacy, "markdown");
     }
 
 }

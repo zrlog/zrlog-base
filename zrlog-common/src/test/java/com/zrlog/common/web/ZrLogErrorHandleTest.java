@@ -34,20 +34,67 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class ZrLogErrorHandleTest {
 
+    private final Logger errorHandleLogger = Logger.getLogger(ZrLogErrorHandle.class.getName());
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
-    private final Logger errorHandleLogger = Logger.getLogger(ZrLogErrorHandle.class.getName());
     private Level previousLevel;
     private boolean previousUseParentHandlers;
     private I18nVO previousI18n;
+
+    private static void restoreProperty(String key, String value) {
+        if (value == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, value);
+        }
+    }
+
+    private static void useLocale(String locale) {
+        I18nVO resources = new I18nVO();
+        resources.setBackend(I18nUtil.getI18nVOCache().getBackend());
+        resources.setLocale(locale);
+        I18nUtil.threadLocal.set(resources);
+    }
+
+    private static HttpRequest request(String uri, String query) {
+        return request(uri, query, "");
+    }
+
+    private static HttpResponse response(HttpRequest request, ByteArrayOutputStream wire) {
+        return new SimpleHttpResponse(request, new ResponseConfig()) {
+            @Override
+            protected void send(byte[] bytes, boolean body, boolean close) {
+                wire.write(bytes, 0, bytes.length);
+            }
+        };
+    }
+
+    private static HttpRequest request(String uri, String query, String contextPath) {
+        ServerConfig serverConfig = new ServerConfig();
+        return (HttpRequest) Proxy.newProxyInstance(
+                ZrLogErrorHandleTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    if ("getUri".equals(method.getName())) {
+                        return uri;
+                    }
+                    if ("getQueryStr".equals(method.getName())) {
+                        return query;
+                    }
+                    if ("getContextPath".equals(method.getName())) return contextPath;
+                    if ("getServerConfig".equals(method.getName())) return serverConfig;
+                    if ("getHttpVersion".equals(method.getName())) return HttpVersion.HTTP_1_1;
+                    if ("getMethod".equals(method.getName())) return HttpMethod.GET;
+                    if ("toString".equals(method.getName())) {
+                        return "HttpRequestProxy";
+                    }
+                    return null;
+                });
+    }
 
     @Before
     public void setUp() {
@@ -182,7 +229,10 @@ public class ZrLogErrorHandleTest {
             for (String contextPath : new String[]{"", "/", "/blog"}) {
                 for (String detail : new String[]{null, "输入无效 &next=/example?value=1#section + 50% 😀\r\nLocation: /else"}) {
                     Throwable failure = detail == null ? new IllegalStateException("private-details") : new TestBusinessException() {
-                        @Override public String getMessage() { return detail; }
+                        @Override
+                        public String getMessage() {
+                            return detail;
+                        }
                     };
                     HttpRequest request = request("/admin/system/proxy", "", contextPath);
                     ByteArrayOutputStream wire = new ByteArrayOutputStream();
@@ -297,62 +347,15 @@ public class ZrLogErrorHandleTest {
         }
     }
 
-    private static void restoreProperty(String key, String value) {
-        if (value == null) {
-            System.clearProperty(key);
-        } else {
-            System.setProperty(key, value);
-        }
-    }
-
-    private static void useLocale(String locale) {
-        I18nVO resources = new I18nVO();
-        resources.setBackend(I18nUtil.getI18nVOCache().getBackend());
-        resources.setLocale(locale);
-        I18nUtil.threadLocal.set(resources);
-    }
-
-    private static HttpRequest request(String uri, String query) {
-        return request(uri, query, "");
-    }
-
-    private static HttpResponse response(HttpRequest request, ByteArrayOutputStream wire) {
-        return new SimpleHttpResponse(request, new ResponseConfig()) {
-            @Override
-            protected void send(byte[] bytes, boolean body, boolean close) {
-                wire.write(bytes, 0, bytes.length);
-            }
-        };
-    }
-
-    private static HttpRequest request(String uri, String query, String contextPath) {
-        ServerConfig serverConfig = new ServerConfig();
-        return (HttpRequest) Proxy.newProxyInstance(
-                ZrLogErrorHandleTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getUri".equals(method.getName())) {
-                        return uri;
-                    }
-                    if ("getQueryStr".equals(method.getName())) {
-                        return query;
-                    }
-                    if ("getContextPath".equals(method.getName())) return contextPath;
-                    if ("getServerConfig".equals(method.getName())) return serverConfig;
-                    if ("getHttpVersion".equals(method.getName())) return HttpVersion.HTTP_1_1;
-                    if ("getMethod".equals(method.getName())) return HttpMethod.GET;
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
+    private interface ThrowingRunnable {
+        void run() throws Exception;
     }
 
     private static class ResponseRecorder {
 
+        private final Map<String, String> headers = new HashMap<>();
         private Object json;
         private String redirect;
-        private final Map<String, String> headers = new HashMap<>();
         private Integer renderCode;
         private Integer writeCode;
         private String writtenBody;
@@ -377,10 +380,6 @@ public class ZrLogErrorHandleTest {
                         return null;
                     });
         }
-    }
-
-    private interface ThrowingRunnable {
-        void run() throws Exception;
     }
 
     private static class TestBusinessException extends AbstractBusinessException {

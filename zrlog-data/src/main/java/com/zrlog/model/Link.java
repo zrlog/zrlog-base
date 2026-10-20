@@ -5,7 +5,6 @@ import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequest;
 import com.zrlog.common.cache.dto.LinkDTO;
-
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;

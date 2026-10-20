@@ -38,6 +38,29 @@ public class ArticleDetailDTO extends ArticleBasicDTO {
         this.nextLog = nextLog;
     }
 
+    public List<VisitorCommentDTO> getComments() {
+        return comments;
+    }
+
+    public void setComments(List<VisitorCommentDTO> comments) {
+        this.comments = comments;
+    }
+
+    public String getTocHtml() {
+        return tocHtml;
+    }
+
+    public void setTocHtml(String tocHtml) {
+        this.tocHtml = tocHtml;
+    }
+
+    public String getContentProtectorHtml() {
+        return contentProtectorHtml;
+    }
+
+    public void setContentProtectorHtml(String contentProtectorHtml) {
+        this.contentProtectorHtml = contentProtectorHtml;
+    }
 
     public static class LastLogDTO {
         private String title;
@@ -118,29 +141,5 @@ public class ArticleDetailDTO extends ArticleBasicDTO {
         public void setUrl(String url) {
             this.url = url;
         }
-    }
-
-    public List<VisitorCommentDTO> getComments() {
-        return comments;
-    }
-
-    public void setComments(List<VisitorCommentDTO> comments) {
-        this.comments = comments;
-    }
-
-    public String getTocHtml() {
-        return tocHtml;
-    }
-
-    public void setTocHtml(String tocHtml) {
-        this.tocHtml = tocHtml;
-    }
-
-    public String getContentProtectorHtml() {
-        return contentProtectorHtml;
-    }
-
-    public void setContentProtectorHtml(String contentProtectorHtml) {
-        this.contentProtectorHtml = contentProtectorHtml;
     }
 }

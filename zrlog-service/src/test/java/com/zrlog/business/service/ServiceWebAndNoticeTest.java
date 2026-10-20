@@ -27,15 +27,49 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class ServiceWebAndNoticeTest {
 
     private com.zrlog.common.ZrLogConfig applicationConfig;
+
+    private static PublicWebSiteInfo siteInfo(boolean darkMode) {
+        PublicWebSiteInfo info = new PublicWebSiteInfo();
+        info.setTitle("ZrLog");
+        info.setHost("example.com");
+        info.setLanguage("zh_CN");
+        info.setAdmin_darkMode(darkMode);
+        info.setAdmin_color_primary("#1677ff");
+        info.setAppId("app-id");
+        return info;
+    }
+
+    private static HttpRequest request(String contextPath, String host) {
+        return (HttpRequest) Proxy.newProxyInstance(
+                ServiceWebAndNoticeTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    if ("getContextPath".equals(method.getName())) {
+                        return contextPath;
+                    }
+                    if ("getHeader".equals(method.getName())) {
+                        return host;
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "HttpRequestProxy";
+                    }
+                    return null;
+                });
+    }
+
+    private static Version futureVersion() {
+        Version version = new Version();
+        version.setBuildId("future-build");
+        version.setVersion("99.0.0-SNAPSHOT");
+        version.setReleaseDate("2099-01-01 00:00");
+        version.setBuildDate(new Date(System.currentTimeMillis() + 86_400_000L));
+        return version;
+    }
 
     @Test
     public void shouldBuildPublicInfoWithLightThemeColor() throws Exception {
@@ -65,8 +99,12 @@ public class ServiceWebAndNoticeTest {
 
     @Test
     public void shouldBuildEmptyUpgradeNoticeWhenVersionIsMissing() {
-        CheckVersionResponse nullResponse = new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> { throw new IllegalStateException("Database is unavailable in this test"); })).buildResponse(null);
-        CheckVersionResponse missingDate = new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> { throw new IllegalStateException("Database is unavailable in this test"); })).buildResponse(new Version());
+        CheckVersionResponse nullResponse = new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> {
+            throw new IllegalStateException("Database is unavailable in this test");
+        })).buildResponse(null);
+        CheckVersionResponse missingDate = new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> {
+            throw new IllegalStateException("Database is unavailable in this test");
+        })).buildResponse(new Version());
 
         assertFalse(nullResponse.getUpgrade());
         assertNull(nullResponse.getVersion());
@@ -82,7 +120,9 @@ public class ServiceWebAndNoticeTest {
         version.setReleaseDate("2099-01-01 00:00");
         version.setBuildDate(new Date(System.currentTimeMillis() + 86_400_000L));
 
-        CheckVersionResponse response = new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> { throw new IllegalStateException("Database is unavailable in this test"); })).buildResponse(version);
+        CheckVersionResponse response = new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> {
+            throw new IllegalStateException("Database is unavailable in this test");
+        })).buildResponse(version);
 
         assertTrue(response.getUpgrade());
         assertEquals("99.0.0", response.getVersion().getVersion());
@@ -91,7 +131,9 @@ public class ServiceWebAndNoticeTest {
 
     @Test
     public void shouldReturnEmptyNoticeWhenKvStoreIsUnavailable() {
-        CheckVersionResponse response = new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> { throw new IllegalStateException("Database is unavailable in this test"); })).getNotice();
+        CheckVersionResponse response = new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> {
+            throw new IllegalStateException("Database is unavailable in this test");
+        })).getNotice();
 
         assertFalse(response.getUpgrade());
         assertNull(response.getVersion());
@@ -188,62 +230,15 @@ public class ServiceWebAndNoticeTest {
         assertNull(notInstalledKv.removedKey);
     }
 
-    private static PublicWebSiteInfo siteInfo(boolean darkMode) {
-        PublicWebSiteInfo info = new PublicWebSiteInfo();
-        info.setTitle("ZrLog");
-        info.setHost("example.com");
-        info.setLanguage("zh_CN");
-        info.setAdmin_darkMode(darkMode);
-        info.setAdmin_color_primary("#1677ff");
-        info.setAppId("app-id");
-        return info;
-    }
-
-    private static HttpRequest request(String contextPath, String host) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                ServiceWebAndNoticeTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getContextPath".equals(method.getName())) {
-                        return contextPath;
-                    }
-                    if ("getHeader".equals(method.getName())) {
-                        return host;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
-    }
-
     private UpgradeNoticeService noticeService(FakeWebsiteKvService kvService) {
         ZrLogConfig config = applicationConfig;
         return new UpgradeNoticeService(() -> config != null && config.isInstalled(), kvService);
     }
 
-    private static Version futureVersion() {
-        Version version = new Version();
-        version.setBuildId("future-build");
-        version.setVersion("99.0.0-SNAPSHOT");
-        version.setReleaseDate("2099-01-01 00:00");
-        version.setBuildDate(new Date(System.currentTimeMillis() + 86_400_000L));
-        return version;
-    }
-
     private static class TestZrLogConfig extends ZrLogConfig {
+        private final boolean installed;
         private CacheService cacheService;
 
-        @Override
-        public <T> T getWebSetup(Class<T> capability) {
-            if (capability == WebSiteInfoProvider.class) {
-                return capability.cast((WebSiteInfoProvider) cacheService::getPublicWebSiteInfo);
-            }
-            return super.getWebSetup(capability);
-        }
-
-
-        private final boolean installed;
 
         TestZrLogConfig(PublicWebSiteInfo info) throws Exception {
             this(info, false);
@@ -253,6 +248,14 @@ public class ServiceWebAndNoticeTest {
             super(19082, null, "/");
             this.cacheService = new TestCacheService(info);
             this.installed = installed;
+        }
+
+        @Override
+        public <T> T getWebSetup(Class<T> capability) {
+            if (capability == WebSiteInfoProvider.class) {
+                return capability.cast((WebSiteInfoProvider) cacheService::getPublicWebSiteInfo);
+            }
+            return super.getWebSetup(capability);
         }
 
         @Override
@@ -277,9 +280,6 @@ public class ServiceWebAndNoticeTest {
     }
 
     private static class FakeWebsiteKvService extends WebsiteKvService {
-        FakeWebsiteKvService() {
-            super(() -> { throw new AssertionError("Unexpected database access"); });
-        }
         private String storedJson;
         private String putKey;
         private String putValue;
@@ -288,6 +288,11 @@ public class ServiceWebAndNoticeTest {
         private int removeAttempts;
         private boolean throwOnPut;
         private boolean throwOnRemove;
+        FakeWebsiteKvService() {
+            super(() -> {
+                throw new AssertionError("Unexpected database access");
+            });
+        }
 
         @Override
         public String getString(String key) {

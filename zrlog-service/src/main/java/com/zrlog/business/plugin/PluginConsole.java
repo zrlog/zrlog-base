@@ -7,8 +7,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -19,9 +19,9 @@ import java.util.logging.Logger;
  */
 public class PluginConsole implements AutoCloseable {
 
-    private static final Logger LOGGER = LoggerUtil.getLogger(PluginConsole.class);
     static final int READ_BUFFER_SIZE = 8 * 1024;
     static final long MAX_BYTES_PER_POLL = 1024L * 1024L;
+    private static final Logger LOGGER = LoggerUtil.getLogger(PluginConsole.class);
     private static final byte[] CORRUPT_JAR_MARKER =
             "Error: Invalid or corrupt jarfile".getBytes(StandardCharsets.US_ASCII);
 

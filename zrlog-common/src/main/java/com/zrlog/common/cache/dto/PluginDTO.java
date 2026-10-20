@@ -31,15 +31,15 @@ public class PluginDTO implements Serializable {
         return isSystem;
     }
 
+    public void setSystem(Boolean system) {
+        this.isSystem = system;
+    }
+
     /**
      * freemarker
      */
     public Boolean getIsSystem() {
         return isSystem;
-    }
-
-    public void setSystem(Boolean system) {
-        this.isSystem = system;
     }
 
     public Long getLevel() {

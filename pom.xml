@@ -77,14 +77,41 @@
     <dependencies>
         <!-- Implementation is supplied by the application; base uses it only in integration tests. -->
         <dependency>
-            <groupId>com.hibegin</groupId><artifactId>zrlog-updater-zip</artifactId>
-            <version>${zrlog-updater.version}</version><scope>test</scope>
+            <groupId>com.hibegin</groupId>
+            <artifactId>zrlog-updater-zip</artifactId>
+            <version>${zrlog-updater.version}</version>
+            <scope>test</scope>
         </dependency>
-        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-updater-native</artifactId><version>${zrlog-updater.version}</version><scope>test</scope></dependency>
-        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-updater-war</artifactId><version>${zrlog-updater.version}</version><scope>test</scope></dependency>
-        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-updater-faas</artifactId><version>${zrlog-updater.version}</version><scope>test</scope></dependency>
-        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-updater-docker</artifactId><version>${zrlog-updater.version}</version><scope>test</scope></dependency>
-        <dependency><groupId>com.hibegin</groupId><artifactId>zrlog-updater-deb</artifactId><version>${zrlog-updater.version}</version><scope>test</scope></dependency>
+        <dependency>
+            <groupId>com.hibegin</groupId>
+            <artifactId>zrlog-updater-native</artifactId>
+            <version>${zrlog-updater.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.hibegin</groupId>
+            <artifactId>zrlog-updater-war</artifactId>
+            <version>${zrlog-updater.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.hibegin</groupId>
+            <artifactId>zrlog-updater-faas</artifactId>
+            <version>${zrlog-updater.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.hibegin</groupId>
+            <artifactId>zrlog-updater-docker</artifactId>
+            <version>${zrlog-updater.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.hibegin</groupId>
+            <artifactId>zrlog-updater-deb</artifactId>
+            <version>${zrlog-updater.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.hibegin</groupId>
             <artifactId>simplewebserver</artifactId>
@@ -272,14 +299,20 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
                         <executions>
-                            <execution><id>attach-javadocs</id><phase>none</phase></execution>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <phase>none</phase>
+                            </execution>
                         </executions>
                     </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
                         <executions>
-                            <execution><id>sign-artifacts</id><phase>none</phase></execution>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>none</phase>
+                            </execution>
                         </executions>
                     </plugin>
                     <plugin>
@@ -290,7 +323,9 @@
                             <execution>
                                 <id>disable-central-snapshot-publishing</id>
                                 <phase>none</phase>
-                                <goals><goal>publish</goal></goals>
+                                <goals>
+                                    <goal>publish</goal>
+                                </goals>
                             </execution>
                         </executions>
                     </plugin>

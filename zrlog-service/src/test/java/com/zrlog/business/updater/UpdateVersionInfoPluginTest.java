@@ -7,8 +7,8 @@ import com.zrlog.business.service.UpgradeNoticeService;
 import com.zrlog.business.service.WebsiteKvService;
 import com.zrlog.common.vo.Version;
 import com.zrlog.model.WebSite;
-import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import org.junit.Test;
 import org.junit.experimental.theories.DataPoints;
 import org.junit.experimental.theories.Theories;
@@ -23,17 +23,28 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 @RunWith(Theories.class)
 public class UpdateVersionInfoPluginTest {
 
     @DataPoints
     public static final DatabaseType[] DATABASES = DatabaseType.values();
+
+    private static Map<String, Object> noChangeLogRes() {
+        Map<String, Object> res = new HashMap<>();
+        res.put("upgrade.result.noChangeLog", "No diff log");
+        return res;
+    }
+
+    private static Version version(String value) {
+        Version version = new Version();
+        version.setVersion(value);
+        version.setBuildId("build");
+        version.setBuildDate(new Date(1_000));
+        version.setReleaseDate("1970-01-01 00:00");
+        return version;
+    }
 
     @Test
     public void shouldNormalizePreviewAndReleaseVersionsForDisplay() {
@@ -53,7 +64,11 @@ public class UpdateVersionInfoPluginTest {
 
     @Test
     public void shouldExposeLifecycleWithoutStartingNetworkTask() {
-        UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> { throw new IllegalStateException("Database is unavailable in this test"); })), () -> "zh_CN", null, new WebsiteKvService(() -> { throw new IllegalStateException("Database is unavailable in this test"); }));
+        UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> {
+            throw new IllegalStateException("Database is unavailable in this test");
+        })), () -> "zh_CN", null, new WebsiteKvService(() -> {
+            throw new IllegalStateException("Database is unavailable in this test");
+        }));
 
         assertEquals(!EnvKit.isFaaSMode(), plugin.autoStart());
         assertFalse(plugin.isStarted());
@@ -162,21 +177,6 @@ public class UpdateVersionInfoPluginTest {
         assertTrue(changeLog.startsWith("No commit log"));
         assertFalse(changeLog.contains("diff"));
         assertTrue(changeLog.contains("commit"));
-    }
-
-    private static Map<String, Object> noChangeLogRes() {
-        Map<String, Object> res = new HashMap<>();
-        res.put("upgrade.result.noChangeLog", "No diff log");
-        return res;
-    }
-
-    private static Version version(String value) {
-        Version version = new Version();
-        version.setVersion(value);
-        version.setBuildId("build");
-        version.setBuildDate(new Date(1_000));
-        version.setReleaseDate("1970-01-01 00:00");
-        return version;
     }
 
     private static class TestUpdateVersionInfoPlugin extends UpdateVersionInfoPlugin {

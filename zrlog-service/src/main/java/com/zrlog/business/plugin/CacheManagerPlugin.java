@@ -7,7 +7,6 @@ import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.util.ThreadUtils;
-
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
@@ -22,13 +21,10 @@ import java.util.concurrent.TimeUnit;
 @Singleton
 public class CacheManagerPlugin implements IPlugin {
 
-    private ScheduledExecutorService scheduledThreadPoolExecutor;
-
-    private boolean started = false;
-
     private final CacheService cacheService;
-
     private final WebsiteKvService settings;
+    private ScheduledExecutorService scheduledThreadPoolExecutor;
+    private boolean started = false;
 
     @Inject
     public CacheManagerPlugin(CacheService cacheService, WebsiteKvService settings) {

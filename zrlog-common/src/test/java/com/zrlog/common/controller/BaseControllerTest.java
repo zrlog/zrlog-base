@@ -16,11 +16,56 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class BaseControllerTest {
+
+    private static BaseController controller(Map<String, String> params, String body) throws Exception {
+        BaseController controller = new BaseController();
+        setControllerField(controller, "request", request(params, body));
+        setControllerField(controller, "response", response());
+        return controller;
+    }
+
+    private static void setControllerField(BaseController controller, String name, Object value) throws Exception {
+        Field field = Controller.class.getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(controller, value);
+    }
+
+    private static HttpRequest request(Map<String, String> params, String body) {
+        return (HttpRequest) Proxy.newProxyInstance(
+                BaseControllerTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    if ("getParaToStr".equals(method.getName())) {
+                        return params.get(args[0].toString());
+                    }
+                    if ("getInputStream".equals(method.getName())) {
+                        if (body == null) {
+                            return null;
+                        }
+                        return new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8));
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "HttpRequestProxy";
+                    }
+                    return null;
+                });
+    }
+
+    private static HttpResponse response() {
+        return (HttpResponse) Proxy.newProxyInstance(
+                BaseControllerTest.class.getClassLoader(),
+                new Class[]{HttpResponse.class},
+                (proxy, method, args) -> {
+                    if ("write".equals(method.getName()) && args != null && args.length == 1
+                            && args[0] instanceof InputStream) {
+                        ((InputStream) args[0]).readAllBytes();
+                    }
+                    return null;
+                });
+    }
 
     @Test
     public void shouldReadRequiredParamOrThrowArgsException() throws Exception {
@@ -73,53 +118,6 @@ public class BaseControllerTest {
     public void shouldRejectJsonNullRequestBody() {
         assertThrows(NullPointerException.class,
                 () -> BaseController.convertWithValid("null", SampleRequest.class));
-    }
-
-    private static BaseController controller(Map<String, String> params, String body) throws Exception {
-        BaseController controller = new BaseController();
-        setControllerField(controller, "request", request(params, body));
-        setControllerField(controller, "response", response());
-        return controller;
-    }
-
-    private static void setControllerField(BaseController controller, String name, Object value) throws Exception {
-        Field field = Controller.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(controller, value);
-    }
-
-    private static HttpRequest request(Map<String, String> params, String body) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                BaseControllerTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getParaToStr".equals(method.getName())) {
-                        return params.get(args[0].toString());
-                    }
-                    if ("getInputStream".equals(method.getName())) {
-                        if (body == null) {
-                            return null;
-                        }
-                        return new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8));
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
-    }
-
-    private static HttpResponse response() {
-        return (HttpResponse) Proxy.newProxyInstance(
-                BaseControllerTest.class.getClassLoader(),
-                new Class[]{HttpResponse.class},
-                (proxy, method, args) -> {
-                    if ("write".equals(method.getName()) && args != null && args.length == 1
-                            && args[0] instanceof InputStream) {
-                        ((InputStream) args[0]).readAllBytes();
-                    }
-                    return null;
-                });
     }
 
     public static class SampleRequest implements Validator {

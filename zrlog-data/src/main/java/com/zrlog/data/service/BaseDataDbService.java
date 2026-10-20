@@ -16,20 +16,10 @@ import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.util.DateValueFormatUtils;
 import com.zrlog.model.*;
-import com.zrlog.model.Link;
-import com.zrlog.model.Log;
-import com.zrlog.model.LogNav;
-import com.zrlog.model.Plugin;
-import com.zrlog.model.Tag;
-import com.zrlog.model.Type;
-import com.zrlog.model.User;
-import com.zrlog.model.WebSite;
-
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;
 import java.util.*;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.logging.Logger;
@@ -40,6 +30,7 @@ import java.util.stream.Collectors;
  */
 public class BaseDataDbService {
 
+    private static final Logger LOGGER = LoggerUtil.getLogger(BaseDataDbService.class);
     private final jakarta.inject.Provider<Link> linkProvider;
     private final jakarta.inject.Provider<Log> logProvider;
     private final jakarta.inject.Provider<LogNav> logNavProvider;
@@ -69,16 +60,6 @@ public class BaseDataDbService {
         this.webSiteProvider = Objects.requireNonNull(webSiteProvider);
     }
 
-    private static final Logger LOGGER = LoggerUtil.getLogger(BaseDataDbService.class);
-
-    private HotLogBasicInfoEntry convertToBasicVO(ArticleBasicDTO log) {
-        String format = "yyyy-MM-dd";
-        log.setReleaseTime(DateValueFormatUtils.format(log.getReleaseTime(), format));
-        log.setLastUpdateDate(DateValueFormatUtils.format(log.getLastUpdateDate(), format));
-        log.setLast_update_date(DateValueFormatUtils.format(log.getLast_update_date(), format));
-        return BeanUtil.convert(log, HotLogBasicInfoEntry.class);
-    }
-
     public static long getWebSiteVersion(PublicWebSiteInfo website) {
         return new Gson().toJson(website).hashCode();
     }
@@ -94,6 +75,14 @@ public class BaseDataDbService {
             archives.add(archive);
         }
         return archives;
+    }
+
+    private HotLogBasicInfoEntry convertToBasicVO(ArticleBasicDTO log) {
+        String format = "yyyy-MM-dd";
+        log.setReleaseTime(DateValueFormatUtils.format(log.getReleaseTime(), format));
+        log.setLastUpdateDate(DateValueFormatUtils.format(log.getLastUpdateDate(), format));
+        log.setLast_update_date(DateValueFormatUtils.format(log.getLast_update_date(), format));
+        return BeanUtil.convert(log, HotLogBasicInfoEntry.class);
     }
 
     public BaseDataInitVO queryCacheInit(Executor executor) {

@@ -7,11 +7,7 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.net.InetAddress;
-import java.net.Proxy;
-import java.net.ProxySelector;
-import java.net.ServerSocket;
-import java.net.URI;
+import java.net.*;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -28,7 +24,13 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.*;
 
 public class NetworkProxyTest {
-    @Rule public TemporaryFolder temporary = new TemporaryFolder();
+    @Rule
+    public TemporaryFolder temporary = new TemporaryFolder();
+
+    private static NetworkProxy.Settings settings(String url, String noProxy) {
+        return NetworkProxy.resolve(Map.of(NetworkProxy.URL_ENV, url, NetworkProxy.HTTPS_URL_ENV, url,
+                NetworkProxy.NO_PROXY_ENV, noProxy), new Properties());
+    }
 
     @Test
     public void fileSettingsAreOverriddenPerFieldIncludingExplicitDisable() throws Exception {
@@ -72,7 +74,9 @@ public class NetworkProxyTest {
         NetworkProxy.Settings active = settings("http://active.example:3128", "");
         NetworkProxy.save(path, "http://next.example:8080", ".internal.example");
         Properties file = new Properties();
-        try (var input = Files.newInputStream(path)) { file.load(input); }
+        try (var input = Files.newInputStream(path)) {
+            file.load(input);
+        }
         assertEquals("http://next.example:8080", file.getProperty(NetworkProxy.URL_KEY));
         assertFalse(active.samePolicy(NetworkProxy.resolve(Map.of(), file)));
         assertEquals("http://active.example:3128", active.getUrl());
@@ -81,13 +85,17 @@ public class NetworkProxyTest {
                 () -> NetworkProxy.save(path, "http://user:secret@other:80", ""));
         assertArrayEquals(before, Files.readAllBytes(path));
         NetworkProxy.save(path, "http://editable.example:80", "localhost");
-        try (var input = Files.newInputStream(path)) { file.load(input); }
+        try (var input = Files.newInputStream(path)) {
+            file.load(input);
+        }
         assertEquals("http://editable.example:80", file.getProperty(NetworkProxy.URL_KEY));
         assertEquals("http://env.example:80", NetworkProxy.resolve(Map.of("HTTP_PROXY", "http://env.example:80"), file).getUrl());
         assertEquals("http://editable.example:80", NetworkProxy.resolve(Map.of("HTTP_PROXY", "http://env.example:80"), file).getHttpsUrl());
         assertEquals("localhost", file.getProperty(NetworkProxy.NO_PROXY_KEY));
         NetworkProxy.save(path, "", "");
-        try (var input = Files.newInputStream(path)) { file.load(input); }
+        try (var input = Files.newInputStream(path)) {
+            file.load(input);
+        }
         NetworkProxy.Settings disabled = NetworkProxy.resolve(Map.of(), file);
         assertFalse(disabled.isEnabled());
         assertEquals("file", disabled.getSource());
@@ -174,13 +182,9 @@ public class NetworkProxyTest {
         }
     }
 
-    private static NetworkProxy.Settings settings(String url, String noProxy) {
-        return NetworkProxy.resolve(Map.of(NetworkProxy.URL_ENV, url, NetworkProxy.HTTPS_URL_ENV, url,
-                NetworkProxy.NO_PROXY_ENV, noProxy), new Properties());
-    }
-
     private static final class Policy implements AutoCloseable {
         private final Map<String, String> previous = new LinkedHashMap<>();
+
         Policy(NetworkProxy.Settings settings) {
             for (String argument : settings.launchArguments()) {
                 int separator = argument.indexOf('=');
@@ -189,8 +193,12 @@ public class NetworkProxyTest {
                 System.setProperty(key, argument.substring(separator + 1));
             }
         }
+
         public void close() {
-            previous.forEach((key, value) -> { if (value == null) System.clearProperty(key); else System.setProperty(key, value); });
+            previous.forEach((key, value) -> {
+                if (value == null) System.clearProperty(key);
+                else System.setProperty(key, value);
+            });
         }
     }
 
@@ -198,6 +206,7 @@ public class NetworkProxyTest {
         private final ServerSocket socket = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"));
         private final CompletableFuture<String> request = new CompletableFuture<>();
         private final Thread worker;
+
         ProxyFixture() throws Exception {
             worker = new Thread(() -> {
                 try (var connection = socket.accept()) {
@@ -205,18 +214,28 @@ public class NetworkProxyTest {
                     BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.US_ASCII));
                     String first = reader.readLine();
                     String line;
-                    while ((line = reader.readLine()) != null && !line.isEmpty()) { }
+                    while ((line = reader.readLine()) != null && !line.isEmpty()) {
+                    }
                     request.complete(first);
                     String response = first.startsWith("CONNECT ")
                             ? "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
                             : "HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nproxied";
                     connection.getOutputStream().write(response.getBytes(StandardCharsets.US_ASCII));
-                } catch (Exception exception) { request.completeExceptionally(exception); }
+                } catch (Exception exception) {
+                    request.completeExceptionally(exception);
+                }
             });
             worker.setDaemon(true);
             worker.start();
         }
-        String url() { return "http://127.0.0.1:" + socket.getLocalPort(); }
-        public void close() throws Exception { socket.close(); worker.join(4000); }
+
+        String url() {
+            return "http://127.0.0.1:" + socket.getLocalPort();
+        }
+
+        public void close() throws Exception {
+            socket.close();
+            worker.join(4000);
+        }
     }
 }

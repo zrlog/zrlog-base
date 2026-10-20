@@ -15,10 +15,13 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Map;
 
-/** Supplies the application's existing HTTP client and user agent to updater modules. */
+/**
+ * Supplies the application's existing HTTP client and user agent to updater modules.
+ */
 final class UpdaterHttp implements UpdateHttp {
     public static final UpdaterHttp INSTANCE = new UpdaterHttp();
     private final URI dockerEndpoint;
+
     private UpdaterHttp() {
         URI endpoint = null;
         String url = System.getenv("ZRLOG_UPDATER_URL");
@@ -51,13 +54,17 @@ final class UpdaterHttp implements UpdateHttp {
             throw new IOException("Invalid update metadata URL", error);
         }
     }
+
     public int download(URI uri, File file) throws Exception {
         HttpFileHandle handle = new HttpFileHandle(file.getParent(), file.getName());
         handle.setT(file);
         HttpUtil.getInstance().sendGetRequest(uri.toString(), handle, Map.of());
         return handle.getStatusCode();
     }
-    /** Docker control traffic stays within the deployment, independently of outbound proxy settings. */
+
+    /**
+     * Docker control traffic stays within the deployment, independently of outbound proxy settings.
+     */
     public HttpResponse<String> send(HttpRequest request) throws Exception {
         if (dockerEndpoint == null || !dockerEndpoint.getScheme().equals(request.uri().getScheme())
                 || !dockerEndpoint.getRawAuthority().equalsIgnoreCase(request.uri().getRawAuthority())) {
@@ -71,8 +78,10 @@ final class UpdaterHttp implements UpdateHttp {
         request.version().ifPresent(builder::version);
         request.headers().map().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
         if (!"default".equals(settings.getSource())) builder.setHeader("X-ZrLog-HTTP-Proxy", settings.getUrl());
-        if (!"default".equals(settings.getHttpsSource())) builder.setHeader("X-ZrLog-HTTPS-Proxy", settings.getHttpsUrl());
-        if (!"default".equals(settings.getNoProxySource())) builder.setHeader("X-ZrLog-No-Proxy", settings.getNoProxy());
+        if (!"default".equals(settings.getHttpsSource()))
+            builder.setHeader("X-ZrLog-HTTPS-Proxy", settings.getHttpsUrl());
+        if (!"default".equals(settings.getNoProxySource()))
+            builder.setHeader("X-ZrLog-No-Proxy", settings.getNoProxy());
         return HttpUtil.getInstance().sendDirectRequest(builder.build());
     }
 }

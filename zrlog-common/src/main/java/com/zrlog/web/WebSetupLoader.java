@@ -2,27 +2,21 @@ package com.zrlog.web;
 
 import com.hibegin.common.util.LoggerUtil;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.ServiceLoader;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
-/** Shared discovery and startup selection for production and standalone development. */
+/**
+ * Shared discovery and startup selection for production and standalone development.
+ */
 public final class WebSetupLoader {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(WebSetupLoader.class);
 
-    private WebSetupLoader() { }
+    private WebSetupLoader() {
+    }
 
     public static List<WebSetup> load(WebSetupContext context) {
         return load(context, provider -> true);

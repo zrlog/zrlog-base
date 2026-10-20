@@ -7,8 +7,8 @@ import com.zrlog.business.di.DaggerServiceComponent;
 import com.zrlog.business.version.UpgradeVersionHandler;
 import com.zrlog.common.CacheService;
 import com.zrlog.data.di.DaggerDataComponent;
-import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -26,33 +26,36 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class DbUpgradeServiceDatabaseTest {
+
+    private final DatabaseType databaseType;
+    @Rule
+    public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
+    public DbUpgradeServiceDatabaseTest(DatabaseType databaseType) {
+        this.databaseType = databaseType;
+    }
 
     @Parameterized.Parameters(name = "{0}")
     public static DatabaseType[] databases() {
         return DatabaseType.values();
     }
 
-    private final DatabaseType databaseType;
-
-    public DbUpgradeServiceDatabaseTest(DatabaseType databaseType) {
-        this.databaseType = databaseType;
+    private static void restoreProperty(String key, String value) {
+        if (value == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, value);
+        }
     }
-
-    @Rule
-    public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     private DbUpgradeService upgradeService(DataSourceWrapper source, long version) {
         return DaggerServiceComponent.factory().create(
-                DaggerDataComponent.factory().create(() -> source, () -> true),
-                () -> true, () -> null, () -> null, java.util.Collections::emptyList)
+                        DaggerDataComponent.factory().create(() -> source, () -> true),
+                        () -> true, () -> null, () -> null, java.util.Collections::emptyList)
                 .databaseUpgrades().create(version);
     }
 
@@ -438,7 +441,9 @@ public class DbUpgradeServiceDatabaseTest {
                 assertThrows(SQLException.class, () -> db.update("insert into oauth_client(clientId,name,redirectUris) values(?,?,?)", "app", "Duplicate", "[]"));
                 assertEquals(String.valueOf(UpgradeVersionHandler.SQL_VERSION), db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
             }
-        } finally { restoreProperty("sws.conf.path", previous); }
+        } finally {
+            restoreProperty("sws.conf.path", previous);
+        }
     }
 
     @Test
@@ -459,7 +464,9 @@ public class DbUpgradeServiceDatabaseTest {
                 upgradeService(db.dataSource(), 28).tryDoUpgrade();
                 assertEquals("{\"language\":\"en_US\"}", db.scalar("select preferences from user where userId=1"));
             }
-        } finally { restoreProperty("sws.conf.path", previous); }
+        } finally {
+            restoreProperty("sws.conf.path", previous);
+        }
     }
 
     @Test
@@ -481,7 +488,9 @@ public class DbUpgradeServiceDatabaseTest {
                 upgradeService(db.dataSource(), 29).tryDoUpgrade();
                 assertEquals("Assistant", db.scalar("select name from user_access_token where id=?", "token-id"));
             }
-        } finally { restoreProperty("sws.conf.path", previous); }
+        } finally {
+            restoreProperty("sws.conf.path", previous);
+        }
     }
 
     private void preparePartiallyAppliedPasskeySchemaForWebApi(ZrLogTestDatabase db) throws SQLException {
@@ -508,13 +517,5 @@ public class DbUpgradeServiceDatabaseTest {
                         throw e.getCause();
                     }
                 });
-    }
-
-    private static void restoreProperty(String key, String value) {
-        if (value == null) {
-            System.clearProperty(key);
-        } else {
-            System.setProperty(key, value);
-        }
     }
 }

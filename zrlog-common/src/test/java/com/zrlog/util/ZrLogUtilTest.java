@@ -4,12 +4,7 @@ import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.util.EnvKit;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
-import com.zrlog.common.CacheService;
-import com.zrlog.common.Constants;
-import com.zrlog.common.TokenService;
-import com.zrlog.common.Updater;
-import com.zrlog.common.UpdaterTypeEnum;
-import com.zrlog.common.ZrLogConfig;
+import com.zrlog.common.*;
 import com.zrlog.common.cache.dto.TagDTO;
 import com.zrlog.common.cache.dto.TypeDTO;
 import com.zrlog.common.cache.dto.UserBasicDTO;
@@ -28,13 +23,63 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class ZrLogUtilTest {
 
     private com.zrlog.common.ZrLogConfig applicationConfig;
+
+    private static HttpRequest request(String contextPath, String host, String uri) {
+        return (HttpRequest) Proxy.newProxyInstance(
+                ZrLogUtilTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    if ("getContextPath".equals(method.getName())) {
+                        return contextPath;
+                    }
+                    if ("getHeader".equals(method.getName()) && "Host".equals(args[0])) {
+                        return host;
+                    }
+                    if ("getUri".equals(method.getName())) {
+                        return uri;
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "HttpRequestProxy";
+                    }
+                    return null;
+                });
+    }
+
+    private static Updater updater(UpdaterTypeEnum type) {
+        return new Updater() {
+            @Override
+            public void restartProcessAsync(Version upgradeVersion) {
+            }
+
+            @Override
+            public String getUnzipPath() {
+                return "/tmp";
+            }
+
+            @Override
+            public File execFile() {
+                return new File("zrlog");
+            }
+
+            @Override
+            public UpdaterTypeEnum getType() {
+                return type;
+            }
+        };
+    }
+
+    private static void restoreProperty(String key, String value) {
+        if (value == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, value);
+        }
+    }
 
     @Test
     public void shouldConvertRequestParamsToBean() {
@@ -149,58 +194,6 @@ public class ZrLogUtilTest {
         }
     }
 
-    private static HttpRequest request(String contextPath, String host, String uri) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                ZrLogUtilTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getContextPath".equals(method.getName())) {
-                        return contextPath;
-                    }
-                    if ("getHeader".equals(method.getName()) && "Host".equals(args[0])) {
-                        return host;
-                    }
-                    if ("getUri".equals(method.getName())) {
-                        return uri;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
-    }
-
-    private static Updater updater(UpdaterTypeEnum type) {
-        return new Updater() {
-            @Override
-            public void restartProcessAsync(Version upgradeVersion) {
-            }
-
-            @Override
-            public String getUnzipPath() {
-                return "/tmp";
-            }
-
-            @Override
-            public File execFile() {
-                return new File("zrlog");
-            }
-
-            @Override
-            public UpdaterTypeEnum getType() {
-                return type;
-            }
-        };
-    }
-
-    private static void restoreProperty(String key, String value) {
-        if (value == null) {
-            System.clearProperty(key);
-        } else {
-            System.setProperty(key, value);
-        }
-    }
-
     private static class ResponseRecorder {
         private final Map<String, String> headers = new HashMap<>();
 
@@ -241,18 +234,10 @@ public class ZrLogUtilTest {
     private static class TestZrLogConfig extends ZrLogConfig {
         private CacheService cacheService;
 
-        @Override
-        public <T> T getWebSetup(Class<T> capability) {
-            if (capability == WebSiteInfoProvider.class) {
-                return capability.cast((WebSiteInfoProvider) cacheService::getPublicWebSiteInfo);
-            }
-            return super.getWebSetup(capability);
-        }
-
-
         TestZrLogConfig(String host) throws Exception {
             this(host, Constants.DEFAULT_LANGUAGE, false, null);
         }
+
 
         TestZrLogConfig(String host, Updater updater) throws Exception {
             this(host, Constants.DEFAULT_LANGUAGE, false, updater);
@@ -261,6 +246,14 @@ public class ZrLogUtilTest {
         TestZrLogConfig(String host, String language, boolean generatorHtmlStatus, Updater updater) throws Exception {
             super(19083, updater, "/");
             this.cacheService = new TestCacheService(host, language, generatorHtmlStatus);
+        }
+
+        @Override
+        public <T> T getWebSetup(Class<T> capability) {
+            if (capability == WebSiteInfoProvider.class) {
+                return capability.cast((WebSiteInfoProvider) cacheService::getPublicWebSiteInfo);
+            }
+            return super.getWebSetup(capability);
         }
 
         @Override

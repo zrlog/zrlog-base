@@ -29,8 +29,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.Assert.*;
 
 public class UpdaterHttpProxyTest {
-    @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private static final String TOKEN = "test_token_123456789012345678901234";
+    @Rule
+    public TemporaryFolder temporary = new TemporaryFolder();
 
     @Test(timeout = 45000)
     public void dockerControlIsDirectAndForwardsTheActivePolicyWhileOtherRequestsKeepTheirProxy() throws Exception {
@@ -105,7 +106,9 @@ public class UpdaterHttpProxyTest {
             try {
                 assertTrue("Proxy probe did not finish: " + mode, process.waitFor(10, TimeUnit.SECONDS));
                 assertEquals(mode + ": " + Files.readString(output), 0, process.exitValue());
-            } finally { process.destroyForcibly(); }
+            } finally {
+                process.destroyForcibly();
+            }
             assertEquals(1, controlRequests.get());
             assertEquals(4, proxiedRequests.get());
             assertTrue("Active proxy settings were not forwarded: " + mode, forwarded.get());
@@ -141,7 +144,9 @@ public class UpdaterHttpProxyTest {
                 assertEquals(200, context.http.download(external, download.toFile()));
                 assertEquals("proxied metadata", Files.readString(download));
                 assertEquals(Proxy.Type.HTTP, ProxySelector.getDefault().select(control).get(0).type());
-            } finally { HttpUtil.getInstance().closeHttpClient(); }
+            } finally {
+                HttpUtil.getInstance().closeHttpClient();
+            }
         }
     }
 }

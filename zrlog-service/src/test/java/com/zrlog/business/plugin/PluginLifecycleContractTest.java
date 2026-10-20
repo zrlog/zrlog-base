@@ -1,9 +1,5 @@
 package com.zrlog.business.plugin;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.business.service.WebsiteKvService;
 import com.zrlog.common.CacheService;
@@ -14,21 +10,16 @@ import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.model.WebSite;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
-import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.web.WebSiteInfoProvider;
-
 import org.junit.Test;
 import org.junit.experimental.theories.DataPoints;
 import org.junit.experimental.theories.Theories;
 import org.junit.experimental.theories.Theory;
 import org.junit.runner.RunWith;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.OutputStream;
-import java.io.PrintStream;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -39,11 +30,59 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 
+import static org.junit.Assert.*;
+
 @RunWith(Theories.class)
 public class PluginLifecycleContractTest {
 
     @DataPoints
     public static final DatabaseType[] DATABASES = DatabaseType.values();
+
+    private static String captured(ByteArrayOutputStream outputCapture) {
+        return new String(outputCapture.toByteArray(), StandardCharsets.UTF_8);
+    }
+
+    private static byte[] repeatedAsciiBytes(int length, char value) {
+        byte[] bytes = new byte[length];
+        Arrays.fill(bytes, (byte) value);
+        return bytes;
+    }
+
+    private static ScheduledExecutorService scheduler(PluginConsole console) throws Exception {
+        Field scheduler = PluginConsole.class.getDeclaredField("scheduler");
+        scheduler.setAccessible(true);
+        return (ScheduledExecutorService) scheduler.get(console);
+    }
+
+    private static void waitUntil(BooleanSupplier condition) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 2_000;
+        while (System.currentTimeMillis() < deadline) {
+            if (condition.getAsBoolean()) {
+                return;
+            }
+            Thread.sleep(25);
+        }
+        throw new AssertionError("Timed out waiting for async plugin lifecycle action");
+    }
+
+    private static CacheService countingCacheService(AtomicInteger refreshCount) {
+        return (CacheService) java.lang.reflect.Proxy.newProxyInstance(
+                PluginLifecycleContractTest.class.getClassLoader(),
+                new Class[]{CacheService.class},
+                (proxy, method, args) -> {
+                    if ("refreshInitData".equals(method.getName())) {
+                        refreshCount.incrementAndGet();
+                        return new BaseDataInitVO();
+                    }
+                    if ("getCurrentSqlVersion".equals(method.getName()) || "getWebSiteVersion".equals(method.getName())) {
+                        return 0L;
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "CountingCacheServiceProxy";
+                    }
+                    return null;
+                });
+    }
 
     @Test
     public void shouldClosePluginConsoleAndDeleteOutputFile() throws Exception {
@@ -277,7 +316,9 @@ public class PluginLifecycleContractTest {
     public void shouldExposeCacheManagerLifecycleWithoutStartingScheduler() throws Exception {
         CacheManagerPlugin plugin =
                 new CacheManagerPlugin(
-                        countingCacheService(new AtomicInteger()), new WebsiteKvService(() -> { throw new IllegalStateException("Database is unavailable in this test"); }));
+                        countingCacheService(new AtomicInteger()), new WebsiteKvService(() -> {
+                    throw new IllegalStateException("Database is unavailable in this test");
+                }));
 
         assertTrue(plugin.autoStart());
         assertFalse(plugin.isStarted());
@@ -312,33 +353,6 @@ public class PluginLifecycleContractTest {
         assertEquals(1, refreshCount.get());
     }
 
-    private static String captured(ByteArrayOutputStream outputCapture) {
-        return new String(outputCapture.toByteArray(), StandardCharsets.UTF_8);
-    }
-
-    private static byte[] repeatedAsciiBytes(int length, char value) {
-        byte[] bytes = new byte[length];
-        Arrays.fill(bytes, (byte) value);
-        return bytes;
-    }
-
-    private static ScheduledExecutorService scheduler(PluginConsole console) throws Exception {
-        Field scheduler = PluginConsole.class.getDeclaredField("scheduler");
-        scheduler.setAccessible(true);
-        return (ScheduledExecutorService) scheduler.get(console);
-    }
-
-    private static void waitUntil(BooleanSupplier condition) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 2_000;
-        while (System.currentTimeMillis() < deadline) {
-            if (condition.getAsBoolean()) {
-                return;
-            }
-            Thread.sleep(25);
-        }
-        throw new AssertionError("Timed out waiting for async plugin lifecycle action");
-    }
-
     private static class TestZrLogConfig extends ZrLogConfig {
 
         private final CacheService cacheService;
@@ -350,6 +364,21 @@ public class PluginLifecycleContractTest {
         TestZrLogConfig(CacheService cacheService) throws Exception {
             super(19083, null, "/");
             this.cacheService = cacheService;
+        }
+
+        private static CacheService nullCacheService() {
+            return (CacheService) java.lang.reflect.Proxy.newProxyInstance(
+                    PluginLifecycleContractTest.class.getClassLoader(),
+                    new Class[]{CacheService.class},
+                    (proxy, method, args) -> {
+                        if ("getCurrentSqlVersion".equals(method.getName()) || "getWebSiteVersion".equals(method.getName())) {
+                            return 0L;
+                        }
+                        if ("toString".equals(method.getName())) {
+                            return "CacheServiceProxy";
+                        }
+                        return null;
+                    });
         }
 
         @Override
@@ -385,39 +414,5 @@ public class PluginLifecycleContractTest {
         public List<IPlugin> getBasePluginList() {
             return new Plugins();
         }
-
-        private static CacheService nullCacheService() {
-            return (CacheService) java.lang.reflect.Proxy.newProxyInstance(
-                    PluginLifecycleContractTest.class.getClassLoader(),
-                    new Class[]{CacheService.class},
-                    (proxy, method, args) -> {
-                        if ("getCurrentSqlVersion".equals(method.getName()) || "getWebSiteVersion".equals(method.getName())) {
-                            return 0L;
-                        }
-                        if ("toString".equals(method.getName())) {
-                            return "CacheServiceProxy";
-                        }
-                        return null;
-                    });
-        }
-    }
-
-    private static CacheService countingCacheService(AtomicInteger refreshCount) {
-        return (CacheService) java.lang.reflect.Proxy.newProxyInstance(
-                PluginLifecycleContractTest.class.getClassLoader(),
-                new Class[]{CacheService.class},
-                (proxy, method, args) -> {
-                    if ("refreshInitData".equals(method.getName())) {
-                        refreshCount.incrementAndGet();
-                        return new BaseDataInitVO();
-                    }
-                    if ("getCurrentSqlVersion".equals(method.getName()) || "getWebSiteVersion".equals(method.getName())) {
-                        return 0L;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "CountingCacheServiceProxy";
-                    }
-                    return null;
-                });
     }
 }

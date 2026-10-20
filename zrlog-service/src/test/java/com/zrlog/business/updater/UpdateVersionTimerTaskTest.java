@@ -1,8 +1,8 @@
 package com.zrlog.business.updater;
 
-import com.zrlog.common.vo.Version;
 import com.zrlog.common.updater.UpdateChannel;
 import com.zrlog.common.updater.UpdateVersionCheckResult;
+import com.zrlog.common.vo.Version;
 import org.junit.Test;
 
 import java.util.Date;
@@ -10,10 +10,16 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class UpdateVersionTimerTaskTest {
+
+    private static Version version(String value) {
+        Version version = new Version();
+        version.setVersion(value);
+        version.setBuildId("build");
+        version.setBuildDate(new Date(1_000));
+        return version;
+    }
 
     @Test
     public void shouldExposeSelectedChannelAndVersionToConsumers() {
@@ -36,8 +42,11 @@ public class UpdateVersionTimerTaskTest {
         java.util.concurrent.atomic.AtomicBoolean fail = new java.util.concurrent.atomic.AtomicBoolean();
         Version version = version("4.0.0");
         UpdateVersionTimerTask task = new UpdateVersionTimerTask(false, "zh_CN") {
-            @Override protected UpdateVersionCheckResult fetchLastVersion(boolean preview) throws java.io.IOException {
-                if (fail.get()) { throw new java.io.IOException("metadata unavailable"); }
+            @Override
+            protected UpdateVersionCheckResult fetchLastVersion(boolean preview) throws java.io.IOException {
+                if (fail.get()) {
+                    throw new java.io.IOException("metadata unavailable");
+                }
                 return new UpdateVersionCheckResult(version, UpdateChannel.RELEASE, true);
             }
         };
@@ -50,14 +59,6 @@ public class UpdateVersionTimerTaskTest {
         fail.set(false);
         task.run();
         org.junit.Assert.assertFalse(task.isLastCheckFailed());
-    }
-
-    private static Version version(String value) {
-        Version version = new Version();
-        version.setVersion(value);
-        version.setBuildId("build");
-        version.setBuildDate(new Date(1_000));
-        return version;
     }
 
     private static class FakeUpdateVersionTimerTask extends UpdateVersionTimerTask {

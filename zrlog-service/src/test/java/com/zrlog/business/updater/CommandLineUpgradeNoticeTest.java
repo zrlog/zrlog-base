@@ -11,12 +11,20 @@ import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class CommandLineUpgradeNoticeTest {
+
+    private static String nextNotice(UpdateVersionCheckResult result, Updater updater, Set<String> notifiedUpdates) {
+        return CommandLineUpgradeNotice.nextNotice(result, updater, false, false, false, false, notifiedUpdates);
+    }
+
+    private static UpdateVersionCheckResult result(String versionValue, String buildId, UpdateChannel channel) {
+        Version version = new Version();
+        version.setVersion(versionValue);
+        version.setBuildId(buildId);
+        return new UpdateVersionCheckResult(version, channel, true);
+    }
 
     @Test
     public void shouldBuildReleaseCommandForZipPackage() {
@@ -73,17 +81,6 @@ public class CommandLineUpgradeNoticeTest {
                 notifiedUpdates));
         assertNotNull(nextNotice(result("3.9.1", "next-build", UpdateChannel.RELEASE), updater,
                 notifiedUpdates));
-    }
-
-    private static String nextNotice(UpdateVersionCheckResult result, Updater updater, Set<String> notifiedUpdates) {
-        return CommandLineUpgradeNotice.nextNotice(result, updater, false, false, false, false, notifiedUpdates);
-    }
-
-    private static UpdateVersionCheckResult result(String versionValue, String buildId, UpdateChannel channel) {
-        Version version = new Version();
-        version.setVersion(versionValue);
-        version.setBuildId(buildId);
-        return new UpdateVersionCheckResult(version, channel, true);
     }
 
     private static class TestUpdater implements Updater {

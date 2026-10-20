@@ -24,11 +24,10 @@ import java.util.stream.Collectors;
 
 public class HttpUtil {
     private static final Logger LOGGER = LoggerUtil.getLogger(HttpUtil.class);
-    private final HttpClient httpClient;
-    private HttpClient directHttpClient;
-
     private static final HttpUtil instance = new HttpUtil();
+    private final HttpClient httpClient;
     private final ExecutorService executorService = ThreadUtils.newFixedThreadPool(20);
+    private HttpClient directHttpClient;
 
     private HttpUtil() {
         com.zrlog.util.NetworkProxy.initialize();
@@ -39,12 +38,49 @@ public class HttpUtil {
         return instance;
     }
 
-    /** Reuse the existing client for signed and service-to-service requests. Redirects remain disabled. */
+    public static String buildUserAgent(String appName, String appVersion, String buildId) {
+        String osName = System.getProperty("os.name", "UnknownOS").replaceAll("\\s+", "");
+        String osArch = System.getProperty("os.arch", "UnknownArch").replaceAll("\\s+", "");
+        String javaVendor = System.getProperty("java.vendor", "UnknownVendor").replaceAll("\\s+", "");
+        String javaVersion = System.getProperty("java.version", "UnknownVersion");
+
+        if (EnvKit.isFaaSMode()) {
+            return String.format("Mozilla/5.0 (%s %s) %s/%s build/%s",
+                    osName, osArch, appName, appVersion, buildId);
+        }
+        return String.format("Mozilla/5.0 (%s %s; %s) Java/%s %s/%s build/%s",
+                osName, osArch, javaVendor, javaVersion, appName, appVersion, buildId);
+    }
+
+    public static String getUserAgent() {
+        return buildUserAgent("ZrLog", BlogBuildInfoUtil.getVersion(), BlogBuildInfoUtil.getBuildId());
+    }
+
+    private static URI getUri(String urlPath, Map<String, String[]> requestParam) {
+        if (requestParam.isEmpty()) {
+            return URI.create(urlPath);
+        }
+        String queryStr = mapToQueryStr(requestParam);
+        if (urlPath.contains("?")) {
+            return URI.create(urlPath + "&" + queryStr);
+        }
+        return URI.create(urlPath + "?" + queryStr);
+    }
+
+    private static String mapToQueryStr(Map<String, String[]> params) {
+        return params.entrySet().stream().flatMap(entry -> Arrays.stream(entry.getValue()).map(value -> entry.getKey() + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8))).collect(Collectors.joining("&"));
+    }
+
+    /**
+     * Reuse the existing client for signed and service-to-service requests. Redirects remain disabled.
+     */
     public HttpResponse<String> sendRequest(HttpRequest request) throws IOException, InterruptedException {
         return sendRequest(request, httpClient);
     }
 
-    /** Deployment-internal control requests bypass application and JVM proxies. */
+    /**
+     * Deployment-internal control requests bypass application and JVM proxies.
+     */
     public HttpResponse<String> sendDirectRequest(HttpRequest request) throws IOException, InterruptedException {
         return sendRequest(request, directHttpClient());
     }
@@ -70,24 +106,6 @@ public class HttpUtil {
         return client.send(adapted, HttpResponse.BodyHandlers.ofString());
     }
 
-    public static String buildUserAgent(String appName, String appVersion, String buildId) {
-        String osName = System.getProperty("os.name", "UnknownOS").replaceAll("\\s+", "");
-        String osArch = System.getProperty("os.arch", "UnknownArch").replaceAll("\\s+", "");
-        String javaVendor = System.getProperty("java.vendor", "UnknownVendor").replaceAll("\\s+", "");
-        String javaVersion = System.getProperty("java.version", "UnknownVersion");
-
-        if (EnvKit.isFaaSMode()) {
-            return String.format("Mozilla/5.0 (%s %s) %s/%s build/%s",
-                    osName, osArch, appName, appVersion, buildId);
-        }
-        return String.format("Mozilla/5.0 (%s %s; %s) Java/%s %s/%s build/%s",
-                osName, osArch, javaVendor, javaVersion, appName, appVersion, buildId);
-    }
-
-    public static String getUserAgent() {
-        return buildUserAgent("ZrLog", BlogBuildInfoUtil.getVersion(), BlogBuildInfoUtil.getBuildId());
-    }
-
     public void closeHttpClient() {
         this.executorService.shutdown();
         //close thread
@@ -95,17 +113,6 @@ public class HttpUtil {
             if (t.getName().matches("HttpClient-.*-SelectorManager"))
                 t.interrupt();
         });
-    }
-
-    private static URI getUri(String urlPath, Map<String, String[]> requestParam) {
-        if (requestParam.isEmpty()) {
-            return URI.create(urlPath);
-        }
-        String queryStr = mapToQueryStr(requestParam);
-        if (urlPath.contains("?")) {
-            return URI.create(urlPath + "&" + queryStr);
-        }
-        return URI.create(urlPath + "?" + queryStr);
     }
 
     public <T> HttpHandle<T> sendGetRequest(String urlPath, Map<String, String[]> requestParam, HttpHandle<T> httpHandle, Map<String, String> reqHeaders) throws IOException, InterruptedException, URISyntaxException {
@@ -135,10 +142,6 @@ public class HttpUtil {
         HttpRequest request = builder.build();
         HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
         return handleResponse(httpHandle, request, response);
-    }
-
-    private static String mapToQueryStr(Map<String, String[]> params) {
-        return params.entrySet().stream().flatMap(entry -> Arrays.stream(entry.getValue()).map(value -> entry.getKey() + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8))).collect(Collectors.joining("&"));
     }
 
     private void setHttpHeaders(HttpRequest.Builder requestBuilder, Map<String, String> headers) {

@@ -9,10 +9,10 @@ import java.util.Objects;
  */
 public class AdminTokenThreadLocal {
 
+    private static final ThreadLocal<AdminTokenVO> userThreadLocal = new ThreadLocal<>();
+
     private AdminTokenThreadLocal() {
     }
-
-    private static final ThreadLocal<AdminTokenVO> userThreadLocal = new ThreadLocal<>();
 
     public static AdminTokenVO getUser() {
         return userThreadLocal.get();
@@ -31,13 +31,18 @@ public class AdminTokenThreadLocal {
         }
     }
 
-    /** Explicitly carries a request identity into a worker; restores any previous context afterwards. */
+    /**
+     * Explicitly carries a request identity into a worker; restores any previous context afterwards.
+     */
     public static <T> T withUser(AdminTokenVO user, java.util.concurrent.Callable<T> task) throws Exception {
         AdminTokenVO previous = userThreadLocal.get();
-        if (user == null) userThreadLocal.remove(); else userThreadLocal.set(user);
-        try { return task.call(); }
-        finally {
-            if (previous == null) userThreadLocal.remove(); else userThreadLocal.set(previous);
+        if (user == null) userThreadLocal.remove();
+        else userThreadLocal.set(user);
+        try {
+            return task.call();
+        } finally {
+            if (previous == null) userThreadLocal.remove();
+            else userThreadLocal.set(previous);
         }
     }
 

@@ -11,7 +11,6 @@ import com.zrlog.business.version.UpgradeVersionHandler;
 import com.zrlog.business.version.UpgradeVersionHandlerHelpers;
 import com.zrlog.common.CacheService;
 import com.zrlog.model.WebSite;
-
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
@@ -51,11 +50,6 @@ public class DbUpgradeService {
         this.currentSqlVersion = currentSqlVersion;
     }
 
-    @AssistedFactory
-    public interface Factory {
-        DbUpgradeService create(long currentSqlVersion);
-    }
-
     static String resolveDbName(String jdbcUrl) {
         if (StringUtils.isEmpty(jdbcUrl)) {
             return "";
@@ -85,7 +79,6 @@ public class DbUpgradeService {
         }
         return urlWithoutParams;
     }
-
 
     private static Map<Integer, String> getSqlFileList() {
         Map<Integer, String> fileList = new LinkedHashMap<>();
@@ -205,5 +198,10 @@ public class DbUpgradeService {
             }
         }
         return false;
+    }
+
+    @AssistedFactory
+    public interface Factory {
+        DbUpgradeService create(long currentSqlVersion);
     }
 }

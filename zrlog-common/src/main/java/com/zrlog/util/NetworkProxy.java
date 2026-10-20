@@ -6,22 +6,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
-import java.net.InetSocketAddress;
-import java.net.Proxy;
-import java.net.ProxySelector;
-import java.net.SocketAddress;
-import java.net.URI;
+import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
-/** Startup configuration, available before any WebAPI database connection. */
+/**
+ * Startup configuration, available before any WebAPI database connection.
+ */
 public final class NetworkProxy {
     public static final String URL_KEY = "network.proxy.url";
     public static final String NO_PROXY_KEY = "network.proxy.noProxy";
@@ -32,7 +25,8 @@ public final class NetworkProxy {
     private static final String LOOPBACK = "localhost|127.*|[::1]|[::ffff:127.*";
     private static Settings effective;
 
-    private NetworkProxy() { }
+    private NetworkProxy() {
+    }
 
     public static synchronized Settings initialize() {
         if (effective == null) {
@@ -71,7 +65,9 @@ public final class NetworkProxy {
         save(configFile(), url, noProxy);
     }
 
-    /** Resolve pending file values with environment overrides, without changing the running process. */
+    /**
+     * Resolve pending file values with environment overrides, without changing the running process.
+     */
     public static Settings preview(String url, String noProxy) {
         return resolve(System.getenv(), updatedFile(new Properties(), url, noProxy));
     }
@@ -174,7 +170,13 @@ public final class NetworkProxy {
         private final String url;
         private final String host;
         private final int port;
-        private Endpoint(String url, String host, int port) { this.url = url; this.host = host; this.port = port; }
+
+        private Endpoint(String url, String host, int port) {
+            this.url = url;
+            this.host = host;
+            this.port = port;
+        }
+
         private Proxy proxy() {
             if (url.isEmpty()) return Proxy.NO_PROXY;
             String address = host.startsWith("[") ? host.substring(1, host.length() - 1) : host;
@@ -196,49 +198,16 @@ public final class NetworkProxy {
 
         private Settings(Endpoint http, Endpoint https, String noProxy, String source, String httpsSource, String noProxySource,
                          String httpVariable, String httpsVariable, String noProxyVariable, String bypass) {
-            this.http = http; this.https = https; this.noProxy = noProxy;
-            this.source = source; this.httpsSource = httpsSource; this.noProxySource = noProxySource;
-            this.httpVariable = httpVariable; this.httpsVariable = httpsVariable; this.noProxyVariable = noProxyVariable;
+            this.http = http;
+            this.https = https;
+            this.noProxy = noProxy;
+            this.source = source;
+            this.httpsSource = httpsSource;
+            this.noProxySource = noProxySource;
+            this.httpVariable = httpVariable;
+            this.httpsVariable = httpsVariable;
+            this.noProxyVariable = noProxyVariable;
             this.bypass = bypass;
-        }
-
-        public String getUrl() { return http.url; }
-        public String getHttpsUrl() { return https.url; }
-        public String getNoProxy() { return noProxy; }
-        public String getSource() { return source; }
-        public String getHttpsSource() { return httpsSource; }
-        public String getNoProxySource() { return noProxySource; }
-        public String getHttpVariable() { return httpVariable; }
-        public String getHttpsVariable() { return httpsVariable; }
-        public String getNoProxyVariable() { return noProxyVariable; }
-        public boolean isEnabled() { return !http.url.isEmpty() || !https.url.isEmpty(); }
-
-        public boolean samePolicy(Settings other) {
-            return http.url.equals(other.http.url) && https.url.equals(other.https.url) && bypass.equals(other.bypass)
-                    && "default".equals(source) == "default".equals(other.source)
-                    && "default".equals(httpsSource) == "default".equals(other.httpsSource);
-        }
-
-        /** Builds a client selector for these settings without replacing the global proxy selector. */
-        public ProxySelector proxySelector() {
-            ProxySelector inherited = ProxySelector.getDefault();
-            return new ProxySelector() {
-                @Override public List<Proxy> select(URI uri) {
-                    if (uri == null) throw new IllegalArgumentException("URI is required");
-                    boolean secure = "https".equalsIgnoreCase(uri.getScheme());
-                    if (!(secure || "http".equalsIgnoreCase(uri.getScheme()))) return List.of(Proxy.NO_PROXY);
-                    String destination = uri.getHost();
-                    if (destination == null) return List.of(Proxy.NO_PROXY);
-                    for (String pattern : bypass.split("\\|")) {
-                        if (matchesHost(destination, pattern)) return List.of(Proxy.NO_PROXY);
-                    }
-                    if ("default".equals(secure ? httpsSource : source) && inherited != null) return inherited.select(uri);
-                    return List.of((secure ? https : http).proxy());
-                }
-                @Override public void connectFailed(URI uri, SocketAddress address, IOException error) {
-                    // Deliberately no direct fallback when a configured proxy fails.
-                }
-            };
         }
 
         private static boolean matchesHost(String destination, String pattern) {
@@ -252,6 +221,80 @@ public final class NetworkProxy {
             if (prefix) return host.endsWith(literal);
             if (suffix) return host.startsWith(literal);
             return host.equals(literal);
+        }
+
+        public String getUrl() {
+            return http.url;
+        }
+
+        public String getHttpsUrl() {
+            return https.url;
+        }
+
+        public String getNoProxy() {
+            return noProxy;
+        }
+
+        public String getSource() {
+            return source;
+        }
+
+        public String getHttpsSource() {
+            return httpsSource;
+        }
+
+        public String getNoProxySource() {
+            return noProxySource;
+        }
+
+        public String getHttpVariable() {
+            return httpVariable;
+        }
+
+        public String getHttpsVariable() {
+            return httpsVariable;
+        }
+
+        public String getNoProxyVariable() {
+            return noProxyVariable;
+        }
+
+        public boolean isEnabled() {
+            return !http.url.isEmpty() || !https.url.isEmpty();
+        }
+
+        public boolean samePolicy(Settings other) {
+            return http.url.equals(other.http.url) && https.url.equals(other.https.url) && bypass.equals(other.bypass)
+                    && "default".equals(source) == "default".equals(other.source)
+                    && "default".equals(httpsSource) == "default".equals(other.httpsSource);
+        }
+
+        /**
+         * Builds a client selector for these settings without replacing the global proxy selector.
+         */
+        public ProxySelector proxySelector() {
+            ProxySelector inherited = ProxySelector.getDefault();
+            return new ProxySelector() {
+                @Override
+                public List<Proxy> select(URI uri) {
+                    if (uri == null) throw new IllegalArgumentException("URI is required");
+                    boolean secure = "https".equalsIgnoreCase(uri.getScheme());
+                    if (!(secure || "http".equalsIgnoreCase(uri.getScheme()))) return List.of(Proxy.NO_PROXY);
+                    String destination = uri.getHost();
+                    if (destination == null) return List.of(Proxy.NO_PROXY);
+                    for (String pattern : bypass.split("\\|")) {
+                        if (matchesHost(destination, pattern)) return List.of(Proxy.NO_PROXY);
+                    }
+                    if ("default".equals(secure ? httpsSource : source) && inherited != null)
+                        return inherited.select(uri);
+                    return List.of((secure ? https : http).proxy());
+                }
+
+                @Override
+                public void connectFailed(URI uri, SocketAddress address, IOException error) {
+                    // Deliberately no direct fallback when a configured proxy fails.
+                }
+            };
         }
 
         private Map<String, String> systemProperties() {

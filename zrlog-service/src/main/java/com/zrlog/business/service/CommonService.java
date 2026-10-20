@@ -5,7 +5,6 @@ import com.zrlog.business.rest.response.PublicInfoVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.ZrLogUtil;
-
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 

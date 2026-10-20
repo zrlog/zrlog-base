@@ -7,12 +7,7 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.net.InetAddress;
-import java.net.Proxy;
-import java.net.ProxySelector;
-import java.net.ServerSocket;
-import java.net.SocketAddress;
-import java.net.URI;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,7 +21,29 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.*;
 
 public class DataSourceUtilProxyTest {
-    @Rule public TemporaryFolder temporary = new TemporaryFolder();
+    @Rule
+    public TemporaryFolder temporary = new TemporaryFolder();
+
+    private static void receiveRequests(ServerSocket proxy, CompletableFuture<List<String>> result) {
+        try {
+            List<String> requests = new ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                try (var connection = proxy.accept()) {
+                    connection.setSoTimeout(3000);
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.US_ASCII));
+                    requests.add(reader.readLine());
+                    String line;
+                    while ((line = reader.readLine()) != null && !line.isEmpty()) {
+                    }
+                    connection.getOutputStream().write(("HTTP/1.1 502 Bad Gateway\r\n"
+                            + "Content-Length: 0\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+                }
+            }
+            result.complete(requests);
+        } catch (Exception error) {
+            result.completeExceptionally(error);
+        }
+    }
 
     @Test(timeout = 30000)
     public void connectionChecksAndQueriesUseTheActiveProxyIndependentlyOfTheGlobalSelector() throws Exception {
@@ -67,36 +84,20 @@ public class DataSourceUtilProxyTest {
         }
     }
 
-    private static void receiveRequests(ServerSocket proxy, CompletableFuture<List<String>> result) {
-        try {
-            List<String> requests = new ArrayList<>();
-            for (int i = 0; i < 2; i++) {
-                try (var connection = proxy.accept()) {
-                    connection.setSoTimeout(3000);
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.US_ASCII));
-                    requests.add(reader.readLine());
-                    String line;
-                    while ((line = reader.readLine()) != null && !line.isEmpty()) { }
-                    connection.getOutputStream().write(("HTTP/1.1 502 Bad Gateway\r\n"
-                            + "Content-Length: 0\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
-                }
-            }
-            result.complete(requests);
-        } catch (Exception error) {
-            result.completeExceptionally(error);
-        }
-    }
-
     public static final class Probe {
         public static void main(String[] args) throws Exception {
             PathUtil.setRootPath(args[0]);
             NetworkProxy.initialize();
             NetworkProxy.save("http://pending.invalid:3128", "");
             ProxySelector.setDefault(new ProxySelector() {
-                @Override public List<Proxy> select(URI uri) {
+                @Override
+                public List<Proxy> select(URI uri) {
                     throw new AssertionError("WebAPI used the global selector instead of the active application proxy");
                 }
-                @Override public void connectFailed(URI uri, SocketAddress address, java.io.IOException error) { }
+
+                @Override
+                public void connectFailed(URI uri, SocketAddress address, java.io.IOException error) {
+                }
             });
             Properties properties = new Properties();
             properties.setProperty("jdbcUrl", "jdbc:webapi://database.invalid:443/query");

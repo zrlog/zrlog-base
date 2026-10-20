@@ -59,6 +59,55 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
         this.token = UUID.randomUUID().toString().replace("-", "");
     }
 
+    private static boolean waitToStarted(String pluginServerBaseUrl, String token, int retryCount) {
+        if (retryCount < 0) {
+            LOGGER.severe("plugin-core readiness check has no attempts remaining");
+            return false;
+        }
+        int seek = 1000;
+        Exception lastFailure = null;
+        for (int remainingRetries = retryCount; remainingRetries >= 0; remainingRetries--) {
+            try {
+                HttpHandle<PluginStatusResponse> httpHandle = HttpUtil.getInstance().sendGetRequest(
+                        pluginServerBaseUrl + "/api/status?token=" + token,
+                        new HttpResponseJsonHandle<>(PluginStatusResponse.class), new ConcurrentHashMap<>());
+                PluginStatusResponse statusResponse = httpHandle.getT();
+                if (Objects.nonNull(statusResponse) && Objects.nonNull(statusResponse.getStatus())) {
+                    if (Constants.debugLoggerPrintAble()) {
+                        LOGGER.info("Plugin status: " + new Gson().toJson(statusResponse));
+                    }
+                    if (Objects.equals(statusResponse.getStatus(), PluginCoreStatus.STARTED)) {
+                        return true;
+                    }
+                } else {
+                    lastFailure = new IllegalStateException("plugin-core status response is missing status");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LOGGER.log(Level.WARNING, "plugin-core readiness check interrupted", e);
+                return false;
+            } catch (Exception e) {
+                lastFailure = e;
+            }
+            if (remainingRetries == 0) {
+                break;
+            }
+            try {
+                Thread.sleep(seek);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LOGGER.log(Level.WARNING, "plugin-core readiness wait interrupted", e);
+                return false;
+            }
+        }
+        if (Objects.isNull(lastFailure)) {
+            LOGGER.severe("plugin-core readiness timed out at " + pluginServerBaseUrl);
+        } else {
+            LOGGER.log(Level.WARNING, "plugin-core readiness failed at " + pluginServerBaseUrl, lastFailure);
+        }
+        return false;
+    }
+
     @Override
     public boolean autoStart() {
         return !EnvKit.isFaaSMode();
@@ -309,54 +358,5 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
 
     boolean waitToStarted(String pluginServerBaseUrl, String token) {
         return waitToStarted(pluginServerBaseUrl, token, 360);
-    }
-
-    private static boolean waitToStarted(String pluginServerBaseUrl, String token, int retryCount) {
-        if (retryCount < 0) {
-            LOGGER.severe("plugin-core readiness check has no attempts remaining");
-            return false;
-        }
-        int seek = 1000;
-        Exception lastFailure = null;
-        for (int remainingRetries = retryCount; remainingRetries >= 0; remainingRetries--) {
-            try {
-                HttpHandle<PluginStatusResponse> httpHandle = HttpUtil.getInstance().sendGetRequest(
-                        pluginServerBaseUrl + "/api/status?token=" + token,
-                        new HttpResponseJsonHandle<>(PluginStatusResponse.class), new ConcurrentHashMap<>());
-                PluginStatusResponse statusResponse = httpHandle.getT();
-                if (Objects.nonNull(statusResponse) && Objects.nonNull(statusResponse.getStatus())) {
-                    if (Constants.debugLoggerPrintAble()) {
-                        LOGGER.info("Plugin status: " + new Gson().toJson(statusResponse));
-                    }
-                    if (Objects.equals(statusResponse.getStatus(), PluginCoreStatus.STARTED)) {
-                        return true;
-                    }
-                } else {
-                    lastFailure = new IllegalStateException("plugin-core status response is missing status");
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                LOGGER.log(Level.WARNING, "plugin-core readiness check interrupted", e);
-                return false;
-            } catch (Exception e) {
-                lastFailure = e;
-            }
-            if (remainingRetries == 0) {
-                break;
-            }
-            try {
-                Thread.sleep(seek);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                LOGGER.log(Level.WARNING, "plugin-core readiness wait interrupted", e);
-                return false;
-            }
-        }
-        if (Objects.isNull(lastFailure)) {
-            LOGGER.severe("plugin-core readiness timed out at " + pluginServerBaseUrl);
-        } else {
-            LOGGER.log(Level.WARNING, "plugin-core readiness failed at " + pluginServerBaseUrl, lastFailure);
-        }
-        return false;
     }
 }

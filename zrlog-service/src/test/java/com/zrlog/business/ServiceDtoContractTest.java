@@ -6,13 +6,7 @@ import com.zrlog.business.exception.MissingInstallException;
 import com.zrlog.business.plugin.RequestInfo;
 import com.zrlog.business.plugin.type.StaticSiteType;
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
-import com.zrlog.business.rest.response.CheckVersionResponse;
-import com.zrlog.business.rest.response.PluginCoreStatus;
-import com.zrlog.business.rest.response.PluginStatusResponse;
-import com.zrlog.business.rest.response.PreCheckVersionResponse;
-import com.zrlog.business.rest.response.BackupProtectionStatus;
-import com.zrlog.business.rest.response.PublicInfoVO;
-import com.zrlog.business.rest.response.UpgradeProcessResponse;
+import com.zrlog.business.rest.response.*;
 import com.zrlog.common.exception.AbstractBusinessException;
 import com.zrlog.common.exception.ArgsException;
 import com.zrlog.common.vo.Version;
@@ -25,76 +19,9 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class ServiceDtoContractTest {
-
-    //TODO: Add fixture-backed tests for plugin runtime, upgrade services, and DAO-backed KV writes.
-    // Those paths depend on DAO state, subprocesses, plugin runtime, or network/update artifacts.
-    @Test
-    public void shouldExposeBeanStyleServiceDtos() throws Exception {
-        assertBeanProperties(StoredUpgradeNotice.class);
-        assertBeanProperties(UpgradeWebSiteInfo.class);
-        assertBeanProperties(CheckVersionResponse.class);
-        assertBeanProperties(PluginStatusResponse.class);
-        assertBeanProperties(PreCheckVersionResponse.class);
-        assertBeanProperties(BackupProtectionStatus.class);
-        assertBeanProperties(RequestInfo.class);
-    }
-
-    @Test
-    public void shouldValidateUpgradeWebsiteInfo() {
-        UpgradeWebSiteInfo info = new UpgradeWebSiteInfo();
-
-        assertThrows(ArgsException.class, info::doValid);
-
-        info.setAutoUpgradeVersion(86400);
-        info.doValid();
-        assertEquals(Integer.valueOf(86400), info.getAutoUpgradeVersion());
-    }
-
-    @Test
-    public void shouldExposeConstructorOnlyResponses() {
-        PublicInfoVO publicInfo = new PublicInfoVO(
-                "3.6.0",
-                "ZrLog",
-                "https://example.com",
-                true,
-                "#1677ff",
-                "#ffffff",
-                "app-id");
-        UpgradeProcessResponse upgradeProcess = new UpgradeProcessResponse(false, "running");
-
-        assertEquals("3.6.0", publicInfo.getCurrentVersion());
-        assertEquals("ZrLog", publicInfo.getWebsiteTitle());
-        assertEquals("https://example.com", publicInfo.getHomeUrl());
-        assertEquals(true, publicInfo.getAdmin_darkMode());
-        assertEquals("#1677ff", publicInfo.getAdmin_color_primary());
-        assertEquals("#ffffff", publicInfo.getPwaThemeColor());
-        assertEquals("app-id", publicInfo.getAppId());
-
-        assertEquals(false, upgradeProcess.getFinish());
-        assertEquals("running", upgradeProcess.getMessage());
-        upgradeProcess.setFinish(true);
-        upgradeProcess.setMessage("done");
-        assertEquals(true, upgradeProcess.getFinish());
-        assertEquals("done", upgradeProcess.getMessage());
-    }
-
-    @Test
-    public void shouldExposeEnumsAndBusinessExceptions() {
-        assertEquals(PluginCoreStatus.STARTED, PluginCoreStatus.valueOf("STARTED"));
-        assertEquals(PluginCoreStatus.STARTING, PluginCoreStatus.valueOf("STARTING"));
-        assertEquals(StaticSiteType.BLOG, StaticSiteType.valueOf("BLOG"));
-        assertEquals(StaticSiteType.ADMIN, StaticSiteType.valueOf("ADMIN"));
-
-        assertException(new DownloadUpgradeFileException(), 9026);
-        assertException(new DownloadUpgradeFileException(new IllegalStateException("boom")), 9026);
-        assertException(new MissingInstallException(), 9029);
-    }
 
     private static void assertException(AbstractBusinessException exception, int error) {
         assertEquals(error, exception.getError());
@@ -185,5 +112,69 @@ public class ServiceDtoContractTest {
         Constructor<?> constructor = type.getDeclaredConstructor();
         constructor.setAccessible(true);
         return constructor.newInstance();
+    }
+
+    //TODO: Add fixture-backed tests for plugin runtime, upgrade services, and DAO-backed KV writes.
+    // Those paths depend on DAO state, subprocesses, plugin runtime, or network/update artifacts.
+    @Test
+    public void shouldExposeBeanStyleServiceDtos() throws Exception {
+        assertBeanProperties(StoredUpgradeNotice.class);
+        assertBeanProperties(UpgradeWebSiteInfo.class);
+        assertBeanProperties(CheckVersionResponse.class);
+        assertBeanProperties(PluginStatusResponse.class);
+        assertBeanProperties(PreCheckVersionResponse.class);
+        assertBeanProperties(BackupProtectionStatus.class);
+        assertBeanProperties(RequestInfo.class);
+    }
+
+    @Test
+    public void shouldValidateUpgradeWebsiteInfo() {
+        UpgradeWebSiteInfo info = new UpgradeWebSiteInfo();
+
+        assertThrows(ArgsException.class, info::doValid);
+
+        info.setAutoUpgradeVersion(86400);
+        info.doValid();
+        assertEquals(Integer.valueOf(86400), info.getAutoUpgradeVersion());
+    }
+
+    @Test
+    public void shouldExposeConstructorOnlyResponses() {
+        PublicInfoVO publicInfo = new PublicInfoVO(
+                "3.6.0",
+                "ZrLog",
+                "https://example.com",
+                true,
+                "#1677ff",
+                "#ffffff",
+                "app-id");
+        UpgradeProcessResponse upgradeProcess = new UpgradeProcessResponse(false, "running");
+
+        assertEquals("3.6.0", publicInfo.getCurrentVersion());
+        assertEquals("ZrLog", publicInfo.getWebsiteTitle());
+        assertEquals("https://example.com", publicInfo.getHomeUrl());
+        assertEquals(true, publicInfo.getAdmin_darkMode());
+        assertEquals("#1677ff", publicInfo.getAdmin_color_primary());
+        assertEquals("#ffffff", publicInfo.getPwaThemeColor());
+        assertEquals("app-id", publicInfo.getAppId());
+
+        assertEquals(false, upgradeProcess.getFinish());
+        assertEquals("running", upgradeProcess.getMessage());
+        upgradeProcess.setFinish(true);
+        upgradeProcess.setMessage("done");
+        assertEquals(true, upgradeProcess.getFinish());
+        assertEquals("done", upgradeProcess.getMessage());
+    }
+
+    @Test
+    public void shouldExposeEnumsAndBusinessExceptions() {
+        assertEquals(PluginCoreStatus.STARTED, PluginCoreStatus.valueOf("STARTED"));
+        assertEquals(PluginCoreStatus.STARTING, PluginCoreStatus.valueOf("STARTING"));
+        assertEquals(StaticSiteType.BLOG, StaticSiteType.valueOf("BLOG"));
+        assertEquals(StaticSiteType.ADMIN, StaticSiteType.valueOf("ADMIN"));
+
+        assertException(new DownloadUpgradeFileException(), 9026);
+        assertException(new DownloadUpgradeFileException(new IllegalStateException("boom")), 9026);
+        assertException(new MissingInstallException(), 9029);
     }
 }

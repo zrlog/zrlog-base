@@ -15,16 +15,19 @@ public class Constants {
     public static final String API_PUBLIC_ADMIN_RESOURCE = "/api/public/adminResource";
     public static final String API_PUBLIC_VERSION = "/api/public/version";
     public static final String TEMPLATE_BASE_PATH = "/include/templates/";
-    public static String getDefaultTemplatePath() { return BundledThemes.getInstance().defaultPath(); }
     public static final String ATTACHED_FOLDER = "/attached/";
     public static final String TEMPLATE_CONFIG_STR_KEY = "configStr";
     public static final String DATE_FORMAT_PATTERN = "yyyy-MM-dd HH:mm:ssXXX";
-    private static volatile long lastAccessTime = System.currentTimeMillis();
     public static final String DEFAULT_LANGUAGE = "zh_CN";
     public static final String MYSQL_JDBC_PARAMS = "characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=GMT";
+    private static volatile long lastAccessTime = System.currentTimeMillis();
 
     static {
         init();
+    }
+
+    public static String getDefaultTemplatePath() {
+        return BundledThemes.getInstance().defaultPath();
     }
 
     public static long getLastAccessTime() {

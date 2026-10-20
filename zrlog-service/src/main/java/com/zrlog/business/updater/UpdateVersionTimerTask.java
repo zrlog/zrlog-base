@@ -29,16 +29,12 @@ import java.util.logging.Logger;
 public class UpdateVersionTimerTask extends TimerTask {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(UpdateVersionTimerTask.class);
-    private Version version;
-    private volatile boolean lastCheckFailed;
-
-    public boolean isLastCheckFailed() { return lastCheckFailed; }
-
     private final boolean previewAble;
     private final String lang;
     private final Consumer<Version> versionConsumer;
     private final Consumer<UpdateVersionCheckResult> checkResultConsumer;
-
+    private Version version;
+    private volatile boolean lastCheckFailed;
     public UpdateVersionTimerTask(boolean previewAble, String lang) {
         this(previewAble, lang, version -> {
         });
@@ -59,6 +55,15 @@ public class UpdateVersionTimerTask extends TimerTask {
 
     public static boolean isHtml(String str) {
         return str.startsWith("<!DOCTYPE html>") || str.startsWith("<html>");
+    }
+
+    private static String getJsonFilename() {
+        return ZrLogUtil.isDockerMode() ? BlogBuildInfoUtil.getDockerUpdateVersionJsonFilename()
+                : BlogBuildInfoUtil.getUpdateVersionJsonFilename();
+    }
+
+    public boolean isLastCheckFailed() {
+        return lastCheckFailed;
     }
 
     private String getChangeLog(String version, Date releaseDate, String buildId, Map<String, Object> res) {
@@ -111,18 +116,16 @@ public class UpdateVersionTimerTask extends TimerTask {
         try {
             result = com.zrlog.updater.spi.UpdateCatalogs.getInstance().checkVersion(context.build(), preview,
                     value -> ZrLogUtil.greatThenCurrentVersion(value.getBuildId(), value.getBuildDate(), value.getVersion()));
-        } catch (IOException | InterruptedException | ParseException e) { throw e; }
-        catch (Exception e) { throw new IOException("Unable to check update manifest", e); }
+        } catch (IOException | InterruptedException | ParseException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IOException("Unable to check update manifest", e);
+        }
         Version selected = result.getVersion();
         Map<String, Object> resources = I18nUtil.getBackend();
         selected.setChangeLog(lang == null || resources == null ? ""
                 : getChangeLog(selected.getVersion(), selected.getBuildDate(), selected.getBuildId(), resources));
         return result;
-    }
-
-    private static String getJsonFilename() {
-        return ZrLogUtil.isDockerMode() ? BlogBuildInfoUtil.getDockerUpdateVersionJsonFilename()
-                : BlogBuildInfoUtil.getUpdateVersionJsonFilename();
     }
 
     public Version getVersion() {

@@ -26,14 +26,6 @@ final class CommandLineUpgradeNotice {
         this.updater = updater;
     }
 
-    void notifyUpdate(UpdateVersionCheckResult checkResult) {
-        String notice = nextNotice(checkResult, updater, ZrLogUtil.isDockerMode(),
-                ZrLogUtil.isSystemServiceMode(), EnvKit.isFaaSMode(), EnvKit.isDevMode(), notifiedUpdates);
-        if (Objects.nonNull(notice)) {
-            LOGGER.info("\n" + notice);
-        }
-    }
-
     static String nextNotice(UpdateVersionCheckResult checkResult, Updater updater, boolean dockerMode,
                              boolean systemServiceMode, boolean faasMode, boolean devMode,
                              Set<String> notifiedUpdates) {
@@ -81,5 +73,13 @@ final class CommandLineUpgradeNotice {
 
     private static String quote(String path) {
         return "\"" + path.replace("\"", "\\\"") + "\"";
+    }
+
+    void notifyUpdate(UpdateVersionCheckResult checkResult) {
+        String notice = nextNotice(checkResult, updater, ZrLogUtil.isDockerMode(),
+                ZrLogUtil.isSystemServiceMode(), EnvKit.isFaaSMode(), EnvKit.isDevMode(), notifiedUpdates);
+        if (Objects.nonNull(notice)) {
+            LOGGER.info("\n" + notice);
+        }
     }
 }

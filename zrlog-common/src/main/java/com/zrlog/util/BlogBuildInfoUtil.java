@@ -23,6 +23,7 @@ import java.util.logging.Logger;
  */
 public class BlogBuildInfoUtil {
 
+    public static final String BUILD_PROPERTIES_FILE_PATH = "/build.properties";
     private static final Logger LOGGER = LoggerUtil.getLogger(BlogBuildInfoUtil.class);
     private static final String DEFAULT_BUILD_ID = "0000000";
     private static final String DEFAULT_VERSION = "1.0.0-SNAPSHOT";
@@ -31,7 +32,6 @@ public class BlogBuildInfoUtil {
     private static final String DEFAULT_RUNTIME_TYPE = "java";
     private static final String DEFAULT_PACKAGE_TYPE = "zip";
     private static final String DEFAULT_UPDATE_VERSION_JSON_FILENAME = "last.version.json";
-
     /**
      * 目前以git的commitId的前7位标记构建的Id
      */
@@ -45,7 +45,6 @@ public class BlogBuildInfoUtil {
     private static String packageType = DEFAULT_PACKAGE_TYPE;
     private static String updateVersionJsonFilename = DEFAULT_UPDATE_VERSION_JSON_FILENAME;
     private static String dockerUpdateVersionJsonFilename = "last.docker-image.version.json";
-    public static final String BUILD_PROPERTIES_FILE_PATH = "/build.properties";
 
     static {
         Properties properties = new Properties();
@@ -126,33 +125,6 @@ public class BlogBuildInfoUtil {
         updateVersionJsonFilename = buildInfo.updateVersionJsonFilename;
     }
 
-    static final class BuildInfo {
-
-        final String buildId;
-        final String version;
-        final Date time;
-        final String runMode;
-        final String fileArch;
-        final String resourceDownloadUrl;
-        final String runtimeType;
-        final String packageType;
-        final String updateVersionJsonFilename;
-
-        private BuildInfo(String buildId, String version, Date time, String runMode, String fileArch,
-                          String resourceDownloadUrl, String runtimeType, String packageType,
-                          String updateVersionJsonFilename) {
-            this.buildId = buildId;
-            this.version = version;
-            this.time = time;
-            this.runMode = runMode;
-            this.fileArch = fileArch;
-            this.resourceDownloadUrl = resourceDownloadUrl;
-            this.runtimeType = runtimeType;
-            this.packageType = packageType;
-            this.updateVersionJsonFilename = updateVersionJsonFilename;
-        }
-    }
-
     public static String getBuildId() {
         return buildId;
     }
@@ -185,7 +157,9 @@ public class BlogBuildInfoUtil {
         return updateVersionJsonFilename;
     }
 
-    /** Native ZIPs also run inside Docker; keep both manifest names in build.properties. */
+    /**
+     * Native ZIPs also run inside Docker; keep both manifest names in build.properties.
+     */
     public static String getDockerUpdateVersionJsonFilename() {
         return dockerUpdateVersionJsonFilename;
     }
@@ -233,5 +207,32 @@ public class BlogBuildInfoUtil {
 
     public static String getVersionInfoFull() {
         return BlogBuildInfoUtil.getVersion() + " - " + BlogBuildInfoUtil.getBuildId() + " (" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(BlogBuildInfoUtil.getTime()) + ")";
+    }
+
+    static final class BuildInfo {
+
+        final String buildId;
+        final String version;
+        final Date time;
+        final String runMode;
+        final String fileArch;
+        final String resourceDownloadUrl;
+        final String runtimeType;
+        final String packageType;
+        final String updateVersionJsonFilename;
+
+        private BuildInfo(String buildId, String version, Date time, String runMode, String fileArch,
+                          String resourceDownloadUrl, String runtimeType, String packageType,
+                          String updateVersionJsonFilename) {
+            this.buildId = buildId;
+            this.version = version;
+            this.time = time;
+            this.runMode = runMode;
+            this.fileArch = fileArch;
+            this.resourceDownloadUrl = resourceDownloadUrl;
+            this.runtimeType = runtimeType;
+            this.packageType = packageType;
+            this.updateVersionJsonFilename = updateVersionJsonFilename;
+        }
     }
 }

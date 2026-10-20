@@ -3,7 +3,6 @@ package com.zrlog.model;
 import com.hibegin.common.dao.BasePageableDAO;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.common.cache.dto.PluginDTO;
-
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;

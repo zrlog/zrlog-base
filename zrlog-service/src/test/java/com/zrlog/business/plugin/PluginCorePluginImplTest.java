@@ -27,20 +27,141 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class PluginCorePluginImplTest {
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> headerMap(HttpRequest request, AdminTokenVO adminTokenVO) throws Exception {
+        Method method = PluginCorePluginImpl.class.getDeclaredMethod("genHeaderMapByRequest",
+                HttpRequest.class, AdminTokenVO.class);
+        method.setAccessible(true);
+        return (Map<String, String>) method.invoke(new PluginCorePluginImpl(new File("db.properties"), "/blog",
+                () -> 19084, cacheService()::getPublicWebSiteInfo), request, adminTokenVO);
+    }
+
+    private static HttpRequest request(Map<String, String> headers) {
+        Map<String, Object> attributes = new java.util.HashMap<>();
+        ServerConfig serverConfig = new ServerConfig();
+        serverConfig.setPort(19080);
+        return (HttpRequest) Proxy.newProxyInstance(
+                PluginCorePluginImplTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    switch (method.getName()) {
+                        case "getAttr":
+                            return attributes;
+                        case "getHeader":
+                            return headers.get((String) args[0]);
+                        case "getHeaderMap":
+                            return headers;
+                        case "getServerConfig":
+                            return serverConfig;
+                        case "getFullUrl":
+                            return "http://example.com/admin/plugin";
+                        case "getRemoteHost":
+                            return "198.51.100.8";
+                        case "getQueryStr":
+                            return "q=1";
+                        case "getMethod":
+                            return HttpMethod.GET;
+                        case "getInputStream":
+                            return new ByteArrayInputStream("body".getBytes(StandardCharsets.UTF_8));
+                        case "getContextPath":
+                            return "/blog";
+                        case "toString":
+                            return "HttpRequestProxy";
+                        default:
+                            return null;
+                    }
+                });
+    }
+
+    private static HttpServer localServer() throws Exception {
+        return HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    }
+
+    private static PluginCorePluginImpl startedPlugin(HttpServer server) throws Exception {
+        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo);
+        setPluginServerBaseUrl(plugin, "http://127.0.0.1:" + server.getAddress().getPort());
+        return plugin;
+    }
+
+    private static void setPluginServerBaseUrl(PluginCorePluginImpl plugin, String value) throws Exception {
+        Field serverBaseUrl = PluginCorePluginImpl.class.getDeclaredField("pluginServerBaseUrl");
+        serverBaseUrl.setAccessible(true);
+        serverBaseUrl.set(plugin, value);
+    }
+
+    private static void setPluginCoreProcess(PluginCorePluginImpl plugin, PluginCoreProcess process) throws Exception {
+        Field field = PluginCorePluginImpl.class.getDeclaredField("pluginCoreProcess");
+        field.setAccessible(true);
+        field.set(plugin, process);
+    }
+
+    private static PluginCoreProcess pluginCoreProcess(AtomicInteger startCount, AtomicInteger stopCount, int port) {
+        return new PluginCoreProcess() {
+            @Override
+            public int pluginServerStart(String dbProperties, String pluginJvmArgs, String runtimePath,
+                                         String runTimeVersion, String token) {
+                startCount.incrementAndGet();
+                return port;
+            }
+
+            @Override
+            public void stopPluginCore() {
+                stopCount.incrementAndGet();
+            }
+        };
+    }
+
+    private static boolean invokeWaitToStarted(String serverBaseUrl, String token, int retryCount) throws Exception {
+        Method method = PluginCorePluginImpl.class.getDeclaredMethod("waitToStarted", String.class, String.class,
+                int.class);
+        method.setAccessible(true);
+        return (boolean) method.invoke(null, serverBaseUrl, token, retryCount);
+    }
+
+    private static void invokeRefreshCacheWithRetry(PluginCorePluginImpl plugin, int retryCount,
+                                                    String cacheVersion) throws Exception {
+        Method method = PluginCorePluginImpl.class.getDeclaredMethod("refreshCacheWithRetry", int.class,
+                String.class);
+        method.setAccessible(true);
+        method.invoke(plugin, retryCount, cacheVersion);
+    }
+
+    private static String readBody(InputStream inputStream) throws Exception {
+        try (InputStream body = inputStream) {
+            return new String(body.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private static CacheService cacheService() {
+        PublicWebSiteInfo info = new PublicWebSiteInfo();
+        info.setAdmin_darkMode(true);
+        info.setAdmin_color_primary("#1677ff");
+        info.setAdmin_theme("desk");
+        info.setAdmin_compactMode(true);
+        return (CacheService) Proxy.newProxyInstance(
+                PluginCorePluginImplTest.class.getClassLoader(),
+                new Class[]{CacheService.class},
+                (proxy, method, args) -> {
+                    if ("getPublicWebSiteInfo".equals(method.getName())) {
+                        return info;
+                    }
+                    if ("getCurrentSqlVersion".equals(method.getName()) || "getWebSiteVersion".equals(method.getName())) {
+                        return 0L;
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "CacheServiceProxy";
+                    }
+                    return null;
+                });
+    }
 
     @Test
     public void shouldExposeLifecycleWithoutStartingPluginCore() {
@@ -535,134 +656,6 @@ public class PluginCorePluginImplTest {
     @Test
     public void shouldWaitToStartedReturnImmediatelyAfterRetriesExhausted() throws Exception {
         assertFalse(invokeWaitToStarted("http://127.0.0.1:1", "token", -1));
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, String> headerMap(HttpRequest request, AdminTokenVO adminTokenVO) throws Exception {
-        Method method = PluginCorePluginImpl.class.getDeclaredMethod("genHeaderMapByRequest",
-                HttpRequest.class, AdminTokenVO.class);
-        method.setAccessible(true);
-        return (Map<String, String>) method.invoke(new PluginCorePluginImpl(new File("db.properties"), "/blog",
-                () -> 19084, cacheService()::getPublicWebSiteInfo), request, adminTokenVO);
-    }
-
-    private static HttpRequest request(Map<String, String> headers) {
-        Map<String, Object> attributes = new java.util.HashMap<>();
-        ServerConfig serverConfig = new ServerConfig();
-        serverConfig.setPort(19080);
-        return (HttpRequest) Proxy.newProxyInstance(
-                PluginCorePluginImplTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    switch (method.getName()) {
-                        case "getAttr":
-                            return attributes;
-                        case "getHeader":
-                            return headers.get((String) args[0]);
-                        case "getHeaderMap":
-                            return headers;
-                        case "getServerConfig":
-                            return serverConfig;
-                        case "getFullUrl":
-                            return "http://example.com/admin/plugin";
-                        case "getRemoteHost":
-                            return "198.51.100.8";
-                        case "getQueryStr":
-                            return "q=1";
-                        case "getMethod":
-                            return HttpMethod.GET;
-                        case "getInputStream":
-                            return new ByteArrayInputStream("body".getBytes(StandardCharsets.UTF_8));
-                        case "getContextPath":
-                            return "/blog";
-                        case "toString":
-                            return "HttpRequestProxy";
-                        default:
-                            return null;
-                    }
-                });
-    }
-
-    private static HttpServer localServer() throws Exception {
-        return HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-    }
-
-    private static PluginCorePluginImpl startedPlugin(HttpServer server) throws Exception {
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo);
-        setPluginServerBaseUrl(plugin, "http://127.0.0.1:" + server.getAddress().getPort());
-        return plugin;
-    }
-
-    private static void setPluginServerBaseUrl(PluginCorePluginImpl plugin, String value) throws Exception {
-        Field serverBaseUrl = PluginCorePluginImpl.class.getDeclaredField("pluginServerBaseUrl");
-        serverBaseUrl.setAccessible(true);
-        serverBaseUrl.set(plugin, value);
-    }
-
-    private static void setPluginCoreProcess(PluginCorePluginImpl plugin, PluginCoreProcess process) throws Exception {
-        Field field = PluginCorePluginImpl.class.getDeclaredField("pluginCoreProcess");
-        field.setAccessible(true);
-        field.set(plugin, process);
-    }
-
-    private static PluginCoreProcess pluginCoreProcess(AtomicInteger startCount, AtomicInteger stopCount, int port) {
-        return new PluginCoreProcess() {
-            @Override
-            public int pluginServerStart(String dbProperties, String pluginJvmArgs, String runtimePath,
-                                         String runTimeVersion, String token) {
-                startCount.incrementAndGet();
-                return port;
-            }
-
-            @Override
-            public void stopPluginCore() {
-                stopCount.incrementAndGet();
-            }
-        };
-    }
-
-    private static boolean invokeWaitToStarted(String serverBaseUrl, String token, int retryCount) throws Exception {
-        Method method = PluginCorePluginImpl.class.getDeclaredMethod("waitToStarted", String.class, String.class,
-                int.class);
-        method.setAccessible(true);
-        return (boolean) method.invoke(null, serverBaseUrl, token, retryCount);
-    }
-
-    private static void invokeRefreshCacheWithRetry(PluginCorePluginImpl plugin, int retryCount,
-                                                    String cacheVersion) throws Exception {
-        Method method = PluginCorePluginImpl.class.getDeclaredMethod("refreshCacheWithRetry", int.class,
-                String.class);
-        method.setAccessible(true);
-        method.invoke(plugin, retryCount, cacheVersion);
-    }
-
-    private static String readBody(InputStream inputStream) throws Exception {
-        try (InputStream body = inputStream) {
-            return new String(body.readAllBytes(), StandardCharsets.UTF_8);
-        }
-    }
-
-    private static CacheService cacheService() {
-        PublicWebSiteInfo info = new PublicWebSiteInfo();
-        info.setAdmin_darkMode(true);
-        info.setAdmin_color_primary("#1677ff");
-        info.setAdmin_theme("desk");
-        info.setAdmin_compactMode(true);
-        return (CacheService) Proxy.newProxyInstance(
-                PluginCorePluginImplTest.class.getClassLoader(),
-                new Class[]{CacheService.class},
-                (proxy, method, args) -> {
-                    if ("getPublicWebSiteInfo".equals(method.getName())) {
-                        return info;
-                    }
-                    if ("getCurrentSqlVersion".equals(method.getName()) || "getWebSiteVersion".equals(method.getName())) {
-                        return 0L;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "CacheServiceProxy";
-                    }
-                    return null;
-                });
     }
 
     private static class CapturedHostResponse {

@@ -15,7 +15,6 @@ import com.zrlog.data.dto.ArticleDetailDTO;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.util.ParseUtil;
 import com.zrlog.util.ThreadUtils;
-
 import jakarta.inject.Inject;
 
 import java.io.Serializable;
@@ -32,9 +31,19 @@ import java.util.concurrent.ExecutorService;
  */
 public class Log extends BasePageableDAO implements Serializable {
 
-    private final DataSourceWrapper dataSource;
-
     public static final String TABLE_NAME = "log";
+    private static final Map<String, String> sortKeyMap = new HashMap<>();
+
+    static {
+        sortKeyMap.put("typeName", "l.typeId");
+        sortKeyMap.put("releaseTime", "l.releaseTime");
+        sortKeyMap.put("commentSize", "commentSize");
+        sortKeyMap.put("privacy", "l.privacy");
+        sortKeyMap.put("click", "l.click");
+        sortKeyMap.put("lastUpdateDate", "l.last_update_date");
+    }
+
+    private final DataSourceWrapper dataSource;
 
     @Inject
     public Log(DataSourceWrapper dataSource) {
@@ -42,6 +51,19 @@ public class Log extends BasePageableDAO implements Serializable {
         this.dataSource = dataSource;
         this.tableName = TABLE_NAME;
         this.pk = "logId";
+    }
+
+    private static String getPageSort(PageRequest pageRequest) {
+        List<OrderBy> orders = pageRequest.getSorts();
+        if (orders == null || orders.isEmpty()) {
+            return "l.logId desc";
+        }
+        StringBuilder orderSort = new StringBuilder();
+        for (OrderBy orderBy : orders) {
+            orderSort.append(sortKeyMap.getOrDefault(orderBy.getSortKey(), "l.logId"));
+            orderSort.append(" ").append(orderBy.getDirection().name().toLowerCase());
+        }
+        return orderSort.toString();
     }
 
     private ArticleDetailDTO getDetail(Object idOrAlias) throws SQLException {
@@ -251,30 +273,6 @@ public class Log extends BasePageableDAO implements Serializable {
         return queryPageData(
                 sql, pageRequest,
                 searchParam.toArray(), ArticleBasicDTO.class);
-    }
-
-    private static final Map<String, String> sortKeyMap = new HashMap<>();
-
-    static {
-        sortKeyMap.put("typeName", "l.typeId");
-        sortKeyMap.put("releaseTime", "l.releaseTime");
-        sortKeyMap.put("commentSize", "commentSize");
-        sortKeyMap.put("privacy", "l.privacy");
-        sortKeyMap.put("click", "l.click");
-        sortKeyMap.put("lastUpdateDate", "l.last_update_date");
-    }
-
-    private static String getPageSort(PageRequest pageRequest) {
-        List<OrderBy> orders = pageRequest.getSorts();
-        if (orders == null || orders.isEmpty()) {
-            return "l.logId desc";
-        }
-        StringBuilder orderSort = new StringBuilder();
-        for (OrderBy orderBy : orders) {
-            orderSort.append(sortKeyMap.getOrDefault(orderBy.getSortKey(), "l.logId"));
-            orderSort.append(" ").append(orderBy.getDirection().name().toLowerCase());
-        }
-        return orderSort.toString();
     }
 
     public PageData<ArticleBasicDTO> findByTypeAlias(long page, long pageSize, String typeAlias) {

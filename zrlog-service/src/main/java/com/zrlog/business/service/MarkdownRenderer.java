@@ -1,6 +1,8 @@
 package com.zrlog.business.service;
 
-/** Optional server-side Markdown conversion, supplied by a runtime provider. */
+/**
+ * Optional server-side Markdown conversion, supplied by a runtime provider.
+ */
 @FunctionalInterface
 public interface MarkdownRenderer {
 

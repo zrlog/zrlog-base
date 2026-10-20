@@ -11,7 +11,6 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.dto.FaviconBase64DTO;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.util.WebSiteUtils;
-
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;
@@ -22,12 +21,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * 存放全局的设置，比如网站标题，关键字，插件，主题的配置信息等，当字典表处理即可，对应数据库的 website 表
  */
 public class WebSite extends DAO {
-
-    private final DataSourceWrapper dataSource;
-
-    private static final List<String> websitePublicQueryKeys;
-    private static final List<String> websitePublicQueryStrKeys;
-    private static final String TEMPLATE_CONFIG_SUFFIX = "_setting";
 
     //number
     public static final String generator_html_status = "generator_html_status";
@@ -40,7 +33,6 @@ public class WebSite extends DAO {
     public static final String rows = "rows";
     public static final String session_timeout = "session_timeout";
     public static final String content_protector_enabled = "content_protector_enabled";
-
     //string
     public static final String appId = "appId";
     public static final String changyan_status = "changyan_status";
@@ -61,6 +53,9 @@ public class WebSite extends DAO {
     public static final String author = "author";
     public static final String content_protector_license_type = "content_protector_license_type";
     public static final String content_protector_template = "content_protector_template";
+    private static final List<String> websitePublicQueryKeys;
+    private static final List<String> websitePublicQueryStrKeys;
+    private static final String TEMPLATE_CONFIG_SUFFIX = "_setting";
 
     static {
 
@@ -76,6 +71,8 @@ public class WebSite extends DAO {
         websitePublicQueryKeys.addAll(websitePublicQueryStrKeys);
         websitePublicQueryKeys.addAll(Arrays.asList(listNum));
     }
+
+    private final DataSourceWrapper dataSource;
 
     @Inject
     public WebSite(DataSourceWrapper dataSource) {

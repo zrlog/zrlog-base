@@ -23,6 +23,16 @@ public class BaseController extends Controller {
         super(request, response);
     }
 
+    static <T extends Validator> T convertWithValid(String jsonStr, Class<T> tClass) {
+        T obj = new Gson().fromJson(jsonStr, tClass);
+        if (Objects.isNull(obj)) {
+            throw new NullPointerException(I18nUtil.getBackendStringFromRes("entryNull"));
+        }
+        obj.doValid();
+        obj.doClean();
+        return obj;
+    }
+
     public String getParamWithEmptyCheck(String paramName) {
         String value = request.getParaToStr(paramName);
         if (StringUtils.isEmpty(value)) {
@@ -40,15 +50,5 @@ public class BaseController extends Controller {
             throw new MissingRequestBodyException();
         }
         return convertWithValid(body, clazz);
-    }
-
-    static <T extends Validator> T convertWithValid(String jsonStr, Class<T> tClass) {
-        T obj = new Gson().fromJson(jsonStr, tClass);
-        if (Objects.isNull(obj)) {
-            throw new NullPointerException(I18nUtil.getBackendStringFromRes("entryNull"));
-        }
-        obj.doValid();
-        obj.doClean();
-        return obj;
     }
 }

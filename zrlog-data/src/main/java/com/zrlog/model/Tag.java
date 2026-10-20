@@ -9,7 +9,6 @@ import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.StringUtils;
 import com.zrlog.common.cache.dto.TagDTO;
 import com.zrlog.data.exception.DAOException;
-
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;
@@ -21,9 +20,8 @@ import java.util.logging.Logger;
  */
 public class Tag extends BasePageableDAO {
 
-    private final DataSourceWrapper dataSource;
-
     private static final Logger LOGGER = LoggerUtil.getLogger(Tag.class);
+    private final DataSourceWrapper dataSource;
 
     @Inject
     public Tag(DataSourceWrapper dataSource) {

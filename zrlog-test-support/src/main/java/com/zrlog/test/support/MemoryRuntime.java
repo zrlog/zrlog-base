@@ -6,10 +6,13 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.Comparator;
 
-/** Filesystem and command-line support for local memory applications, never an installer. */
+/**
+ * Filesystem and command-line support for local memory applications, never an installer.
+ */
 public final class MemoryRuntime {
 
-    private MemoryRuntime() { }
+    private MemoryRuntime() {
+    }
 
     public static Path projectRoot() {
         Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
@@ -29,7 +32,9 @@ public final class MemoryRuntime {
         return properties;
     }
 
-    /** Only the reserved child directory is cleared; symbolic links are never traversed. */
+    /**
+     * Only the reserved child directory is cleared; symbolic links are never traversed.
+     */
     public static Path reset(Path projectRoot) throws IOException {
         Path root = projectRoot.toRealPath().resolve(".zrlog-memory");
         if (Files.isSymbolicLink(root)) {

@@ -20,13 +20,57 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class BodySaveResponseTest {
 
+
+    private static File tempFile(String name) throws Exception {
+        File dir = Files.createTempDirectory("zrlog-body-save").toFile();
+        File file = new File(dir, name);
+        Files.writeString(file.toPath(), "stale", StandardCharsets.UTF_8);
+        return file;
+    }
+
+    private static HttpRequest request(String uri) {
+        ServerConfig serverConfig = new ServerConfig()
+                .setApplicationName("zrlog-test")
+                .setApplicationVersion("test");
+        serverConfig.setContextPath("");
+        return (HttpRequest) Proxy.newProxyInstance(
+                BodySaveResponseTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    if ("getUri".equals(method.getName())) {
+                        return uri;
+                    }
+                    if ("getContextPath".equals(method.getName())) {
+                        return "";
+                    }
+                    if ("getScheme".equals(method.getName())) {
+                        return "https";
+                    }
+                    if ("getServerConfig".equals(method.getName())) {
+                        return serverConfig;
+                    }
+                    if ("getHttpVersion".equals(method.getName())) {
+                        return HttpVersion.HTTP_1_1;
+                    }
+                    if ("getHeader".equals(method.getName())) {
+                        return null;
+                    }
+                    if ("getCookies".equals(method.getName())) {
+                        return null;
+                    }
+                    if ("getHandler".equals(method.getName())) {
+                        return null;
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "HttpRequestProxy";
+                    }
+                    return null;
+                });
+    }
 
     @Test
     public void shouldPersistSuccessfulTextBodyToStaticCacheFile() throws Exception {
@@ -91,65 +135,19 @@ public class BodySaveResponseTest {
         }
     }
 
-    private static File tempFile(String name) throws Exception {
-        File dir = Files.createTempDirectory("zrlog-body-save").toFile();
-        File file = new File(dir, name);
-        Files.writeString(file.toPath(), "stale", StandardCharsets.UTF_8);
-        return file;
-    }
-
-    private static HttpRequest request(String uri) {
-        ServerConfig serverConfig = new ServerConfig()
-                .setApplicationName("zrlog-test")
-                .setApplicationVersion("test");
-        serverConfig.setContextPath("");
-        return (HttpRequest) Proxy.newProxyInstance(
-                BodySaveResponseTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getUri".equals(method.getName())) {
-                        return uri;
-                    }
-                    if ("getContextPath".equals(method.getName())) {
-                        return "";
-                    }
-                    if ("getScheme".equals(method.getName())) {
-                        return "https";
-                    }
-                    if ("getServerConfig".equals(method.getName())) {
-                        return serverConfig;
-                    }
-                    if ("getHttpVersion".equals(method.getName())) {
-                        return HttpVersion.HTTP_1_1;
-                    }
-                    if ("getHeader".equals(method.getName())) {
-                        return null;
-                    }
-                    if ("getCookies".equals(method.getName())) {
-                        return null;
-                    }
-                    if ("getHandler".equals(method.getName())) {
-                        return null;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
-    }
-
     private static class TestStaticSitePlugin implements StaticSitePlugin {
         private final com.zrlog.common.vo.PublicWebSiteInfo site = new com.zrlog.common.vo.PublicWebSiteInfo();
-        @Override public com.zrlog.common.vo.PublicWebSiteInfo getSiteInfo() { return site; }
-
-
         private final File cacheFile;
         private final Map<String, HandleState> handleStatusPageMap = new HashMap<>();
         private final Lock parseLock = new ReentrantLock();
         private final List<File> cacheFiles = new ArrayList<>();
-
         TestStaticSitePlugin(File cacheFile) {
             this.cacheFile = cacheFile;
+        }
+
+        @Override
+        public com.zrlog.common.vo.PublicWebSiteInfo getSiteInfo() {
+            return site;
         }
 
         @Override

@@ -13,9 +13,9 @@ import com.zrlog.common.cache.vo.Archive;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.common.cache.vo.HotLogBasicInfoEntry;
 import com.zrlog.common.cache.vo.HotTypeLogInfo;
+import com.zrlog.common.json.JsonObjectMapAdapter;
 import com.zrlog.common.updater.UpgradeProgressEvent;
 import com.zrlog.common.vo.*;
-import com.zrlog.common.json.JsonObjectMapAdapter;
 import org.apache.commons.dbutils.BasicRowProcessor;
 
 import java.io.BufferedReader;
@@ -25,12 +25,6 @@ import java.io.InputStreamReader;
 import java.util.*;
 
 public class ZrLogBaseNativeImageUtils {
-
-    public static class MyBasicRowProcessor extends BasicRowProcessor {
-        public static Map<String, Object> createMap() {
-            return createCaseInsensitiveHashMap(2);
-        }
-    }
 
     private static String getWindowsExecutablePath() {
         try {
@@ -124,6 +118,12 @@ public class ZrLogBaseNativeImageUtils {
         NativeImageUtils.gsonNativeAgentByClazz(List.of(objects));
         for (Class<?> o : objects) {
             NativeImageUtils.regGetMethodByClassName(o);
+        }
+    }
+
+    public static class MyBasicRowProcessor extends BasicRowProcessor {
+        public static Map<String, Object> createMap() {
+            return createCaseInsensitiveHashMap(2);
         }
     }
 }

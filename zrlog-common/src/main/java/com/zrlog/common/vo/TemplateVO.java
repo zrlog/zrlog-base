@@ -17,6 +17,13 @@ public class TemplateVO extends BaseTemplateVO {
         this.config = config;
     }
 
+    public List<String> getStaticResources() {
+        return staticResources;
+    }
+
+    public void setStaticResources(List<String> staticResources) {
+        this.staticResources = staticResources;
+    }
 
     public static class TemplateConfigMap extends LinkedHashMap<String, TemplateConfigVO> {
 
@@ -87,14 +94,6 @@ public class TemplateVO extends BaseTemplateVO {
         public void setPreviewValue(String previewValue) {
             this.previewValue = previewValue;
         }
-    }
-
-    public List<String> getStaticResources() {
-        return staticResources;
-    }
-
-    public void setStaticResources(List<String> staticResources) {
-        this.staticResources = staticResources;
     }
 
 }

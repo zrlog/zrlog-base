@@ -2,15 +2,10 @@ package com.zrlog.business.service;
 
 import com.hibegin.common.util.StringUtils;
 import com.zrlog.business.rest.response.BackupProtectionStatus;
-
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.LongSupplier;
 import java.util.regex.Pattern;
 
@@ -19,9 +14,6 @@ public class BackupProtectionService {
 
     static final long BACKUP_MAX_AGE_MILLIS = 36L * 60 * 60 * 1000;
     static final long VERIFICATION_MAX_AGE_MILLIS = 8L * 24 * 60 * 60 * 1000;
-    private static final long MAX_CLOCK_SKEW_MILLIS = 5L * 60 * 1000;
-    private static final Pattern SHA256 = Pattern.compile("^[0-9a-fA-F]{64}$");
-
     static final String LAST_BACKUP_AT = "backupProtectionLastBackupAt";
     static final String LAST_BACKUP_FILE = "backupProtectionLastBackupFile";
     static final String LAST_BACKUP_SHA256 = "backupProtectionLastBackupSha256";
@@ -30,7 +22,8 @@ public class BackupProtectionService {
     static final String LAST_VERIFIED_SHA256 = "backupProtectionLastVerifiedSha256";
     static final String LAST_VERIFICATION_SUCCESS = "backupProtectionLastVerificationSuccess";
     static final String LAST_VERIFICATION_MESSAGE = "backupProtectionLastVerificationMessage";
-
+    private static final long MAX_CLOCK_SKEW_MILLIS = 5L * 60 * 1000;
+    private static final Pattern SHA256 = Pattern.compile("^[0-9a-fA-F]{64}$");
     private static final List<String> EVIDENCE_KEYS = Arrays.asList(
             LAST_BACKUP_AT,
             LAST_BACKUP_FILE,
@@ -53,23 +46,6 @@ public class BackupProtectionService {
     BackupProtectionService(WebsiteKvService websiteKvService, LongSupplier currentTimeMillis) {
         this.websiteKvService = websiteKvService;
         this.currentTimeMillis = currentTimeMillis;
-    }
-
-    public BackupProtectionStatus getStatus() {
-        Map<String, Object> evidence = websiteKvService.getByNames(EVIDENCE_KEYS);
-        BackupProtectionStatus status = new BackupProtectionStatus();
-        status.setLastBackupAt(toLong(evidence.get(LAST_BACKUP_AT)));
-        status.setLastBackupFile(toStringValue(evidence.get(LAST_BACKUP_FILE)));
-        status.setLastBackupSha256(normalizeSha256(evidence.get(LAST_BACKUP_SHA256)));
-        status.setLastVerifiedAt(toLong(evidence.get(LAST_VERIFIED_AT)));
-        status.setLastVerifiedFile(toStringValue(evidence.get(LAST_VERIFIED_FILE)));
-        status.setLastVerifiedSha256(normalizeSha256(evidence.get(LAST_VERIFIED_SHA256)));
-        status.setVerificationSuccess(toBoolean(evidence.get(LAST_VERIFICATION_SUCCESS)));
-        status.setVerificationMessage(toStringValue(evidence.get(LAST_VERIFICATION_MESSAGE)));
-        status.setBackupMaxAgeMillis(BACKUP_MAX_AGE_MILLIS);
-        status.setVerificationMaxAgeMillis(VERIFICATION_MAX_AGE_MILLIS);
-        evaluate(status, currentTimeMillis.getAsLong());
-        return status;
     }
 
     static void evaluate(BackupProtectionStatus status, long now) {
@@ -155,5 +131,22 @@ public class BackupProtectionService {
         }
         String text = Objects.toString(value, "").trim();
         return text.isEmpty() ? null : text;
+    }
+
+    public BackupProtectionStatus getStatus() {
+        Map<String, Object> evidence = websiteKvService.getByNames(EVIDENCE_KEYS);
+        BackupProtectionStatus status = new BackupProtectionStatus();
+        status.setLastBackupAt(toLong(evidence.get(LAST_BACKUP_AT)));
+        status.setLastBackupFile(toStringValue(evidence.get(LAST_BACKUP_FILE)));
+        status.setLastBackupSha256(normalizeSha256(evidence.get(LAST_BACKUP_SHA256)));
+        status.setLastVerifiedAt(toLong(evidence.get(LAST_VERIFIED_AT)));
+        status.setLastVerifiedFile(toStringValue(evidence.get(LAST_VERIFIED_FILE)));
+        status.setLastVerifiedSha256(normalizeSha256(evidence.get(LAST_VERIFIED_SHA256)));
+        status.setVerificationSuccess(toBoolean(evidence.get(LAST_VERIFICATION_SUCCESS)));
+        status.setVerificationMessage(toStringValue(evidence.get(LAST_VERIFICATION_MESSAGE)));
+        status.setBackupMaxAgeMillis(BACKUP_MAX_AGE_MILLIS);
+        status.setVerificationMaxAgeMillis(VERIFICATION_MAX_AGE_MILLIS);
+        evaluate(status, currentTimeMillis.getAsLong());
+        return status;
     }
 }

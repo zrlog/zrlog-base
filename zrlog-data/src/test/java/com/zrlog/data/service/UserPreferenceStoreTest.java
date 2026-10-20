@@ -3,10 +3,12 @@ package com.zrlog.data.service;
 import com.zrlog.model.User;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import org.junit.Test;
-import static org.junit.Assert.*;
+
+import static org.junit.Assert.assertEquals;
 
 public class UserPreferenceStoreTest {
-    @Test public void sessionPreferencesUseAccountJsonAndValidateStoredValues() throws Exception {
+    @Test
+    public void sessionPreferencesUseAccountJsonAndValidateStoredValues() throws Exception {
         for (ZrLogTestDatabase.DatabaseType database : ZrLogTestDatabase.DatabaseType.values()) {
             try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(database)) {
                 User user = new User(ignored.dataSource());

@@ -1,6 +1,8 @@
 package com.zrlog.plugin;
 
-/** Request-scoped appearance resolved by the authenticated admin host, never from browser headers. */
+/**
+ * Request-scoped appearance resolved by the authenticated admin host, never from browser headers.
+ */
 public final class PluginAdminAppearance {
 
     public static final String REQUEST_ATTRIBUTE = PluginAdminAppearance.class.getName();
@@ -17,8 +19,19 @@ public final class PluginAdminAppearance {
         this.compactMode = compactMode;
     }
 
-    public String getTheme() { return theme; }
-    public boolean isDarkMode() { return darkMode; }
-    public String getColorPrimary() { return colorPrimary; }
-    public boolean isCompactMode() { return compactMode; }
+    public String getTheme() {
+        return theme;
+    }
+
+    public boolean isDarkMode() {
+        return darkMode;
+    }
+
+    public String getColorPrimary() {
+        return colorPrimary;
+    }
+
+    public boolean isCompactMode() {
+        return compactMode;
+    }
 }

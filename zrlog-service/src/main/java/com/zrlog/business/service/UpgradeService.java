@@ -1,6 +1,8 @@
 package com.zrlog.business.service;
 
-import com.hibegin.common.util.*;
+import com.hibegin.common.util.BeanUtil;
+import com.hibegin.common.util.EnvKit;
+import com.hibegin.common.util.StringUtils;
 import com.zrlog.business.exception.CheckUpgradeVersionException;
 import com.zrlog.business.exception.DownloadUpgradeFileException;
 import com.zrlog.business.rest.response.CheckVersionResponse;
@@ -10,12 +12,15 @@ import com.zrlog.business.updater.UpdateVersionInfoPlugin;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
 import com.zrlog.common.adapter.UpdaterHosts;
-import com.zrlog.common.updater.*;
+import com.zrlog.common.updater.UpdateVersionHandler;
+import com.zrlog.common.updater.UpgradeProgressListener;
 import com.zrlog.common.vo.Version;
-import com.zrlog.updater.spi.*;
+import com.zrlog.updater.spi.SystemPackageUpdater;
+import com.zrlog.updater.spi.UpdateContext;
+import com.zrlog.updater.spi.UpdateProviders;
+import com.zrlog.updater.spi.UpdateRequest;
 import com.zrlog.util.I18nUtil;
 import com.zrlog.util.ZrLogUtil;
-
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
@@ -42,6 +47,21 @@ public class UpgradeService {
         this.updater = updater.get();
         this.upgradeNoticeService = Objects.requireNonNull(upgradeNoticeService);
         this.backupProtectionService = backupProtectionService;
+    }
+
+    static String buildUpgradeKey(Version version) {
+        String versionTag = Objects.nonNull(version) ? version.getBuildId() : "";
+        if (StringUtils.isEmpty(versionTag) && Objects.nonNull(version)) {
+            versionTag = version.getVersion();
+        }
+        if (StringUtils.isEmpty(versionTag)) {
+            versionTag = String.valueOf(System.currentTimeMillis());
+        }
+        return ("upgrade-" + versionTag + "-" + System.currentTimeMillis()).replaceAll("[^A-Za-z0-9._-]", "-");
+    }
+
+    static String backendString(Map<String, Object> backend, String key) {
+        return Objects.toString(backend.get(key), key);
     }
 
     public CheckVersionResponse getCheckVersionResponse(boolean fetchAble, UpdateVersionInfoPlugin plugin) {
@@ -90,8 +110,11 @@ public class UpgradeService {
         checkVersionResponse.setOnlineUpgradable(!disable);
         Updater currentUpdater = updater;
         if (currentUpdater != null && UpdaterHosts.unwrap(currentUpdater) instanceof SystemPackageUpdater) {
-            try { checkVersionResponse.setSystemPackageUpgrade(((SystemPackageUpdater) UpdaterHosts.unwrap(currentUpdater)).status()); }
-            catch (Exception e) { throw new IllegalStateException("Unable to read system package upgrade status", e); }
+            try {
+                checkVersionResponse.setSystemPackageUpgrade(((SystemPackageUpdater) UpdaterHosts.unwrap(currentUpdater)).status());
+            } catch (Exception e) {
+                throw new IllegalStateException("Unable to read system package upgrade status", e);
+            }
         }
         if (isDockerMode() && UpdaterHosts.dockerConfigured()) {
             try {
@@ -113,13 +136,15 @@ public class UpgradeService {
         return checkVersionResponse;
     }
 
-    private File downloadUpgradePackage(Version version, UpgradeProgressListener progressListener, Map<String,Object> backend, Updater updater) {
+    private File downloadUpgradePackage(Version version, UpgradeProgressListener progressListener, Map<String, Object> backend, Updater updater) {
         try {
             UpdateContext.Builder b = new UpdateContext.Builder(UpdaterHosts.context(updater));
             b.packageSource = websiteKv.upgradeWebSiteInfo().getUpgradePackageSource();
             UpdaterTypeEnum type = isFaaSMode() ? UpdaterTypeEnum.FAAS : updater == null ? UpdaterTypeEnum.ZIP : updater.getType();
             return UpdateProviders.get(type).download(b.build(), new UpdateRequest(null, version, buildUpgradeKey(version), UpdaterHosts.unwrap(updater), progressListener, UpdaterHosts.text(backend)));
-        } catch (Exception e) { throw new DownloadUpgradeFileException(e); }
+        } catch (Exception e) {
+            throw new DownloadUpgradeFileException(e);
+        }
     }
 
     public UpgradeProcessResponse doUpgrade(UpdateVersionInfoPlugin plugin) {
@@ -232,21 +257,6 @@ public class UpgradeService {
 
     boolean isFaaSOnlineUpgradeSupported() {
         return UpdaterHosts.onlineUpgradeSupported(UpdaterTypeEnum.FAAS, updater);
-    }
-
-    static String buildUpgradeKey(Version version) {
-        String versionTag = Objects.nonNull(version) ? version.getBuildId() : "";
-        if (StringUtils.isEmpty(versionTag) && Objects.nonNull(version)) {
-            versionTag = version.getVersion();
-        }
-        if (StringUtils.isEmpty(versionTag)) {
-            versionTag = String.valueOf(System.currentTimeMillis());
-        }
-        return ("upgrade-" + versionTag + "-" + System.currentTimeMillis()).replaceAll("[^A-Za-z0-9._-]", "-");
-    }
-
-    static String backendString(Map<String, Object> backend, String key) {
-        return Objects.toString(backend.get(key), key);
     }
 
 }

@@ -3,8 +3,8 @@ package com.zrlog.data.service;
 import com.zrlog.common.vo.LockVO;
 import com.zrlog.data.di.DaggerDataComponent;
 import com.zrlog.model.WebSite;
-import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -12,23 +12,20 @@ import org.junit.runners.Parameterized;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class DistributedLockDatabaseTest {
-
-    @Parameterized.Parameters(name = "{0}")
-    public static DatabaseType[] databases() {
-        return DatabaseType.values();
-    }
 
     private final DatabaseType databaseType;
 
     public DistributedLockDatabaseTest(DatabaseType databaseType) {
         this.databaseType = databaseType;
+    }
+
+    @Parameterized.Parameters(name = "{0}")
+    public static DatabaseType[] databases() {
+        return DatabaseType.values();
     }
 
     @Test
@@ -58,7 +55,9 @@ public class DistributedLockDatabaseTest {
 
     @Test
     public void shouldRejectUnsupportedOrUnsafeLockOperations() {
-        DistributedLock lock = new DistributedLock(() -> { throw new IllegalStateException("Database is unavailable in this test"); }, "cache");
+        DistributedLock lock = new DistributedLock(() -> {
+            throw new IllegalStateException("Database is unavailable in this test");
+        }, "cache");
 
         assertThrows(UnsupportedOperationException.class, lock::lock);
         assertThrows(UnsupportedOperationException.class, lock::lockInterruptibly);

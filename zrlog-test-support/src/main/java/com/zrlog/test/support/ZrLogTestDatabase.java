@@ -19,21 +19,19 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/** Isolated schema fixture. Installation behavior must be tested through InstallService instead. */
+/**
+ * Isolated schema fixture. Installation behavior must be tested through InstallService instead.
+ */
 public final class ZrLogTestDatabase implements AutoCloseable {
-
-    public enum DatabaseType { H2, SQLITE }
-
-    @FunctionalInterface
-    public interface SqlHook { void run(String sql, Object[] params) throws SQLException; }
 
     private final Path sqliteFile;
     private final Properties properties;
     private final InMemoryDatabase database;
     private DataSourceWrapper activeDataSource;
-    private volatile SqlHook beforeWebApiUpdate = (sql, params) -> { };
-    private volatile SqlHook afterWebApiQuery = (sql, params) -> { };
-
+    private volatile SqlHook beforeWebApiUpdate = (sql, params) -> {
+    };
+    private volatile SqlHook afterWebApiQuery = (sql, params) -> {
+    };
     private ZrLogTestDatabase(DatabaseType type) throws Exception {
         sqliteFile = type == DatabaseType.SQLITE ? Files.createTempFile("zrlog-test-", ".db") : null;
         properties = sqliteFile == null ? InMemoryDatabase.h2Properties("zrlog_test_" + UUID.randomUUID())
@@ -70,22 +68,28 @@ public final class ZrLogTestDatabase implements AutoCloseable {
         activeDataSource = database.dataSource();
     }
 
-    public static ZrLogTestDatabase open() throws Exception { return open(DatabaseType.H2); }
+    public static ZrLogTestDatabase open() throws Exception {
+        return open(DatabaseType.H2);
+    }
 
     public static ZrLogTestDatabase open(DatabaseType type) throws Exception {
         return new ZrLogTestDatabase(java.util.Objects.requireNonNull(type));
     }
 
-    /** SQLite-backed, single-statement adapter for D1-style behavior; no JDBC transactions. */
+    /**
+     * SQLite-backed, single-statement adapter for D1-style behavior; no JDBC transactions.
+     */
     public static ZrLogTestDatabase openWebApi() throws Exception {
         ZrLogTestDatabase db = open(DatabaseType.SQLITE);
         QueryRunner runner = new QueryRunner() {
-            @Override public int update(String sql, Object... params) throws SQLException {
+            @Override
+            public int update(String sql, Object... params) throws SQLException {
                 db.beforeWebApiUpdate.run(sql, params);
                 return db.database.update(sql, params);
             }
 
-            @Override public <T> T query(String sql, ResultSetHandler<T> handler, Object... params) throws SQLException {
+            @Override
+            public <T> T query(String sql, ResultSetHandler<T> handler, Object... params) throws SQLException {
                 T result = db.database.dataSource().getQueryRunner().query(sql, handler, params);
                 db.afterWebApiQuery.run(sql, params);
                 return result;
@@ -95,34 +99,15 @@ public final class ZrLogTestDatabase implements AutoCloseable {
                 new Class<?>[]{DataSourceWrapper.class}, (proxy, method, args) -> {
                     if (method.getName().equals("isWebApi")) return true;
                     if (method.getName().equals("getQueryRunner")) return runner;
-                    if (method.getName().equals("getConnection")) throw new AssertionError("Web API cannot open JDBC transactions");
-                    try { return method.invoke(db.database.dataSource(), args); }
-                    catch (InvocationTargetException e) { throw e.getCause(); }
+                    if (method.getName().equals("getConnection"))
+                        throw new AssertionError("Web API cannot open JDBC transactions");
+                    try {
+                        return method.invoke(db.database.dataSource(), args);
+                    } catch (InvocationTargetException e) {
+                        throw e.getCause();
+                    }
                 });
         return db;
-    }
-
-    public DataSourceWrapper dataSource() { return activeDataSource; }
-
-    public Properties properties() {
-        Properties copy = new Properties();
-        copy.putAll(properties);
-        return copy;
-    }
-
-    public void beforeWebApiUpdate(SqlHook hook) { beforeWebApiUpdate = java.util.Objects.requireNonNull(hook); }
-    public void afterWebApiQuery(SqlHook hook) { afterWebApiQuery = java.util.Objects.requireNonNull(hook); }
-
-    // Fixture setup/assertions use the underlying connection, without triggering application hooks.
-    public int update(String sql, Object... params) throws SQLException { return database.update(sql, params); }
-    public boolean execute(String sql, Object... params) throws SQLException { return database.execute(sql, params); }
-    public Object scalar(String sql, Object... params) throws SQLException { return database.scalar(sql, params); }
-    public Map<String, Object> queryOne(String sql, Object... params) throws SQLException { return database.queryOne(sql, params); }
-    public List<Map<String, Object>> queryList(String sql, Object... params) throws SQLException { return database.queryList(sql, params); }
-
-    public void putWebsite(String name, Object value) throws SQLException {
-        update("delete from website where name=?", name);
-        update("insert into website(name,value) values(?,?)", name, value == null ? null : value.toString());
     }
 
     private static Properties sqliteProperties(Path file) {
@@ -136,6 +121,50 @@ public final class ZrLogTestDatabase implements AutoCloseable {
         return properties;
     }
 
+    public DataSourceWrapper dataSource() {
+        return activeDataSource;
+    }
+
+    public Properties properties() {
+        Properties copy = new Properties();
+        copy.putAll(properties);
+        return copy;
+    }
+
+    public void beforeWebApiUpdate(SqlHook hook) {
+        beforeWebApiUpdate = java.util.Objects.requireNonNull(hook);
+    }
+
+    public void afterWebApiQuery(SqlHook hook) {
+        afterWebApiQuery = java.util.Objects.requireNonNull(hook);
+    }
+
+    // Fixture setup/assertions use the underlying connection, without triggering application hooks.
+    public int update(String sql, Object... params) throws SQLException {
+        return database.update(sql, params);
+    }
+
+    public boolean execute(String sql, Object... params) throws SQLException {
+        return database.execute(sql, params);
+    }
+
+    public Object scalar(String sql, Object... params) throws SQLException {
+        return database.scalar(sql, params);
+    }
+
+    public Map<String, Object> queryOne(String sql, Object... params) throws SQLException {
+        return database.queryOne(sql, params);
+    }
+
+    public List<Map<String, Object>> queryList(String sql, Object... params) throws SQLException {
+        return database.queryList(sql, params);
+    }
+
+    public void putWebsite(String name, Object value) throws SQLException {
+        update("delete from website where name=?", name);
+        update("insert into website(name,value) values(?,?)", name, value == null ? null : value.toString());
+    }
+
     private void deleteSqliteFiles() throws Exception {
         if (sqliteFile != null) {
             Files.deleteIfExists(sqliteFile);
@@ -144,8 +173,19 @@ public final class ZrLogTestDatabase implements AutoCloseable {
         }
     }
 
-    @Override public void close() throws Exception {
-        try { database.close(); }
-        finally { deleteSqliteFiles(); }
+    @Override
+    public void close() throws Exception {
+        try {
+            database.close();
+        } finally {
+            deleteSqliteFiles();
+        }
+    }
+
+    public enum DatabaseType {H2, SQLITE}
+
+    @FunctionalInterface
+    public interface SqlHook {
+        void run(String sql, Object[] params) throws SQLException;
     }
 }

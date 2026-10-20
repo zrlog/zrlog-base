@@ -4,11 +4,16 @@ import com.zrlog.common.vo.AdminTokenVO;
 import org.junit.After;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
+import static org.junit.Assert.*;
 
 public class AdminTokenThreadLocalTest {
+
+    private static AdminTokenVO token(int userId, String protocol) {
+        AdminTokenVO token = new AdminTokenVO();
+        token.setUserId(userId);
+        token.setProtocol(protocol);
+        return token;
+    }
 
     @After
     public void tearDown() {
@@ -43,12 +48,5 @@ public class AdminTokenThreadLocalTest {
 
         assertNull(AdminTokenThreadLocal.getUser());
         assertEquals(-1, AdminTokenThreadLocal.getUserId());
-    }
-
-    private static AdminTokenVO token(int userId, String protocol) {
-        AdminTokenVO token = new AdminTokenVO();
-        token.setUserId(userId);
-        token.setProtocol(protocol);
-        return token;
     }
 }

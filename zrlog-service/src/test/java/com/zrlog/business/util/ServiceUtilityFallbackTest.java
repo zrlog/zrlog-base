@@ -53,12 +53,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -70,26 +65,256 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.CRC32;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class ServiceUtilityFallbackTest {
 
-    private DataSourceWrapper queryDataSource;
-
-    private com.zrlog.common.ZrLogConfig applicationConfig;
-
+    private final Logger cmdLogger = Logger.getLogger(CmdUtil.class.getName());
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
-    private final Logger cmdLogger = Logger.getLogger(CmdUtil.class.getName());
+    private DataSourceWrapper queryDataSource;
+    private com.zrlog.common.ZrLogConfig applicationConfig;
     private Level previousLevel;
     private boolean previousUseParentHandlers;
+
+    private static void waitUntil(BooleanSupplier condition) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 2_000;
+        while (System.currentTimeMillis() < deadline) {
+            if (condition.getAsBoolean()) {
+                return;
+            }
+            Thread.sleep(25);
+        }
+        throw new AssertionError("Timed out waiting for async cache update");
+    }
+
+    private static HttpRequest request(String scheme) {
+        return (HttpRequest) Proxy.newProxyInstance(
+                ServiceUtilityFallbackTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    if ("getScheme".equals(method.getName())) {
+                        return scheme;
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "HttpRequestProxy";
+                    }
+                    return null;
+                });
+    }
+
+    private static byte[] pluginCoreJar() throws IOException {
+        byte[] entryBody = "zrlog-plugin-core".getBytes(StandardCharsets.UTF_8);
+        CRC32 crc32 = new CRC32();
+        crc32.update(entryBody);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        try (JarOutputStream jarOutputStream = new JarOutputStream(outputStream)) {
+            JarEntry entry = new JarEntry("com/zrlog/plugincore/server/Application.class");
+            entry.setMethod(JarEntry.STORED);
+            entry.setSize(entryBody.length);
+            entry.setCompressedSize(entryBody.length);
+            entry.setCrc(crc32.getValue());
+            jarOutputStream.putNextEntry(entry);
+            jarOutputStream.write(entryBody);
+            jarOutputStream.closeEntry();
+        }
+        return outputStream.toByteArray();
+    }
+
+    private static byte[] pluginCoreJarWithInvalidEntryCrc() throws IOException {
+        byte[] jar = pluginCoreJar();
+        byte[] entryBody = "zrlog-plugin-core".getBytes(StandardCharsets.UTF_8);
+        int entryOffset = indexOf(jar, entryBody);
+        if (entryOffset < 0) {
+            throw new IOException("test JAR entry was not stored verbatim");
+        }
+        jar[entryOffset] ^= 1;
+        return jar;
+    }
+
+    private static byte[] nativeElf() {
+        byte[] executable = new byte[256];
+        executable[0] = 0x7f;
+        executable[1] = 'E';
+        executable[2] = 'L';
+        executable[3] = 'F';
+        executable[4] = 2;
+        executable[5] = 1;
+        executable[6] = 1;
+        ByteBuffer header = ByteBuffer.wrap(executable).order(ByteOrder.LITTLE_ENDIAN);
+        header.putShort(16, (short) 2);
+        header.putShort(18, (short) 62);
+        header.putInt(20, 1);
+        header.putLong(32, 64);
+        header.putShort(52, (short) 64);
+        header.putShort(54, (short) 56);
+        header.putShort(56, (short) 1);
+        header.putInt(64, 1);
+        header.putInt(68, 5);
+        header.putLong(72, 0);
+        header.putLong(96, executable.length);
+        header.putLong(104, executable.length);
+        header.putLong(112, 4096);
+        return executable;
+    }
+
+    private static byte[] nativePortableExecutable() {
+        byte[] executable = new byte[512];
+        ByteBuffer header = ByteBuffer.wrap(executable).order(ByteOrder.LITTLE_ENDIAN);
+        header.putShort(0, (short) 0x5a4d);
+        header.putInt(60, 0x80);
+        header.putInt(0x80, 0x00004550);
+        header.putShort(0x84, (short) 0x8664);
+        header.putShort(0x86, (short) 1);
+        header.putShort(0x94, (short) 0xf0);
+        header.putShort(0x98, (short) 0x20b);
+        int section = 0x188;
+        header.putInt(section + 16, 64);
+        header.putInt(section + 20, 448);
+        return executable;
+    }
+
+    private static byte[] nativeMachO() {
+        byte[] executable = new byte[128];
+        ByteBuffer header = ByteBuffer.wrap(executable).order(ByteOrder.LITTLE_ENDIAN);
+        header.putInt(0, 0xfeedfacf);
+        header.putInt(4, 0x0100000c);
+        header.putInt(8, 0);
+        header.putInt(12, 2);
+        header.putInt(16, 1);
+        header.putInt(20, 72);
+        header.putInt(32, 0x19);
+        header.putInt(36, 72);
+        header.putLong(72, 0);
+        header.putLong(80, executable.length);
+        return executable;
+    }
+
+    private static String md5(byte[] body) {
+        final MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        StringBuilder value = new StringBuilder(32);
+        for (byte part : digest.digest(body)) {
+            value.append(String.format(Locale.ROOT, "%02x", part & 0xff));
+        }
+        return value.toString();
+    }
+
+    private static int indexOf(byte[] value, byte[] pattern) {
+        for (int index = 0; index <= value.length - pattern.length; index++) {
+            int patternIndex = 0;
+            while (patternIndex < pattern.length && value[index + patternIndex] == pattern[patternIndex]) {
+                patternIndex++;
+            }
+            if (patternIndex == pattern.length) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static HttpServer startDownloadServer(String fileName, int statusCode, long contentLength,
+                                                  byte[] body) throws IOException {
+        return startDownloadServer(fileName, statusCode, contentLength, body, null);
+    }
+
+    private static HttpServer startDownloadServer(String fileName, int statusCode, long contentLength,
+                                                  byte[] body, AtomicInteger requestCount) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/plugin/core/" + fileName, exchange -> {
+            if (requestCount != null) {
+                requestCount.incrementAndGet();
+            }
+            exchange.sendResponseHeaders(statusCode, contentLength);
+            try {
+                exchange.getResponseBody().write(body);
+            } finally {
+                exchange.close();
+            }
+        });
+        server.start();
+        return server;
+    }
+
+    private static HttpServer startNativeDownloadServer(String fileName, long contentLength,
+                                                        byte[] body, String checksum) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/plugin/core/" + fileName, exchange -> {
+            exchange.sendResponseHeaders(200, contentLength);
+            try {
+                exchange.getResponseBody().write(body);
+            } finally {
+                exchange.close();
+            }
+        });
+        byte[] checksumBody = (checksum + "  " + fileName + "\n").getBytes(StandardCharsets.UTF_8);
+        server.createContext("/plugin/core/" + fileName + ".md5", exchange -> {
+            exchange.sendResponseHeaders(200, checksumBody.length);
+            try {
+                exchange.getResponseBody().write(checksumBody);
+            } finally {
+                exchange.close();
+            }
+        });
+        server.start();
+        return server;
+    }
+
+    private static void assertNoPluginCoreDownloadParts(File pluginsFolder) {
+        File[] downloadParts = pluginsFolder.listFiles((dir, name) -> name.startsWith("plugin-core")
+                && name.endsWith(".part"));
+        assertNotNull(downloadParts);
+        assertEquals(0, downloadParts.length);
+    }
+
+    private static String setBlogBuildInfoString(String fieldName, String value) throws Exception {
+        Field field = BlogBuildInfoUtil.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        String previous = (String) field.get(null);
+        field.set(null, value);
+        return previous;
+    }
+
+    private static DataSourceWrapper dataSource(QueryRunner queryRunner) {
+        return (DataSourceWrapper) Proxy.newProxyInstance(
+                ServiceUtilityFallbackTest.class.getClassLoader(),
+                new Class[]{DataSourceWrapper.class},
+                (proxy, method, args) -> {
+                    if ("getQueryRunner".equals(method.getName())) {
+                        return queryRunner;
+                    }
+                    if ("getDataSourceProperties".equals(method.getName())) {
+                        return new Properties();
+                    }
+                    if ("getDatabaseConnectPoolInfo".equals(method.getName())) {
+                        return new DatabaseConnectPoolInfo(0, 0);
+                    }
+                    if ("getDbInfo".equals(method.getName())) {
+                        return "test-db";
+                    }
+                    if ("isWebApi".equals(method.getName()) || "isDev".equals(method.getName())) {
+                        return false;
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "DataSourceWrapperProxy";
+                    }
+                    Class<?> returnType = method.getReturnType();
+                    if (returnType == boolean.class) {
+                        return false;
+                    }
+                    if (returnType == int.class) {
+                        return 0;
+                    }
+                    if (returnType == long.class) {
+                        return 0L;
+                    }
+                    return null;
+                });
+    }
 
     @Before
     public void setUp() {
@@ -853,7 +1078,7 @@ public class ServiceUtilityFallbackTest {
             setQueryDataSource(dataSource(new FakeQueryRunner()));
             applicationConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin, cacheService);
 
-            cacheRefresh(cacheService).updateCache( false, request("https"), Collections.singletonList(StaticSiteType.BLOG));
+            cacheRefresh(cacheService).updateCache(false, request("https"), Collections.singletonList(StaticSiteType.BLOG));
 
             assertEquals(1, cacheService.refreshInitDataCount);
             assertEquals(1, staticSitePlugin.startCount);
@@ -888,32 +1113,6 @@ public class ServiceUtilityFallbackTest {
                 () -> config == null ? Collections.emptyList() : config.getPluginsByClazz(StaticSitePlugin.class), () -> new WebSite(queryDataSource));
     }
 
-    private static void waitUntil(BooleanSupplier condition) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 2_000;
-        while (System.currentTimeMillis() < deadline) {
-            if (condition.getAsBoolean()) {
-                return;
-            }
-            Thread.sleep(25);
-        }
-        throw new AssertionError("Timed out waiting for async cache update");
-    }
-
-    private static HttpRequest request(String scheme) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                ServiceUtilityFallbackTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getScheme".equals(method.getName())) {
-                        return scheme;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
-    }
-
     private DataSourceWrapper setQueryDataSource(DataSourceWrapper dataSource) {
         DataSourceWrapper previous = queryDataSource;
         queryDataSource = dataSource;
@@ -922,219 +1121,6 @@ public class ServiceUtilityFallbackTest {
 
     private void restoreQueryDataSource(DataSourceWrapper previousDataSource) {
         queryDataSource = previousDataSource;
-    }
-
-    private static byte[] pluginCoreJar() throws IOException {
-        byte[] entryBody = "zrlog-plugin-core".getBytes(StandardCharsets.UTF_8);
-        CRC32 crc32 = new CRC32();
-        crc32.update(entryBody);
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (JarOutputStream jarOutputStream = new JarOutputStream(outputStream)) {
-            JarEntry entry = new JarEntry("com/zrlog/plugincore/server/Application.class");
-            entry.setMethod(JarEntry.STORED);
-            entry.setSize(entryBody.length);
-            entry.setCompressedSize(entryBody.length);
-            entry.setCrc(crc32.getValue());
-            jarOutputStream.putNextEntry(entry);
-            jarOutputStream.write(entryBody);
-            jarOutputStream.closeEntry();
-        }
-        return outputStream.toByteArray();
-    }
-
-    private static byte[] pluginCoreJarWithInvalidEntryCrc() throws IOException {
-        byte[] jar = pluginCoreJar();
-        byte[] entryBody = "zrlog-plugin-core".getBytes(StandardCharsets.UTF_8);
-        int entryOffset = indexOf(jar, entryBody);
-        if (entryOffset < 0) {
-            throw new IOException("test JAR entry was not stored verbatim");
-        }
-        jar[entryOffset] ^= 1;
-        return jar;
-    }
-
-    private static byte[] nativeElf() {
-        byte[] executable = new byte[256];
-        executable[0] = 0x7f;
-        executable[1] = 'E';
-        executable[2] = 'L';
-        executable[3] = 'F';
-        executable[4] = 2;
-        executable[5] = 1;
-        executable[6] = 1;
-        ByteBuffer header = ByteBuffer.wrap(executable).order(ByteOrder.LITTLE_ENDIAN);
-        header.putShort(16, (short) 2);
-        header.putShort(18, (short) 62);
-        header.putInt(20, 1);
-        header.putLong(32, 64);
-        header.putShort(52, (short) 64);
-        header.putShort(54, (short) 56);
-        header.putShort(56, (short) 1);
-        header.putInt(64, 1);
-        header.putInt(68, 5);
-        header.putLong(72, 0);
-        header.putLong(96, executable.length);
-        header.putLong(104, executable.length);
-        header.putLong(112, 4096);
-        return executable;
-    }
-
-    private static byte[] nativePortableExecutable() {
-        byte[] executable = new byte[512];
-        ByteBuffer header = ByteBuffer.wrap(executable).order(ByteOrder.LITTLE_ENDIAN);
-        header.putShort(0, (short) 0x5a4d);
-        header.putInt(60, 0x80);
-        header.putInt(0x80, 0x00004550);
-        header.putShort(0x84, (short) 0x8664);
-        header.putShort(0x86, (short) 1);
-        header.putShort(0x94, (short) 0xf0);
-        header.putShort(0x98, (short) 0x20b);
-        int section = 0x188;
-        header.putInt(section + 16, 64);
-        header.putInt(section + 20, 448);
-        return executable;
-    }
-
-    private static byte[] nativeMachO() {
-        byte[] executable = new byte[128];
-        ByteBuffer header = ByteBuffer.wrap(executable).order(ByteOrder.LITTLE_ENDIAN);
-        header.putInt(0, 0xfeedfacf);
-        header.putInt(4, 0x0100000c);
-        header.putInt(8, 0);
-        header.putInt(12, 2);
-        header.putInt(16, 1);
-        header.putInt(20, 72);
-        header.putInt(32, 0x19);
-        header.putInt(36, 72);
-        header.putLong(72, 0);
-        header.putLong(80, executable.length);
-        return executable;
-    }
-
-    private static String md5(byte[] body) {
-        final MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance("MD5");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
-        StringBuilder value = new StringBuilder(32);
-        for (byte part : digest.digest(body)) {
-            value.append(String.format(Locale.ROOT, "%02x", part & 0xff));
-        }
-        return value.toString();
-    }
-
-    private static int indexOf(byte[] value, byte[] pattern) {
-        for (int index = 0; index <= value.length - pattern.length; index++) {
-            int patternIndex = 0;
-            while (patternIndex < pattern.length && value[index + patternIndex] == pattern[patternIndex]) {
-                patternIndex++;
-            }
-            if (patternIndex == pattern.length) {
-                return index;
-            }
-        }
-        return -1;
-    }
-
-    private static HttpServer startDownloadServer(String fileName, int statusCode, long contentLength,
-                                                  byte[] body) throws IOException {
-        return startDownloadServer(fileName, statusCode, contentLength, body, null);
-    }
-
-    private static HttpServer startDownloadServer(String fileName, int statusCode, long contentLength,
-                                                  byte[] body, AtomicInteger requestCount) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/plugin/core/" + fileName, exchange -> {
-            if (requestCount != null) {
-                requestCount.incrementAndGet();
-            }
-            exchange.sendResponseHeaders(statusCode, contentLength);
-            try {
-                exchange.getResponseBody().write(body);
-            } finally {
-                exchange.close();
-            }
-        });
-        server.start();
-        return server;
-    }
-
-    private static HttpServer startNativeDownloadServer(String fileName, long contentLength,
-                                                        byte[] body, String checksum) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/plugin/core/" + fileName, exchange -> {
-            exchange.sendResponseHeaders(200, contentLength);
-            try {
-                exchange.getResponseBody().write(body);
-            } finally {
-                exchange.close();
-            }
-        });
-        byte[] checksumBody = (checksum + "  " + fileName + "\n").getBytes(StandardCharsets.UTF_8);
-        server.createContext("/plugin/core/" + fileName + ".md5", exchange -> {
-            exchange.sendResponseHeaders(200, checksumBody.length);
-            try {
-                exchange.getResponseBody().write(checksumBody);
-            } finally {
-                exchange.close();
-            }
-        });
-        server.start();
-        return server;
-    }
-
-    private static void assertNoPluginCoreDownloadParts(File pluginsFolder) {
-        File[] downloadParts = pluginsFolder.listFiles((dir, name) -> name.startsWith("plugin-core")
-                && name.endsWith(".part"));
-        assertNotNull(downloadParts);
-        assertEquals(0, downloadParts.length);
-    }
-
-    private static String setBlogBuildInfoString(String fieldName, String value) throws Exception {
-        Field field = BlogBuildInfoUtil.class.getDeclaredField(fieldName);
-        field.setAccessible(true);
-        String previous = (String) field.get(null);
-        field.set(null, value);
-        return previous;
-    }
-
-    private static DataSourceWrapper dataSource(QueryRunner queryRunner) {
-        return (DataSourceWrapper) Proxy.newProxyInstance(
-                ServiceUtilityFallbackTest.class.getClassLoader(),
-                new Class[]{DataSourceWrapper.class},
-                (proxy, method, args) -> {
-                    if ("getQueryRunner".equals(method.getName())) {
-                        return queryRunner;
-                    }
-                    if ("getDataSourceProperties".equals(method.getName())) {
-                        return new Properties();
-                    }
-                    if ("getDatabaseConnectPoolInfo".equals(method.getName())) {
-                        return new DatabaseConnectPoolInfo(0, 0);
-                    }
-                    if ("getDbInfo".equals(method.getName())) {
-                        return "test-db";
-                    }
-                    if ("isWebApi".equals(method.getName()) || "isDev".equals(method.getName())) {
-                        return false;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "DataSourceWrapperProxy";
-                    }
-                    Class<?> returnType = method.getReturnType();
-                    if (returnType == boolean.class) {
-                        return false;
-                    }
-                    if (returnType == int.class) {
-                        return 0;
-                    }
-                    if (returnType == long.class) {
-                        return 0L;
-                    }
-                    return null;
-                });
     }
 
     private static class CacheTestConfig extends ZrLogConfig {
@@ -1297,11 +1283,13 @@ public class ServiceUtilityFallbackTest {
 
     private static class FakeStaticSitePlugin implements StaticSitePlugin {
         private final com.zrlog.common.vo.PublicWebSiteInfo site = new com.zrlog.common.vo.PublicWebSiteInfo();
-        @Override public com.zrlog.common.vo.PublicWebSiteInfo getSiteInfo() { return site; }
-
-
-        private int startCount;
         private final Lock lock = new ReentrantLock();
+        private int startCount;
+
+        @Override
+        public com.zrlog.common.vo.PublicWebSiteInfo getSiteInfo() {
+            return site;
+        }
 
         @Override
         public String getSiteVersion() {

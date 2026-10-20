@@ -15,11 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class AdminTokenServiceTest {
 
@@ -32,12 +28,88 @@ public class AdminTokenServiceTest {
 
     private long now = 1_700_000_000_000L;
 
+    private static Cookie createAdminCookie(AdminTokenService service, String secretKey) throws Exception {
+        CapturedResponse capturedResponse = new CapturedResponse();
+        service.setAdminToken(7, secretKey, "session-id", "http",
+                request("/admin", new HashMap<>(), null, new HashMap<>()),
+                capturedResponse.response());
+        AdminTokenThreadLocal.remove();
+        return capturedResponse.cookies.get(0);
+    }
+
+    private static Map<String, String> header(String token) {
+        Map<String, String> headers = new HashMap<>();
+        headers.put(AdminTokenService.ADMIN_TOKEN_KEY_IN_REQUEST_HEADER, token);
+        return headers;
+    }
+
+    private static void cacheSecretKey(AdminTokenService service, int userId, String secretKey) throws Exception {
+        secretCache(service).put(userId, secretKey);
+    }
+
+    private static Map<Integer, String> secretCache(AdminTokenService service) throws Exception {
+        Field field = AdminTokenService.class.getDeclaredField("userSecretKeyCacheMap");
+        field.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<Integer, String> cache = (Map<Integer, String>) field.get(service);
+        return cache;
+    }
+
+    private static HttpRequest request(String contextPath, Map<String, String> headers,
+                                       Cookie[] cookies, Map<String, String[]> params) {
+        return (HttpRequest) Proxy.newProxyInstance(
+                AdminTokenServiceTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    String name = method.getName();
+                    if ("getContextPath".equals(name)) {
+                        return contextPath;
+                    }
+                    if ("getHeader".equals(name)) {
+                        return headers.get((String) args[0]);
+                    }
+                    if ("getHeaderMap".equals(name)) {
+                        return headers;
+                    }
+                    if ("getCookies".equals(name)) {
+                        return cookies;
+                    }
+                    if ("getParaToStr".equals(name)) {
+                        String[] values = params.get((String) args[0]);
+                        return values == null || values.length == 0 ? null : values[0];
+                    }
+                    if ("getParamMap".equals(name)) {
+                        return params;
+                    }
+                    if ("getScheme".equals(name)) {
+                        return "http";
+                    }
+                    if ("toString".equals(name)) {
+                        return "HttpRequestProxy";
+                    }
+                    return null;
+                });
+    }
+
     private AdminTokenService testService(long timeout) {
-        return new AdminTokenService(timeout, () -> installed, () -> staticHtml, () -> { throw new IllegalStateException("No database in token unit tests"); },
-                () -> { throw new IllegalStateException("Preferences are overridden by this test"); }) {
-            @Override protected long sessionTimeoutMinutes(int userId) { return personalTimeouts.getOrDefault(userId, timeout); }
-            @Override protected long currentTimeMillis() { return now; }
-            @Override protected com.zrlog.data.security.AccountAccess loadAccount(int userId) {
+        return new AdminTokenService(timeout, () -> installed, () -> staticHtml, () -> {
+            throw new IllegalStateException("No database in token unit tests");
+        },
+                () -> {
+                    throw new IllegalStateException("Preferences are overridden by this test");
+                }) {
+            @Override
+            protected long sessionTimeoutMinutes(int userId) {
+                return personalTimeouts.getOrDefault(userId, timeout);
+            }
+
+            @Override
+            protected long currentTimeMillis() {
+                return now;
+            }
+
+            @Override
+            protected com.zrlog.data.security.AccountAccess loadAccount(int userId) {
                 return com.zrlog.data.security.AccountAccess.from(Map.of("userId", userId, "role", "owner", "enabled", true, "authVersion", 0));
             }
         };
@@ -153,7 +225,10 @@ public class AdminTokenServiceTest {
         AdminTokenService service = testService(30);
         cacheSecretKey(service, 7, "secret-key");
         com.zrlog.common.vo.AdminTokenVO legacy = new com.zrlog.common.vo.AdminTokenVO();
-        legacy.setUserId(7); legacy.setCreatedDate(now); legacy.setSessionId("legacy"); legacy.setProtocol("http");
+        legacy.setUserId(7);
+        legacy.setCreatedDate(now);
+        legacy.setSessionId("legacy");
+        legacy.setProtocol("http");
         java.lang.reflect.Method encrypt = AdminTokenService.class.getDeclaredMethod("encrypt", String.class, byte[].class);
         encrypt.setAccessible(true);
         byte[] encrypted = (byte[]) encrypt.invoke(service, "secret-key", new com.google.gson.Gson().toJson(legacy).getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -297,69 +372,6 @@ public class AdminTokenServiceTest {
                 capturedResponse.response());
 
         assertEquals("https://example.com/admin/admin/login.html", capturedResponse.redirects.get(0));
-    }
-
-    private static Cookie createAdminCookie(AdminTokenService service, String secretKey) throws Exception {
-        CapturedResponse capturedResponse = new CapturedResponse();
-        service.setAdminToken(7, secretKey, "session-id", "http",
-                request("/admin", new HashMap<>(), null, new HashMap<>()),
-                capturedResponse.response());
-        AdminTokenThreadLocal.remove();
-        return capturedResponse.cookies.get(0);
-    }
-
-    private static Map<String, String> header(String token) {
-        Map<String, String> headers = new HashMap<>();
-        headers.put(AdminTokenService.ADMIN_TOKEN_KEY_IN_REQUEST_HEADER, token);
-        return headers;
-    }
-
-    private static void cacheSecretKey(AdminTokenService service, int userId, String secretKey) throws Exception {
-        secretCache(service).put(userId, secretKey);
-    }
-
-    private static Map<Integer, String> secretCache(AdminTokenService service) throws Exception {
-        Field field = AdminTokenService.class.getDeclaredField("userSecretKeyCacheMap");
-        field.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        Map<Integer, String> cache = (Map<Integer, String>) field.get(service);
-        return cache;
-    }
-
-    private static HttpRequest request(String contextPath, Map<String, String> headers,
-                                       Cookie[] cookies, Map<String, String[]> params) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                AdminTokenServiceTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    String name = method.getName();
-                    if ("getContextPath".equals(name)) {
-                        return contextPath;
-                    }
-                    if ("getHeader".equals(name)) {
-                        return headers.get((String) args[0]);
-                    }
-                    if ("getHeaderMap".equals(name)) {
-                        return headers;
-                    }
-                    if ("getCookies".equals(name)) {
-                        return cookies;
-                    }
-                    if ("getParaToStr".equals(name)) {
-                        String[] values = params.get((String) args[0]);
-                        return values == null || values.length == 0 ? null : values[0];
-                    }
-                    if ("getParamMap".equals(name)) {
-                        return params;
-                    }
-                    if ("getScheme".equals(name)) {
-                        return "http";
-                    }
-                    if ("toString".equals(name)) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
     }
 
     private static class CapturedResponse {

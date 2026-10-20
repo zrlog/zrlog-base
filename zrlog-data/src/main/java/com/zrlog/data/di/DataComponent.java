@@ -8,17 +8,17 @@ import com.zrlog.data.service.DistributedLock;
 import com.zrlog.data.service.UserPreferenceStore;
 import com.zrlog.data.util.DistributedLockManager;
 import com.zrlog.model.*;
-
 import dagger.BindsInstance;
 import dagger.Component;
-
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
-/** Application data ownership; DAO methods create fresh mutable instances. */
+/**
+ * Application data ownership; DAO methods create fresh mutable instances.
+ */
 @Singleton
 @Component(modules = DataModule.class)
 public interface DataComponent {

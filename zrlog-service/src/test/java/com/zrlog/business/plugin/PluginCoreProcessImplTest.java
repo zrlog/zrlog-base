@@ -27,12 +27,83 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class PluginCoreProcessImplTest {
+
+    private static void restoreProperty(String key, String value) {
+        if (value == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, value);
+        }
+    }
+
+    private static byte[] minimalElfExecutable() {
+        byte[] executable = new byte[256];
+        executable[0] = 0x7f;
+        executable[1] = 'E';
+        executable[2] = 'L';
+        executable[3] = 'F';
+        executable[4] = 2;
+        executable[5] = 1;
+        executable[6] = 1;
+        ByteBuffer header = ByteBuffer.wrap(executable).order(ByteOrder.LITTLE_ENDIAN);
+        header.putShort(16, (short) 2);
+        header.putShort(18, (short) 62);
+        header.putInt(20, 1);
+        header.putLong(32, 64);
+        header.putShort(52, (short) 64);
+        header.putShort(54, (short) 56);
+        header.putShort(56, (short) 1);
+        header.putInt(64, 1);
+        header.putInt(68, 5);
+        header.putLong(72, 0);
+        header.putLong(96, executable.length);
+        header.putLong(104, executable.length);
+        header.putLong(112, 4096);
+        return executable;
+    }
+
+    private static boolean awaitNonEmptyFile(Path path) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 5000L;
+        while (System.currentTimeMillis() < deadline) {
+            if (Files.isRegularFile(path) && path.toFile().length() > 0L) {
+                return true;
+            }
+            Thread.sleep(5L);
+        }
+        return Files.isRegularFile(path) && path.toFile().length() > 0L;
+    }
+
+    private static void delete(Path path) throws IOException {
+        if (!Files.exists(path)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(path)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(item -> {
+                try {
+                    Files.deleteIfExists(item);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+    }
+
+    private static String setFileArch(String value) throws Exception {
+        Field fileArch = BlogBuildInfoUtil.class.getDeclaredField("fileArch");
+        fileArch.setAccessible(true);
+        String previousFileArch = (String) fileArch.get(null);
+        fileArch.set(null, value);
+        return previousFileArch;
+    }
+
+    private static void setField(Object target, String name, Object value) throws Exception {
+        Field field = PluginCoreProcessImpl.class.getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(target, value);
+    }
 
     @Test
     public void restartBackoffShouldGrowBoundAndResetAfterStableRuntime() {
@@ -132,7 +203,7 @@ public class PluginCoreProcessImplTest {
                     PluginCoreProcessImpl.jvmLaunchArguments(pluginCore, root.resolve("missing.properties").toString(),
                             "-Xmx64m", 11));
             assertFalse(PluginCoreProcessImpl.jvmLaunchArguments(
-                    pluginCore, sqliteProperties.toString(), "-Xmx64m", 11)
+                            pluginCore, sqliteProperties.toString(), "-Xmx64m", 11)
                     .contains(PluginCoreProcessImpl.ENABLE_NATIVE_ACCESS_ARGUMENT));
         } finally {
             delete(root);
@@ -707,80 +778,6 @@ public class PluginCoreProcessImplTest {
         assertEquals(null, field.get(process));
     }
 
-    private static void restoreProperty(String key, String value) {
-        if (value == null) {
-            System.clearProperty(key);
-        } else {
-            System.setProperty(key, value);
-        }
-    }
-
-    private static byte[] minimalElfExecutable() {
-        byte[] executable = new byte[256];
-        executable[0] = 0x7f;
-        executable[1] = 'E';
-        executable[2] = 'L';
-        executable[3] = 'F';
-        executable[4] = 2;
-        executable[5] = 1;
-        executable[6] = 1;
-        ByteBuffer header = ByteBuffer.wrap(executable).order(ByteOrder.LITTLE_ENDIAN);
-        header.putShort(16, (short) 2);
-        header.putShort(18, (short) 62);
-        header.putInt(20, 1);
-        header.putLong(32, 64);
-        header.putShort(52, (short) 64);
-        header.putShort(54, (short) 56);
-        header.putShort(56, (short) 1);
-        header.putInt(64, 1);
-        header.putInt(68, 5);
-        header.putLong(72, 0);
-        header.putLong(96, executable.length);
-        header.putLong(104, executable.length);
-        header.putLong(112, 4096);
-        return executable;
-    }
-
-    private static boolean awaitNonEmptyFile(Path path) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 5000L;
-        while (System.currentTimeMillis() < deadline) {
-            if (Files.isRegularFile(path) && path.toFile().length() > 0L) {
-                return true;
-            }
-            Thread.sleep(5L);
-        }
-        return Files.isRegularFile(path) && path.toFile().length() > 0L;
-    }
-
-    private static void delete(Path path) throws IOException {
-        if (!Files.exists(path)) {
-            return;
-        }
-        try (Stream<Path> paths = Files.walk(path)) {
-            paths.sorted(Comparator.reverseOrder()).forEach(item -> {
-                try {
-                    Files.deleteIfExists(item);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-        }
-    }
-
-    private static String setFileArch(String value) throws Exception {
-        Field fileArch = BlogBuildInfoUtil.class.getDeclaredField("fileArch");
-        fileArch.setAccessible(true);
-        String previousFileArch = (String) fileArch.get(null);
-        fileArch.set(null, value);
-        return previousFileArch;
-    }
-
-    private static void setField(Object target, String name, Object value) throws Exception {
-        Field field = PluginCoreProcessImpl.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
-
     private static class TestPluginCoreProcessHandle extends AbstractPluginCoreProcessHandle {
         private final int failuresBeforeSuccess;
         private int closeCount;
@@ -1112,7 +1109,7 @@ public class PluginCoreProcessImplTest {
         }
 
         private CrashLoopPluginCoreProcessImpl(boolean runAsync, int restartLaunchFailures,
-                                                long... runtimesBeforeCrashMillis) {
+                                               long... runtimesBeforeCrashMillis) {
             super(null, "/blog", () -> 19084);
             this.runAsync = runAsync;
             this.restartLaunchFailures = restartLaunchFailures;

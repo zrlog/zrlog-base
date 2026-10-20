@@ -18,10 +18,8 @@ import java.util.logging.Logger;
 public class StaticFileCacheUtils {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(StaticFileCacheUtils.class);
-
-    private final Map<String, String> cacheFileMap = new ConcurrentHashMap<>();
-
     private static StaticFileCacheUtils instance;
+    private final Map<String, String> cacheFileMap = new ConcurrentHashMap<>();
 
     private StaticFileCacheUtils() {
         refreshCacheFileMap();

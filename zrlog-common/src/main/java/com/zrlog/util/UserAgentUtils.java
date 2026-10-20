@@ -16,42 +16,6 @@ public class UserAgentUtils {
             "(bot|spider|crawler|crawl|slurp|curl|wget|python-requests|python-urllib|java/|okhttp|apache-httpclient|httpclient|go-http-client|postmanruntime|headlesschrome|phantomjs|bingpreview|facebookexternalhit|googleweblight|baiduspider|bytespider|petalbot|semrushbot|ahrefsbot|mj12bot|yandexbot)",
             Pattern.CASE_INSENSITIVE);
 
-    public static class UserAgentInfo {
-        private final String os;
-        private final String browser;
-        private final String browserVersion;
-        private final boolean crawler;
-        private final String agentName;
-        private final String agentVersion;
-
-        public UserAgentInfo(String os, String browser, String browserVersion, boolean crawler) {
-            this(os, browser, browserVersion, crawler, null, null);
-        }
-
-        public UserAgentInfo(String os, String browser, String browserVersion, boolean crawler, String agentName, String agentVersion) {
-            this.os = os;
-            this.browser = browser;
-            this.browserVersion = browserVersion;
-            this.crawler = crawler;
-            this.agentName = agentName;
-            this.agentVersion = agentVersion;
-        }
-
-        public String getOs() { return os; }
-        public String getBrowser() { return browser; }
-        public String getBrowserVersion() { return browserVersion; }
-        public boolean isCrawler() { return crawler; }
-        public String getAgentName() { return agentName; }
-        public String getAgentVersion() { return agentVersion; }
-
-        public String getFullBrowser() {
-            if ("Unknown".equals(browserVersion)) {
-                return browser;
-            }
-            return browser + " " + browserVersion;
-        }
-    }
-
     public static UserAgentInfo parse(String ua) {
         if (ua == null || ua.isEmpty()) {
             return new UserAgentInfo("Unknown", "Unknown", "Unknown", false);
@@ -139,5 +103,58 @@ public class UserAgentUtils {
 
     private static boolean isCrawlerUserAgent(String ua) {
         return CRAWLER_PATTERN.matcher(ua).find();
+    }
+
+    public static class UserAgentInfo {
+        private final String os;
+        private final String browser;
+        private final String browserVersion;
+        private final boolean crawler;
+        private final String agentName;
+        private final String agentVersion;
+
+        public UserAgentInfo(String os, String browser, String browserVersion, boolean crawler) {
+            this(os, browser, browserVersion, crawler, null, null);
+        }
+
+        public UserAgentInfo(String os, String browser, String browserVersion, boolean crawler, String agentName, String agentVersion) {
+            this.os = os;
+            this.browser = browser;
+            this.browserVersion = browserVersion;
+            this.crawler = crawler;
+            this.agentName = agentName;
+            this.agentVersion = agentVersion;
+        }
+
+        public String getOs() {
+            return os;
+        }
+
+        public String getBrowser() {
+            return browser;
+        }
+
+        public String getBrowserVersion() {
+            return browserVersion;
+        }
+
+        public boolean isCrawler() {
+            return crawler;
+        }
+
+        public String getAgentName() {
+            return agentName;
+        }
+
+        public String getAgentVersion() {
+            return agentVersion;
+        }
+
+        public String getFullBrowser() {
+            if ("Unknown".equals(browserVersion)) {
+                return browser;
+            }
+            return browser + " " + browserVersion;
+        }
     }
 }

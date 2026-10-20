@@ -8,6 +8,7 @@ import com.zrlog.util.ThreadUtils;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.lang.reflect.Method;
@@ -26,15 +27,81 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.GZIPOutputStream;
-import java.io.ByteArrayOutputStream;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class HttpHandleAndUtilTest {
+
+    private static Object invokeStatic(String methodName, Object... args) throws Exception {
+        Method method = null;
+        for (Method declaredMethod : HttpUtil.class.getDeclaredMethods()) {
+            if (declaredMethod.getName().equals(methodName) && declaredMethod.getParameterCount() == args.length) {
+                method = declaredMethod;
+                break;
+            }
+        }
+        if (method == null) {
+            throw new IllegalArgumentException(methodName);
+        }
+        method.setAccessible(true);
+        return method.invoke(null, args);
+    }
+
+    private static HttpRequest request(String uri) {
+        return HttpRequest.newBuilder(URI.create(uri)).GET().build();
+    }
+
+    private static HttpResponse<InputStream> response(int statusCode, byte[] body, Map<String, List<String>> headers) {
+        return new HttpResponse<>() {
+            @Override
+            public int statusCode() {
+                return statusCode;
+            }
+
+            @Override
+            public HttpRequest request() {
+                return HttpHandleAndUtilTest.request("https://example.com/api");
+            }
+
+            @Override
+            public Optional<HttpResponse<InputStream>> previousResponse() {
+                return Optional.empty();
+            }
+
+            @Override
+            public HttpHeaders headers() {
+                return HttpHeaders.of(headers, (name, value) -> true);
+            }
+
+            @Override
+            public InputStream body() {
+                return new ByteArrayInputStream(body);
+            }
+
+            @Override
+            public Optional<javax.net.ssl.SSLSession> sslSession() {
+                return Optional.empty();
+            }
+
+            @Override
+            public URI uri() {
+                return URI.create("https://example.com/api");
+            }
+
+            @Override
+            public HttpClient.Version version() {
+                return HttpClient.Version.HTTP_1_1;
+            }
+        };
+    }
+
+    private static byte[] gzip(String value) throws Exception {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream)) {
+            gzipOutputStream.write(value.getBytes(StandardCharsets.UTF_8));
+        }
+        return outputStream.toByteArray();
+    }
 
     @Test
     public void shouldHandlePlainAndGzipStringResponses() throws Exception {
@@ -133,77 +200,6 @@ public class HttpHandleAndUtilTest {
             executorService.shutdownNow();
             executorService.awaitTermination(1, TimeUnit.SECONDS);
         }
-    }
-
-    private static Object invokeStatic(String methodName, Object... args) throws Exception {
-        Method method = null;
-        for (Method declaredMethod : HttpUtil.class.getDeclaredMethods()) {
-            if (declaredMethod.getName().equals(methodName) && declaredMethod.getParameterCount() == args.length) {
-                method = declaredMethod;
-                break;
-            }
-        }
-        if (method == null) {
-            throw new IllegalArgumentException(methodName);
-        }
-        method.setAccessible(true);
-        return method.invoke(null, args);
-    }
-
-    private static HttpRequest request(String uri) {
-        return HttpRequest.newBuilder(URI.create(uri)).GET().build();
-    }
-
-    private static HttpResponse<InputStream> response(int statusCode, byte[] body, Map<String, List<String>> headers) {
-        return new HttpResponse<>() {
-            @Override
-            public int statusCode() {
-                return statusCode;
-            }
-
-            @Override
-            public HttpRequest request() {
-                return HttpHandleAndUtilTest.request("https://example.com/api");
-            }
-
-            @Override
-            public Optional<HttpResponse<InputStream>> previousResponse() {
-                return Optional.empty();
-            }
-
-            @Override
-            public HttpHeaders headers() {
-                return HttpHeaders.of(headers, (name, value) -> true);
-            }
-
-            @Override
-            public InputStream body() {
-                return new ByteArrayInputStream(body);
-            }
-
-            @Override
-            public Optional<javax.net.ssl.SSLSession> sslSession() {
-                return Optional.empty();
-            }
-
-            @Override
-            public URI uri() {
-                return URI.create("https://example.com/api");
-            }
-
-            @Override
-            public HttpClient.Version version() {
-                return HttpClient.Version.HTTP_1_1;
-            }
-        };
-    }
-
-    private static byte[] gzip(String value) throws Exception {
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream)) {
-            gzipOutputStream.write(value.getBytes(StandardCharsets.UTF_8));
-        }
-        return outputStream.toByteArray();
     }
 
     private static class SampleJson {

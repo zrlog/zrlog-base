@@ -21,9 +21,9 @@ import com.zrlog.util.*;
 import com.zrlog.web.BaseWebSetup;
 import com.zrlog.web.TokenServiceProvider;
 import com.zrlog.web.WebSetup;
-
 import sun.misc.Signal;
 
+import javax.sql.DataSource;
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.util.*;
@@ -31,31 +31,30 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.sql.DataSource;
-
 /**
  * 全局服务配置，包含 数据库，插件，更新的实现者等
  */
 public abstract class ZrLogConfig extends AbstractServerConfig {
 
     protected static final Logger LOGGER = LoggerUtil.getLogger(ZrLogConfig.class);
+    private static final String TERM_SIGNAL = "TERM";
     public static boolean nativeImageAgent = false;
+
+    static {
+        disableHikariLogging();
+    }
+
     protected final File installLockFile;
     protected final Plugins plugins;
     protected final Updater updater;
     protected final long createdDate;
     protected final List<WebSetup> webSetups;
-    protected DataSourceWrapper dataSource;
     protected final File dbPropertiesFile;
     protected final ServerConfig serverConfig;
+    protected DataSourceWrapper dataSource;
+    protected ZrLogHttpRequestListener zrLogHttpRequestListener = new ZrLogHttpRequestListener();
     private boolean webSetupsInitialized;
     private volatile boolean databaseInitialized;
-    protected ZrLogHttpRequestListener zrLogHttpRequestListener = new ZrLogHttpRequestListener();
-    private static final String TERM_SIGNAL = "TERM";
-
-    static {
-        disableHikariLogging();
-    }
 
     protected ZrLogConfig(Integer port, Updater updater, String contextPath) {
         NetworkProxy.initialize();
@@ -72,6 +71,10 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         this.webSetups.add(new BaseWebSetup(this));
     }
 
+    private static void disableHikariLogging() {
+        System.setProperty("org.slf4j.simpleLogger.log.com.zaxxer.hikari", "off");
+    }
+
     public long getCreatedDate() {
         return createdDate;
     }
@@ -81,10 +84,6 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
             return ParseUtil.toNamingDurationString(zrLogHttpRequestListener.getTotalHandleTime(), I18nUtil.getCurrentLocale().contains("en"));
         }
         return ParseUtil.toNamingDurationString(System.currentTimeMillis() - createdDate, I18nUtil.getCurrentLocale().contains("en"));
-    }
-
-    private static void disableHikariLogging() {
-        System.setProperty("org.slf4j.simpleLogger.log.com.zaxxer.hikari", "off");
     }
 
     public boolean isTest() {
@@ -109,7 +108,9 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         return dataSource;
     }
 
-    /** Complete module registration before any database-backed service is resolved. */
+    /**
+     * Complete module registration before any database-backed service is resolved.
+     */
     protected final synchronized void initializeWebSetups() {
         if (!webSetupsInitialized) {
             webSetups.forEach(WebSetup::setup);
@@ -145,7 +146,9 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         return updater;
     }
 
-    /** Session access for application assembly; the admin module owns the service instance. */
+    /**
+     * Session access for application assembly; the admin module owns the service instance.
+     */
     public TokenService getTokenService() {
         return initTokenService();
     }
@@ -168,7 +171,9 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         return serverConfig;
     }
 
-    /** Find an enabled module's capability without depending on its implementation. */
+    /**
+     * Find an enabled module's capability without depending on its implementation.
+     */
     public <T> T getWebSetup(Class<T> capability) {
         return webSetups.stream().filter(capability::isInstance).map(capability::cast).findFirst().orElse(null);
     }

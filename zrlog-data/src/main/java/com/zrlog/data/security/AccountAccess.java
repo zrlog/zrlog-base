@@ -2,7 +2,9 @@ package com.zrlog.data.security;
 
 import java.util.*;
 
-/** Current database permissions; never trust roles supplied by a client or an old token. */
+/**
+ * Current database permissions; never trust roles supplied by a client or an old token.
+ */
 public final class AccountAccess {
     public static final Set<String> ROLES = Set.of("owner", "admin", "editor", "author", "contributor");
     private final int userId;
@@ -30,15 +32,6 @@ public final class AccountAccess {
                 row.get("authVersion") instanceof Number ? ((Number) row.get("authVersion")).intValue() : -1);
     }
 
-    /** Immutable delegation bound: restrictions can only narrow existing permissions. */
-    public AccountAccess restrictActions(Collection<String> selected) {
-        Set<String> restricted = new LinkedHashSet<>(selected);
-        if (actions != null) restricted.retainAll(actions);
-        return new AccountAccess(userId, role, enabled, authVersion, Set.copyOf(restricted));
-    }
-
-    boolean permitsAction(String id) { return actions == null || actions.contains(id); }
-
     public static boolean truth(Object value) {
         if (value instanceof Boolean) return (Boolean) value;
         if (value instanceof Number) return ((Number) value).intValue() != 0;
@@ -46,18 +39,59 @@ public final class AccountAccess {
         return "true".equalsIgnoreCase(Objects.toString(value, "")) || "1".equals(Objects.toString(value, ""));
     }
 
-    public int getUserId() { return userId; }
-    public String getRole() { return role; }
-    public int getAuthVersion() { return authVersion; }
-    public boolean isEnabled() { return enabled; }
-    public boolean isOwner() { return enabled && "owner".equals(role); }
-    public boolean isAdministrator() { return enabled && ("owner".equals(role) || "admin".equals(role)); }
-    public boolean managesAllArticles() { return isAdministrator() || enabled && "editor".equals(role); }
-    public boolean canPublish() { return AccountAction.ARTICLE_PUBLISH.allowed(this); }
-    public boolean canAccessArticle(int authorId) { return enabled && (managesAllArticles() || authorId == userId); }
+    /**
+     * Immutable delegation bound: restrictions can only narrow existing permissions.
+     */
+    public AccountAccess restrictActions(Collection<String> selected) {
+        Set<String> restricted = new LinkedHashSet<>(selected);
+        if (actions != null) restricted.retainAll(actions);
+        return new AccountAccess(userId, role, enabled, authVersion, Set.copyOf(restricted));
+    }
+
+    boolean permitsAction(String id) {
+        return actions == null || actions.contains(id);
+    }
+
+    public int getUserId() {
+        return userId;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public int getAuthVersion() {
+        return authVersion;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public boolean isOwner() {
+        return enabled && "owner".equals(role);
+    }
+
+    public boolean isAdministrator() {
+        return enabled && ("owner".equals(role) || "admin".equals(role));
+    }
+
+    public boolean managesAllArticles() {
+        return isAdministrator() || enabled && "editor".equals(role);
+    }
+
+    public boolean canPublish() {
+        return AccountAction.ARTICLE_PUBLISH.allowed(this);
+    }
+
+    public boolean canAccessArticle(int authorId) {
+        return enabled && (managesAllArticles() || authorId == userId);
+    }
+
     public boolean canAccessArticle(int authorId, boolean privateArticle) {
         return canAccessArticle(authorId) && (!privateArticle || isAdministrator() || authorId == userId);
     }
+
     public Set<String> scopes() {
         if (!enabled) return Collections.emptySet();
         Set<String> scopes = new LinkedHashSet<>();

@@ -16,9 +16,8 @@ import java.util.logging.Logger;
 public class TemplateDownloadPlugin extends BaseLockObject implements IPlugin {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(TemplateDownloadPlugin.class);
-
-    private boolean started;
     private final Supplier<String> configuredTemplate;
+    private boolean started;
 
     public TemplateDownloadPlugin(Supplier<String> configuredTemplate) {
         this.configuredTemplate = Objects.requireNonNull(configuredTemplate);

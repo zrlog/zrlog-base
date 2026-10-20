@@ -15,14 +15,17 @@ import java.io.File;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class UpdaterHostLifecycleTest {
 
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
+    private static Updater updater(int port) {
+        UpdaterHosts.ApplicationHost host = UpdaterHosts.application(new String[]{"--port=" + port}, null);
+        return host.adapt(new UpdateSession(host.context(), new FakeUpdater()));
+    }
 
     @Test
     public void upgradeCallbacksFollowTheOwningServerPortAndStopWithoutGlobalConfig() throws Exception {
@@ -53,24 +56,48 @@ public class UpdaterHostLifecycleTest {
         }
     }
 
-    private static Updater updater(int port) {
-        UpdaterHosts.ApplicationHost host = UpdaterHosts.application(new String[]{"--port=" + port}, null);
-        return host.adapt(new UpdateSession(host.context(), new FakeUpdater()));
-    }
-
     private static class TestConfig extends ZrLogConfig {
         private boolean stopped;
 
-        TestConfig(int port, Updater updater) { super(port, updater, ""); }
-        @Override public DataSourceWrapper configDatabase() { return null; }
-        @Override public List<IPlugin> getBasePluginList() { return Collections.emptyList(); }
-        @Override public void stop() { stopped = true; }
+        TestConfig(int port, Updater updater) {
+            super(port, updater, "");
+        }
+
+        @Override
+        public DataSourceWrapper configDatabase() {
+            return null;
+        }
+
+        @Override
+        public List<IPlugin> getBasePluginList() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public void stop() {
+            stopped = true;
+        }
     }
 
     private static class FakeUpdater implements Updater {
-        @Override public void restartProcessAsync(Version version) { throw new AssertionError("No process should be started"); }
-        @Override public String getUnzipPath() { return ""; }
-        @Override public File execFile() { return null; }
-        @Override public UpdaterTypeEnum getType() { return UpdaterTypeEnum.ZIP; }
+        @Override
+        public void restartProcessAsync(Version version) {
+            throw new AssertionError("No process should be started");
+        }
+
+        @Override
+        public String getUnzipPath() {
+            return "";
+        }
+
+        @Override
+        public File execFile() {
+            return null;
+        }
+
+        @Override
+        public UpdaterTypeEnum getType() {
+            return UpdaterTypeEnum.ZIP;
+        }
     }
 }

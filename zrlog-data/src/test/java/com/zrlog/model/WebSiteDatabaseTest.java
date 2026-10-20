@@ -2,8 +2,8 @@ package com.zrlog.model;
 
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.dto.FaviconBase64DTO;
-import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -11,22 +11,20 @@ import org.junit.runners.Parameterized;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class WebSiteDatabaseTest {
-
-    @Parameterized.Parameters(name = "{0}")
-    public static DatabaseType[] databases() {
-        return DatabaseType.values();
-    }
 
     private final DatabaseType databaseType;
 
     public WebSiteDatabaseTest(DatabaseType databaseType) {
         this.databaseType = databaseType;
+    }
+
+    @Parameterized.Parameters(name = "{0}")
+    public static DatabaseType[] databases() {
+        return DatabaseType.values();
     }
 
     @Test

@@ -24,9 +24,6 @@ import java.util.logging.Logger;
 
 public class PluginCoreProcessImpl implements PluginCoreProcess {
 
-    private static final Logger LOGGER = LoggerUtil.getLogger(PluginCoreProcessImpl.class);
-    private static final long PROCESS_STOP_TIMEOUT_MILLIS = 2000L;
-    private static final long PROCESS_STOP_RETRY_MILLIS = 1000L;
     static final int PLUGIN_MASTER_PORT_MIN = 40000;
     static final int PLUGIN_MASTER_PORT_MAX_EXCLUSIVE = 50000;
     static final long MIN_RESTART_BACKOFF_MILLIS = TimeUnit.SECONDS.toMillis(5);
@@ -37,29 +34,25 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
     static final long MIN_NATIVE_MAX_HEAP_SIZE = 64L * 1024L * 1024L;
     static final long MAX_NATIVE_MAX_HEAP_SIZE = 512L * 1024L * 1024L;
     static final String ENABLE_NATIVE_ACCESS_ARGUMENT = "--enable-native-access=ALL-UNNAMED";
-    private static final String NATIVE_MAX_HEAP_SIZE_KEY = "pluginCoreNativeMaxHeapSize";
     static final String PLUGIN_CORE_MAIN_CLASS = "com.zrlog.plugincore.server.Application";
-
-    private AbstractPluginCoreProcessHandle pluginCoreProcessHandle;
+    private static final Logger LOGGER = LoggerUtil.getLogger(PluginCoreProcessImpl.class);
+    private static final long PROCESS_STOP_TIMEOUT_MILLIS = 2000L;
+    private static final long PROCESS_STOP_RETRY_MILLIS = 1000L;
+    private static final String NATIVE_MAX_HEAP_SIZE_KEY = "pluginCoreNativeMaxHeapSize";
     private final AtomicBoolean stopped = new AtomicBoolean(false);
     private final AtomicBoolean shutdownHookRegistered = new AtomicBoolean(false);
     private final Object processLifecycleLock = new Object();
-    private File infoLogFile;
-    private File errorLogFile;
-    private int lastPluginMasterPort = -1;
     private final Runnable onStopRunnable;
     //插件服务存放的物理路径
     private final File pluginsFolder;
-    private boolean unzipped = false;
     private final String contextPath;
     private final IntSupplier hostPort;
+    private AbstractPluginCoreProcessHandle pluginCoreProcessHandle;
+    private File infoLogFile;
+    private File errorLogFile;
+    private int lastPluginMasterPort = -1;
+    private boolean unzipped = false;
 
-
-    private File getLogFile(boolean error) {
-        File logFile = new File(PathUtil.getLogPath() + "/plugin-core-" + (error ? "error" : "info") + "." + new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()) + ".log");
-        logFile.getParentFile().mkdirs();
-        return logFile;
-    }
 
     public PluginCoreProcessImpl(Runnable onStopRunnable, String contextPath, IntSupplier hostPort) {
         this.contextPath = contextPath;
@@ -70,6 +63,107 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
         } else {
             this.pluginsFolder = PathUtil.getConfFile("/plugins/");
         }
+    }
+
+    static List<String> jvmLaunchArguments(File pluginCoreFile, String dbProperties, String pluginJvmArgs) {
+        return jvmLaunchArguments(pluginCoreFile, dbProperties, pluginJvmArgs, Runtime.version().feature());
+    }
+
+    static List<String> jvmLaunchArguments(File pluginCoreFile, String dbProperties, String pluginJvmArgs,
+                                           int runtimeFeatureVersion) {
+        List<String> args = new ArrayList<>(Arrays.asList(pluginJvmArgs.split(" ")));
+        args.addAll(com.zrlog.util.NetworkProxy.initialize().launchArguments());
+        if (runtimeFeatureVersion >= 22 && !args.contains(ENABLE_NATIVE_ACCESS_ARGUMENT)) {
+            args.add(ENABLE_NATIVE_ACCESS_ARGUMENT);
+        }
+        if (usesLocalSqlite(dbProperties)) {
+            String parentClasspath = System.getProperty("java.class.path", "");
+            String pluginCoreClasspath = pluginCoreFile.toString();
+            if (!parentClasspath.isEmpty()) {
+                pluginCoreClasspath += File.pathSeparator + parentClasspath;
+            }
+            args.add("-cp");
+            args.add(pluginCoreClasspath);
+            args.add(PLUGIN_CORE_MAIN_CLASS);
+        } else {
+            args.add("-jar");
+            args.add(pluginCoreFile.toString());
+        }
+        return args;
+    }
+
+    static boolean usesLocalSqlite(String dbProperties) {
+        if (dbProperties == null) {
+            return false;
+        }
+        Properties properties = new Properties();
+        try (FileInputStream inputStream = new FileInputStream(dbProperties)) {
+            properties.load(inputStream);
+        } catch (IOException e) {
+            return false;
+        }
+        String jdbcUrl = properties.getProperty("jdbcUrl");
+        return jdbcUrl != null && jdbcUrl.regionMatches(true, 0, "jdbc:sqlite:", 0, "jdbc:sqlite:".length());
+    }
+
+    static long resolveNativeMaxHeapSize(String configured) {
+        if (!isValidNativeMaxHeapSize(configured)) {
+            return DEFAULT_NATIVE_MAX_HEAP_SIZE;
+        }
+        return Long.parseLong(configured.trim());
+    }
+
+    private static boolean isValidNativeMaxHeapSize(String configured) {
+        if (configured == null || configured.trim().isEmpty()) {
+            return false;
+        }
+        try {
+            long value = Long.parseLong(configured.trim());
+            return value >= MIN_NATIVE_MAX_HEAP_SIZE && value <= MAX_NATIVE_MAX_HEAP_SIZE;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private static String processId(Process process) {
+        if (Objects.isNull(process)) {
+            return "none";
+        }
+        try {
+            return Long.toString(process.pid());
+        } catch (RuntimeException e) {
+            return "unknown";
+        }
+    }
+
+    private static String processExitCode(Process process) {
+        try {
+            if (Objects.isNull(process) || process.isAlive()) {
+                return "running";
+            }
+            return Integer.toString(process.exitValue());
+        } catch (RuntimeException e) {
+            return "unknown";
+        }
+    }
+
+    static long nextRestartBackoffMillis(long previousBackoffMillis, long processRuntimeMillis) {
+        if (processRuntimeMillis >= STABLE_PROCESS_RUNTIME_MILLIS) {
+            return MIN_RESTART_BACKOFF_MILLIS;
+        }
+        if (previousBackoffMillis < MIN_RESTART_BACKOFF_MILLIS) {
+            return MIN_RESTART_BACKOFF_MILLIS;
+        }
+        if (previousBackoffMillis >= MAX_RESTART_BACKOFF_MILLIS / 2L) {
+            return MAX_RESTART_BACKOFF_MILLIS;
+        }
+        return Math.min(MAX_RESTART_BACKOFF_MILLIS, previousBackoffMillis * 2L);
+    }
+
+    private File getLogFile(boolean error) {
+        File logFile = new File(PathUtil.getLogPath() + "/plugin-core-" + (error ? "error" : "info") + "." + new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()) + ".log");
+        logFile.getParentFile().mkdirs();
+        return logFile;
     }
 
     String programName(File pluginCoreFile) {
@@ -159,47 +253,6 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
         return new ProcessBuilder(cmd).redirectOutput(infoLogFile).redirectError(errorLogFile).start();
     }
 
-    static List<String> jvmLaunchArguments(File pluginCoreFile, String dbProperties, String pluginJvmArgs) {
-        return jvmLaunchArguments(pluginCoreFile, dbProperties, pluginJvmArgs, Runtime.version().feature());
-    }
-
-    static List<String> jvmLaunchArguments(File pluginCoreFile, String dbProperties, String pluginJvmArgs,
-                                           int runtimeFeatureVersion) {
-        List<String> args = new ArrayList<>(Arrays.asList(pluginJvmArgs.split(" ")));
-        args.addAll(com.zrlog.util.NetworkProxy.initialize().launchArguments());
-        if (runtimeFeatureVersion >= 22 && !args.contains(ENABLE_NATIVE_ACCESS_ARGUMENT)) {
-            args.add(ENABLE_NATIVE_ACCESS_ARGUMENT);
-        }
-        if (usesLocalSqlite(dbProperties)) {
-            String parentClasspath = System.getProperty("java.class.path", "");
-            String pluginCoreClasspath = pluginCoreFile.toString();
-            if (!parentClasspath.isEmpty()) {
-                pluginCoreClasspath += File.pathSeparator + parentClasspath;
-            }
-            args.add("-cp");
-            args.add(pluginCoreClasspath);
-            args.add(PLUGIN_CORE_MAIN_CLASS);
-        } else {
-            args.add("-jar");
-            args.add(pluginCoreFile.toString());
-        }
-        return args;
-    }
-
-    static boolean usesLocalSqlite(String dbProperties) {
-        if (dbProperties == null) {
-            return false;
-        }
-        Properties properties = new Properties();
-        try (FileInputStream inputStream = new FileInputStream(dbProperties)) {
-            properties.load(inputStream);
-        } catch (IOException e) {
-            return false;
-        }
-        String jdbcUrl = properties.getProperty("jdbcUrl");
-        return jdbcUrl != null && jdbcUrl.regionMatches(true, 0, "jdbc:sqlite:", 0, "jdbc:sqlite:".length());
-    }
-
     long nativeMaxHeapSize() {
         String configured = ConfigKit.get(NATIVE_MAX_HEAP_SIZE_KEY, Long.toString(DEFAULT_NATIVE_MAX_HEAP_SIZE));
         if (!isValidNativeMaxHeapSize(configured)) {
@@ -207,25 +260,6 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                     + ", use " + DEFAULT_NATIVE_MAX_HEAP_SIZE);
         }
         return resolveNativeMaxHeapSize(configured);
-    }
-
-    static long resolveNativeMaxHeapSize(String configured) {
-        if (!isValidNativeMaxHeapSize(configured)) {
-            return DEFAULT_NATIVE_MAX_HEAP_SIZE;
-        }
-        return Long.parseLong(configured.trim());
-    }
-
-    private static boolean isValidNativeMaxHeapSize(String configured) {
-        if (configured == null || configured.trim().isEmpty()) {
-            return false;
-        }
-        try {
-            long value = Long.parseLong(configured.trim());
-            return value >= MIN_NATIVE_MAX_HEAP_SIZE && value <= MAX_NATIVE_MAX_HEAP_SIZE;
-        } catch (NumberFormatException e) {
-            return false;
-        }
     }
 
     String getInstalledPluginFolder() {
@@ -518,28 +552,6 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                 % (PLUGIN_MASTER_PORT_MAX_EXCLUSIVE - PLUGIN_MASTER_PORT_MIN);
     }
 
-    private static String processId(Process process) {
-        if (Objects.isNull(process)) {
-            return "none";
-        }
-        try {
-            return Long.toString(process.pid());
-        } catch (RuntimeException e) {
-            return "unknown";
-        }
-    }
-
-    private static String processExitCode(Process process) {
-        try {
-            if (Objects.isNull(process) || process.isAlive()) {
-                return "running";
-            }
-            return Integer.toString(process.exitValue());
-        } catch (RuntimeException e) {
-            return "unknown";
-        }
-    }
-
     PluginGhostWatcher newPluginGhostWatcher(String host, int port) {
         return new PluginGhostWatcher(host, port);
     }
@@ -558,19 +570,6 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
 
     void pauseBeforePluginCoreStopRetry(long millis) throws InterruptedException {
         Thread.sleep(millis);
-    }
-
-    static long nextRestartBackoffMillis(long previousBackoffMillis, long processRuntimeMillis) {
-        if (processRuntimeMillis >= STABLE_PROCESS_RUNTIME_MILLIS) {
-            return MIN_RESTART_BACKOFF_MILLIS;
-        }
-        if (previousBackoffMillis < MIN_RESTART_BACKOFF_MILLIS) {
-            return MIN_RESTART_BACKOFF_MILLIS;
-        }
-        if (previousBackoffMillis >= MAX_RESTART_BACKOFF_MILLIS / 2L) {
-            return MAX_RESTART_BACKOFF_MILLIS;
-        }
-        return Math.min(MAX_RESTART_BACKOFF_MILLIS, previousBackoffMillis * 2L);
     }
 
     boolean stopAndAwaitProcess(Process process) {

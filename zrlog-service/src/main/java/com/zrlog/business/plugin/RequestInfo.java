@@ -4,6 +4,11 @@ public class RequestInfo {
     private String url;
     private String userAgent;
     private Long articleId;
+    private long requestTime;
+    private long usedTime;
+    private String ip;
+    private boolean deal;
+    private String requestUri;
 
     public long getRequestTime() {
         return requestTime;
@@ -13,10 +18,6 @@ public class RequestInfo {
         this.requestTime = requestTime;
     }
 
-    private long requestTime;
-    private long usedTime;
-    private String ip;
-
     public boolean isDeal() {
         return deal;
     }
@@ -25,8 +26,6 @@ public class RequestInfo {
         this.deal = deal;
     }
 
-    private boolean deal;
-
     public String getRequestUri() {
         return requestUri;
     }
@@ -34,8 +33,6 @@ public class RequestInfo {
     public void setRequestUri(String requestUri) {
         this.requestUri = requestUri;
     }
-
-    private String requestUri;
 
     public String getUrl() {
         return url;

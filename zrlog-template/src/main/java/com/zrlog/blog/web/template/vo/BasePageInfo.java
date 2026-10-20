@@ -12,6 +12,7 @@ import java.util.Objects;
  */
 public class BasePageInfo {
 
+    protected BaseDataInitVO init;
     private String title;
     private String keywords;
     private String description;
@@ -29,7 +30,6 @@ public class BasePageInfo {
     private String template;
     private String staticResourceBaseUrl;
     private Map<String, Object> _res;
-    protected BaseDataInitVO init;
     private String key;
     private String requrl;
     private String reqUriPath;

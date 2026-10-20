@@ -13,7 +13,6 @@ import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.model.WebSite;
 import com.zrlog.util.ThreadUtils;
-
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
@@ -31,6 +30,7 @@ import java.util.stream.Collectors;
  */
 @Singleton
 public class CacheRefreshService {
+    private static final Logger LOGGER = LoggerUtil.getLogger(CacheRefreshService.class);
     private final CacheService cacheService;
     private final jakarta.inject.Provider<WebSite> websites;
     private final Supplier<PluginCorePlugin> pluginCore;
@@ -48,13 +48,18 @@ public class CacheRefreshService {
         this.staticSites = Objects.requireNonNull(staticSites);
     }
 
+    private static int getSyncTimeout() {
+        if (EnvKit.isFaaSMode()) {
+            //建议配置 FaaS 为最大超时
+            return 12 * 60;
+        }
+        return 3600;
+    }
+
     public boolean isStaticSiteDisabled() {
         PublicWebSiteInfo site = cacheService.getPublicWebSiteInfo();
         return site == null || !Boolean.TRUE.equals(site.getGenerator_html_status()) || StringUtils.isEmpty(site.getHost());
     }
-
-
-    private static final Logger LOGGER = LoggerUtil.getLogger(CacheRefreshService.class);
 
     public void updateCache(boolean async, HttpRequest request, List<StaticSiteType> staticSiteTypeList) {
         try {
@@ -75,17 +80,9 @@ public class CacheRefreshService {
      * Refreshes cache data synchronously for callers that need to report the actual completion result.
      */
     public void updateCacheSynchronouslyOrThrow(HttpRequest request,
-                                                 List<StaticSiteType> staticSiteTypeList) {
+                                                List<StaticSiteType> staticSiteTypeList) {
         BaseDataInitVO initVO = cacheService.refreshInitData();
         refreshPluginCacheData(initVO.getVersion() + "", request, staticSiteTypeList);
-    }
-
-    private static int getSyncTimeout() {
-        if (EnvKit.isFaaSMode()) {
-            //建议配置 FaaS 为最大超时
-            return 12 * 60;
-        }
-        return 3600;
     }
 
     private void notifyPluginUpdateCache(String cacheVersion, HttpRequest request) {

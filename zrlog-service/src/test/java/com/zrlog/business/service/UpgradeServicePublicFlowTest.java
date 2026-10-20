@@ -23,23 +23,37 @@ import org.junit.rules.TemporaryFolder;
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class UpgradeServicePublicFlowTest {
 
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
+    private static Version futureVersion(String versionText) {
+        Version version = new Version();
+        version.setBuildId("test-" + versionText);
+        version.setVersion(versionText);
+        version.setBuildDate(new Date(BlogBuildInfoUtil.getTime().getTime() + 86_400_000L));
+        version.setZipDownloadUrl("https://example.invalid/zrlog.zip");
+        version.setWarDownloadUrl("https://example.invalid/zrlog.war");
+        return version;
+    }
+
+    private static Map<String, Object> backend() {
+        Map<String, Object> backend = new HashMap<>();
+        backend.put("upgrade.lambda.download", "download upgrade file");
+        backend.put("upgrade.result.noChange", "No change");
+        backend.put("upgrade.tips.docker", "Use docker image");
+        backend.put("upgrade.tips.systemService", "/etc/init.d/zrlog upgrade");
+        backend.put("upgrade.status.downloading", "Downloading");
+        backend.put("upgrade.status.downloaded", "Downloaded");
+        backend.put("upgrade.backupProtection.riskAcceptanceRequired",
+                "Verify a recent backup or accept the backup risk");
+        return backend;
+    }
 
     @Test
     public void shouldReturnNoUpgradeWhenPluginIsMissing() {
@@ -215,11 +229,29 @@ public class UpgradeServicePublicFlowTest {
             version.setWarMd5sum("bad-md5");
             File updateTemp = temporaryFolder.newFolder("war-download");
             Updater updater = new Updater() {
-                @Override public void restartProcessAsync(Version ignored) { }
-                @Override public File getUpdateTempPath() { return updateTemp; }
-                @Override public String getUnzipPath() { return updateTemp.getAbsolutePath(); }
-                @Override public File execFile() { return null; }
-                @Override public UpdaterTypeEnum getType() { return UpdaterTypeEnum.WAR; }
+                @Override
+                public void restartProcessAsync(Version ignored) {
+                }
+
+                @Override
+                public File getUpdateTempPath() {
+                    return updateTemp;
+                }
+
+                @Override
+                public String getUnzipPath() {
+                    return updateTemp.getAbsolutePath();
+                }
+
+                @Override
+                public File execFile() {
+                    return null;
+                }
+
+                @Override
+                public UpdaterTypeEnum getType() {
+                    return UpdaterTypeEnum.WAR;
+                }
             };
 
             assertThrows(DownloadUpgradeFileException.class, () ->
@@ -268,29 +300,6 @@ public class UpgradeServicePublicFlowTest {
         } finally {
             server.stop(0);
         }
-    }
-
-    private static Version futureVersion(String versionText) {
-        Version version = new Version();
-        version.setBuildId("test-" + versionText);
-        version.setVersion(versionText);
-        version.setBuildDate(new Date(BlogBuildInfoUtil.getTime().getTime() + 86_400_000L));
-        version.setZipDownloadUrl("https://example.invalid/zrlog.zip");
-        version.setWarDownloadUrl("https://example.invalid/zrlog.war");
-        return version;
-    }
-
-    private static Map<String, Object> backend() {
-        Map<String, Object> backend = new HashMap<>();
-        backend.put("upgrade.lambda.download", "download upgrade file");
-        backend.put("upgrade.result.noChange", "No change");
-        backend.put("upgrade.tips.docker", "Use docker image");
-        backend.put("upgrade.tips.systemService", "/etc/init.d/zrlog upgrade");
-        backend.put("upgrade.status.downloading", "Downloading");
-        backend.put("upgrade.status.downloaded", "Downloaded");
-        backend.put("upgrade.backupProtection.riskAcceptanceRequired",
-                "Verify a recent backup or accept the backup risk");
-        return backend;
     }
 
     private static class FakeUpdateVersionInfoPlugin extends UpdateVersionInfoPlugin {

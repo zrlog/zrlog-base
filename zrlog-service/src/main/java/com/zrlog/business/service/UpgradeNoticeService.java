@@ -8,7 +8,6 @@ import com.zrlog.business.rest.response.CheckVersionResponse;
 import com.zrlog.business.updater.UpdateVersionInfoPlugin;
 import com.zrlog.common.vo.Version;
 import com.zrlog.util.ZrLogUtil;
-
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
@@ -23,15 +22,13 @@ public class UpgradeNoticeService {
     private static final String UPGRADE_NOTICE_KEY = "admin_message_center_upgrade_notice";
 
     private final BooleanSupplier installed;
-
+    private final Gson gson = new Gson();
+    private final WebsiteKvService kvService;
     @Inject
     public UpgradeNoticeService(BooleanSupplier installed, WebsiteKvService kvService) {
         this.installed = Objects.requireNonNull(installed);
         this.kvService = Objects.requireNonNull(kvService);
     }
-
-    private final Gson gson = new Gson();
-    private final WebsiteKvService kvService;
 
     public void sync(Version version) {
         if (!installed.getAsBoolean()) {

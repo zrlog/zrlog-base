@@ -29,15 +29,47 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class StaticSitePluginTest {
 
     @Rule
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
+    private static HttpRequest request(String uri, String userAgent, String acceptLanguage) {
+        return (HttpRequest) Proxy.newProxyInstance(
+                StaticSitePluginTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    if ("getUri".equals(method.getName())) {
+                        return uri;
+                    }
+                    if ("getHeader".equals(method.getName())) {
+                        if ("User-Agent".equals(args[0])) {
+                            return userAgent;
+                        }
+                        if ("Accept-Language".equals(args[0])) {
+                            return acceptLanguage;
+                        }
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "HttpRequestProxy";
+                    }
+                    return null;
+                });
+    }
+
+    private static java.io.InputStream input(String value) {
+        return new java.io.ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void restoreProperty(String key, String value) {
+        if (value == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, value);
+        }
+    }
 
     @Test
     public void shouldParseOnlyRootHtmlLinksFromCachedPage() throws Exception {
@@ -253,13 +285,16 @@ public class StaticSitePluginTest {
     public void shouldExportNotFoundDocumentWithAndWithoutContextPath() throws Exception {
         for (String contextPath : new String[]{"", "/sub"}) {
             TestStaticSitePlugin plugin = new TestStaticSitePlugin() {
-                @Override public String getContextPath() { return contextPath; }
+                @Override
+                public String getContextPath() {
+                    return contextPath;
+                }
             };
             plugin.handleStatusPageMap.put(plugin.notFindFile(), StaticSitePlugin.HandleState.NEW);
             StaticFetchInterceptor.pages.put("/error/404.html", "<html><body>Missing page"
                     + "<a href=\"/must-not-crawl.html\">ignored</a></body></html>");
             withSite(plugin, true, "blog.example.com", serverConfig -> {
-                    serverConfig.setContextPath(contextPath);
+                serverConfig.setContextPath(contextPath);
                 serverConfig.addInterceptor(StaticFetchInterceptor.class);
                 ApplicationContext applicationContext = new ApplicationContext(serverConfig);
                 applicationContext.init();
@@ -376,41 +411,6 @@ public class StaticSitePluginTest {
         }
     }
 
-    private static HttpRequest request(String uri, String userAgent, String acceptLanguage) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                StaticSitePluginTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getUri".equals(method.getName())) {
-                        return uri;
-                    }
-                    if ("getHeader".equals(method.getName())) {
-                        if ("User-Agent".equals(args[0])) {
-                            return userAgent;
-                        }
-                        if ("Accept-Language".equals(args[0])) {
-                            return acceptLanguage;
-                        }
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
-    }
-
-    private static java.io.InputStream input(String value) {
-        return new java.io.ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static void restoreProperty(String key, String value) {
-        if (value == null) {
-            System.clearProperty(key);
-        } else {
-            System.setProperty(key, value);
-        }
-    }
-
     private interface ThrowingRunnable {
         void run() throws Exception;
     }
@@ -444,12 +444,14 @@ public class StaticSitePluginTest {
 
     private static class TestStaticSitePlugin implements StaticSitePlugin {
         private final PublicWebSiteInfo site = new PublicWebSiteInfo();
-        @Override public PublicWebSiteInfo getSiteInfo() { return site; }
-
-
         private final Map<String, HandleState> handleStatusPageMap = new ConcurrentHashMap<>();
         private final Lock parseLock = new ReentrantLock();
         private final List<File> cacheFiles = new ArrayList<>();
+
+        @Override
+        public PublicWebSiteInfo getSiteInfo() {
+            return site;
+        }
 
         @Override
         public String getVersionFileName() {

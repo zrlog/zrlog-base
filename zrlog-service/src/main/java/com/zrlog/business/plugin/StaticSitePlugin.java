@@ -27,6 +27,8 @@ import static com.zrlog.plugin.BaseStaticSitePlugin.isStaticPluginRequest;
 
 public interface StaticSitePlugin extends BaseStaticSitePlugin {
 
+    Logger LOGGER = LoggerUtil.getLogger(StaticSitePlugin.class);
+
     static String getSuffix(HttpRequest request, boolean staticHtml) {
         if (isStaticPluginRequest(request) || staticHtml) {
             return ".html";
@@ -34,7 +36,9 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
         return "";
     }
 
-    Logger LOGGER = LoggerUtil.getLogger(StaticSitePlugin.class);
+    static boolean isDisabled(boolean staticHtml, String host) {
+        return !staticHtml || StringUtils.isEmpty(host);
+    }
 
     default void faviconHandle(String faviconIconBase64, String saveFilePath, Boolean saveToCache) {
         if (StringUtils.isEmpty(faviconIconBase64)) {
@@ -73,10 +77,6 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
     default boolean isStaticHtmlEnabled() {
         PublicWebSiteInfo site = getSiteInfo();
         return site != null && Boolean.TRUE.equals(site.getGenerator_html_status());
-    }
-
-    static boolean isDisabled(boolean staticHtml, String host) {
-        return !staticHtml || StringUtils.isEmpty(host);
     }
 
     default boolean isDisabled() {

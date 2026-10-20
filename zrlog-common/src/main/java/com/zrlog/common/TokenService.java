@@ -29,7 +29,9 @@ public interface TokenService {
      */
     AdminFullTokenVO getAdminTokenVO(HttpRequest request);
 
-    /** Renew an authenticated browser session without changing its chosen lifetime. */
+    /**
+     * Renew an authenticated browser session without changing its chosen lifetime.
+     */
     default void refreshAdminToken(AdminFullTokenVO token, HttpRequest request, HttpResponse response) throws Exception {
         setAdminToken(token.getUserId(), token.getSecretKey(), token.getSessionId(), token.getProtocol(), request, response);
     }

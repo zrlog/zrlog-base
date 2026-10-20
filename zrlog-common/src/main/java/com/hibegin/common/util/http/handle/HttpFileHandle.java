@@ -34,14 +34,6 @@ public class HttpFileHandle extends HttpHandle<File> {
         this.fileName = fileName;
     }
 
-    private String getFileName(String uriPath) {
-        if (StringUtils.isEmpty(fileName)) {
-            String[] split = uriPath.split("/");
-            return split[split.length - 1];
-        }
-        return fileName;
-    }
-
     private static String getFileNameByHeader(String header) {
         if (Objects.nonNull(header) && header.startsWith("attachment;")) {
             String s = header.substring("attachment;".length()).trim();
@@ -52,6 +44,14 @@ public class HttpFileHandle extends HttpHandle<File> {
             }
         }
         return null;
+    }
+
+    private String getFileName(String uriPath) {
+        if (StringUtils.isEmpty(fileName)) {
+            String[] split = uriPath.split("/");
+            return split[split.length - 1];
+        }
+        return fileName;
     }
 
     @Override

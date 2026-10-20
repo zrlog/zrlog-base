@@ -9,7 +9,6 @@ import com.zrlog.data.dto.CommentDTO;
 import com.zrlog.data.dto.VisitorCommentDTO;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.util.DateValueFormatUtils;
-
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;
@@ -24,9 +23,8 @@ import java.util.Objects;
  */
 public class Comment extends BasePageableDAO {
 
-    private final DataSourceWrapper dataSource;
-
     public static final String TABLE_NAME = "comment";
+    private final DataSourceWrapper dataSource;
 
     @Inject
     public Comment(DataSourceWrapper dataSource) {
@@ -36,7 +34,13 @@ public class Comment extends BasePageableDAO {
         this.pk = "commentId";
     }
 
-    public PageData<CommentDTO> find(PageRequest page) { return find(page, null); }
+    private static String formatCommentTime(Object value) {
+        return DateValueFormatUtils.format(value, "yyyy-MM-dd HH:mm:ss");
+    }
+
+    public PageData<CommentDTO> find(PageRequest page) {
+        return find(page, null);
+    }
 
     public PageData<CommentDTO> find(PageRequest page, Integer privateOwnerId) {
         String sql = "select commentId as id,userComment,header,commTime,userMail,userHome,userIp,userName,hide,logId from " + tableName + (privateOwnerId == null ? "" : " where logId in (select logId from log where privacy=false or userId=?)") + " order by commTime desc";
@@ -82,10 +86,6 @@ public class Comment extends BasePageableDAO {
             }
         }
         return doConvertList(comments, VisitorCommentDTO.class);
-    }
-
-    private static String formatCommentTime(Object value) {
-        return DateValueFormatUtils.format(value, "yyyy-MM-dd HH:mm:ss");
     }
 
     public void doRead(long id) {

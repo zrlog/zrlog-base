@@ -11,7 +11,8 @@ import static org.junit.Assert.*;
 
 public class ZrLogTestDatabaseTest {
 
-    @Test public void schemaFixturesAreIsolatedWithoutChangingTheDefaultDao() throws Exception {
+    @Test
+    public void schemaFixturesAreIsolatedWithoutChangingTheDefaultDao() throws Exception {
         var previous = DAO.getDefaultDataSource();
         for (ZrLogTestDatabase.DatabaseType type : ZrLogTestDatabase.DatabaseType.values()) {
             try (ZrLogTestDatabase outer = ZrLogTestDatabase.open(type)) {
@@ -31,7 +32,8 @@ public class ZrLogTestDatabaseTest {
         }
     }
 
-    @Test public void sqliteFilesAreRemovedAndPropertiesCannotMutateTheFixture() throws Exception {
+    @Test
+    public void sqliteFilesAreRemovedAndPropertiesCannotMutateTheFixture() throws Exception {
         Path file;
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(ZrLogTestDatabase.DatabaseType.SQLITE)) {
             String jdbcUrl = db.properties().getProperty("jdbcUrl");
@@ -48,7 +50,8 @@ public class ZrLogTestDatabaseTest {
         assertFalse(Files.exists(Path.of(file + "-shm")));
     }
 
-    @Test public void webApiAdapterRejectsTransactionsAndExposesControlledSqlHooks() throws Exception {
+    @Test
+    public void webApiAdapterRejectsTransactionsAndExposesControlledSqlHooks() throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.openWebApi()) {
             assertTrue(db.dataSource().isWebApi());
             assertThrows(AssertionError.class, () -> db.dataSource().getConnection());
@@ -57,7 +60,9 @@ public class ZrLogTestDatabaseTest {
             db.dataSource().getQueryRunner().update("insert into website(name,value) values(?,?)", "title", "web-api");
             assertEquals(1, updates.get());
             assertEquals("web-api", db.scalar("select value from website where name='title'"));
-            db.beforeWebApiUpdate((sql, params) -> { throw new java.sql.SQLException("controlled failure"); });
+            db.beforeWebApiUpdate((sql, params) -> {
+                throw new java.sql.SQLException("controlled failure");
+            });
             assertThrows(java.sql.SQLException.class,
                     () -> db.dataSource().getQueryRunner().update("delete from website"));
             assertEquals(1L, ((Number) db.scalar("select count(*) from website")).longValue());

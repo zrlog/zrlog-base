@@ -15,9 +15,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class BaseDataInitVO implements Serializable {
 
-    public BaseDataInitVO() {
-    }
-
     private Long version;
     private Long webSiteVersion;
     private List<TagDTO> tags = new ArrayList<>();
@@ -33,6 +30,8 @@ public class BaseDataInitVO implements Serializable {
     private Statistics statistics = new Statistics();
     private List<UserBasicDTO> users = new ArrayList<>();
     private Map<String, Map<String, Object>> templateConfigCacheMap = new ConcurrentHashMap<>();
+    public BaseDataInitVO() {
+    }
 
     public Map<String, Long> getArchives() {
         return archives;
@@ -98,40 +97,6 @@ public class BaseDataInitVO implements Serializable {
         this.statistics = statistics;
     }
 
-    public static class Statistics implements Serializable {
-
-        public Statistics() {
-        }
-
-        private Long totalArticleSize;
-        private Long totalTagSize;
-        private Long totalTypeSize;
-
-        public Long getTotalArticleSize() {
-            return totalArticleSize;
-        }
-
-        public void setTotalArticleSize(Long totalArticleSize) {
-            this.totalArticleSize = totalArticleSize;
-        }
-
-        public Long getTotalTagSize() {
-            return totalTagSize;
-        }
-
-        public void setTotalTagSize(Long totalTagSize) {
-            this.totalTagSize = totalTagSize;
-        }
-
-        public Long getTotalTypeSize() {
-            return totalTypeSize;
-        }
-
-        public void setTotalTypeSize(Long totalTypeSize) {
-            this.totalTypeSize = totalTypeSize;
-        }
-    }
-
     public Long getWebSiteVersion() {
         return webSiteVersion;
     }
@@ -140,12 +105,12 @@ public class BaseDataInitVO implements Serializable {
         this.webSiteVersion = webSiteVersion;
     }
 
-    public void setWebSite(PublicWebSiteInfo webSite) {
-        this.webSite = webSite;
-    }
-
     public PublicWebSiteInfo getWebSite() {
         return webSite;
+    }
+
+    public void setWebSite(PublicWebSiteInfo webSite) {
+        this.webSite = webSite;
     }
 
     public Long getVersion() {
@@ -186,5 +151,38 @@ public class BaseDataInitVO implements Serializable {
 
     public void setTemplateConfigCacheMap(Map<String, Map<String, Object>> templateConfigCacheMap) {
         this.templateConfigCacheMap = templateConfigCacheMap;
+    }
+
+    public static class Statistics implements Serializable {
+
+        private Long totalArticleSize;
+        private Long totalTagSize;
+        private Long totalTypeSize;
+        public Statistics() {
+        }
+
+        public Long getTotalArticleSize() {
+            return totalArticleSize;
+        }
+
+        public void setTotalArticleSize(Long totalArticleSize) {
+            this.totalArticleSize = totalArticleSize;
+        }
+
+        public Long getTotalTagSize() {
+            return totalTagSize;
+        }
+
+        public void setTotalTagSize(Long totalTagSize) {
+            this.totalTagSize = totalTagSize;
+        }
+
+        public Long getTotalTypeSize() {
+            return totalTypeSize;
+        }
+
+        public void setTotalTypeSize(Long totalTypeSize) {
+            this.totalTypeSize = totalTypeSize;
+        }
     }
 }

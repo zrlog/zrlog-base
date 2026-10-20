@@ -16,6 +16,13 @@ import static org.junit.Assert.assertEquals;
 
 public class UpgradeVersionHandlersTest {
 
+    private static Map<String, Object> row(Long logId, String content) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("logid", logId);
+        row.put("content", content);
+        return row;
+    }
+
     @Test
     public void shouldInitializeThumbnailDuringV5Upgrade() throws Exception {
         RecordingDao dao = new RecordingDao(row(7L, "<p>Hello</p>"));
@@ -40,13 +47,6 @@ public class UpgradeVersionHandlersTest {
         assertEquals(8L, dao.executedParams.get(0)[1]);
     }
 
-    private static Map<String, Object> row(Long logId, String content) {
-        Map<String, Object> row = new HashMap<>();
-        row.put("logid", logId);
-        row.put("content", content);
-        return row;
-    }
-
     private static class RecordingDao extends DAO {
 
         private final List<Map<String, Object>> rows;
@@ -57,19 +57,6 @@ public class UpgradeVersionHandlersTest {
         RecordingDao(Map<String, Object> row) {
             super(dataSource());
             this.rows = List.of(row);
-        }
-
-        @Override
-        public List<Map<String, Object>> queryListWithParams(String sql, Object... params) {
-            querySql = sql;
-            return rows;
-        }
-
-        @Override
-        public boolean execute(String sql, Object... params) throws SQLException {
-            executedSql.add(sql);
-            executedParams.add(params);
-            return true;
         }
 
         private static DataSourceWrapper dataSource() {
@@ -95,6 +82,19 @@ public class UpgradeVersionHandlersTest {
                         }
                         return null;
                     });
+        }
+
+        @Override
+        public List<Map<String, Object>> queryListWithParams(String sql, Object... params) {
+            querySql = sql;
+            return rows;
+        }
+
+        @Override
+        public boolean execute(String sql, Object... params) throws SQLException {
+            executedSql.add(sql);
+            executedParams.add(params);
+            return true;
         }
     }
 

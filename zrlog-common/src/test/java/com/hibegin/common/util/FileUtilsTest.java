@@ -11,13 +11,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.junit.Assume.assumeFalse;
 
 public class FileUtilsTest {
+
+    private static File write(File file, String content) throws Exception {
+        File parent = file.getParentFile();
+        if (parent != null && !parent.exists()) {
+            assertTrue(parent.mkdirs());
+        }
+        Files.write(file.toPath(), content.getBytes(StandardCharsets.UTF_8));
+        return file;
+    }
 
     @Test
     public void shouldCollectFilesWithAndWithoutSuffix() throws Exception {
@@ -174,14 +180,5 @@ public class FileUtilsTest {
     public void shouldReturnFileExtension() {
         assertEquals("gz", FileUtils.getFileExt("/tmp/archive.tar.gz"));
         assertEquals("", FileUtils.getFileExt("/tmp/README"));
-    }
-
-    private static File write(File file, String content) throws Exception {
-        File parent = file.getParentFile();
-        if (parent != null && !parent.exists()) {
-            assertTrue(parent.mkdirs());
-        }
-        Files.write(file.toPath(), content.getBytes(StandardCharsets.UTF_8));
-        return file;
     }
 }

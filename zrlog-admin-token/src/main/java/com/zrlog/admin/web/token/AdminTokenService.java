@@ -19,11 +19,14 @@ import com.zrlog.data.service.UserPreferenceStore;
 import com.zrlog.model.User;
 import com.zrlog.util.CrossUtils;
 import com.zrlog.util.ParseUtil;
-
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -35,25 +38,20 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 import java.util.logging.Logger;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
-
 @Singleton
 public class AdminTokenService implements TokenService {
 
-    private static final String ADMIN_TOKEN_KEY_IN_COOKIE = "admin-token";
     public static final String ADMIN_TOKEN_KEY_IN_REQUEST_HEADER = "X-ZrLog-Admin-Token";
+    private static final String ADMIN_TOKEN_KEY_IN_COOKIE = "admin-token";
     private static final Logger LOGGER = LoggerUtil.getLogger(AdminTokenService.class);
     private final String TOKEN_SPLIT_CHAR = "#";
     private final IvParameterSpec iv;
-    private volatile long sessionTimeout;
     private final BooleanSupplier installed;
     private final jakarta.inject.Provider<User> users;
     private final jakarta.inject.Provider<UserPreferenceStore> preferences;
     private final BooleanSupplier staticHtml;
     private final Map<Integer, String> userSecretKeyCacheMap = new ConcurrentHashMap<>();
+    private volatile long sessionTimeout;
 
     @Inject
     public AdminTokenService(
@@ -85,7 +83,9 @@ public class AdminTokenService implements TokenService {
         return preferences.get().sessionTimeoutMinutes(userId, sessionTimeout / 60000);
     }
 
-    protected long currentTimeMillis() { return System.currentTimeMillis(); }
+    protected long currentTimeMillis() {
+        return System.currentTimeMillis();
+    }
 
     private byte[] encrypt(String secretKey, byte[] value) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
@@ -161,7 +161,8 @@ public class AdminTokenService implements TokenService {
             byte[] adminTokenEncryptAfter = ByteUtils.hexString2Bytes(tokenString.substring(tokenString.indexOf(TOKEN_SPLIT_CHAR) + 1));
             String base64Encode = new String(decrypt(sk, Base64.getDecoder().decode(adminTokenEncryptAfter)));
             AdminFullTokenVO adminTokenVO = new Gson().fromJson(base64Encode, AdminFullTokenVO.class);
-            if (adminTokenVO.getUserId() != userId || adminTokenVO.getAuthVersion() != account.getAuthVersion()) return null;
+            if (adminTokenVO.getUserId() != userId || adminTokenVO.getAuthVersion() != account.getAuthVersion())
+                return null;
             adminTokenVO.setSecretKey(sk);
             long expiresAt = adminTokenVO.getExpiresAt() == null
                     ? Math.addExact(adminTokenVO.getCreatedDate(), sessionTimeout) : adminTokenVO.getExpiresAt();

@@ -14,12 +14,12 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseable {
 
-    private OutputStream outputStream;
     private final File cacheFile;
     private final Lock initLock = new ReentrantLock();
-    private int statusCode;
     private final boolean requiredStatusCodeSuccess;
     private final int additionalAcceptedStatusCode;
+    private OutputStream outputStream;
+    private int statusCode;
 
     public BodySaveResponse(HttpRequest request, ResponseConfig responseConfig, boolean requiredStatusCodeSuccess,
                             StaticSitePlugin staticSitePlugin) {

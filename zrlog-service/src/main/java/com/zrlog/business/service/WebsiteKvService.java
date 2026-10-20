@@ -6,27 +6,21 @@ import com.hibegin.common.util.LoggerUtil;
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
 import com.zrlog.business.updater.AutoUpgradeVersionType;
 import com.zrlog.model.WebSite;
-
 import jakarta.inject.Inject;
 import jakarta.inject.Provider;
 import jakarta.inject.Singleton;
 
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @Singleton
 public class WebsiteKvService {
 
-    private static final Logger LOGGER = LoggerUtil.getLogger(WebsiteKvService.class);
     public static final String AUTO_UPGRADE_VERSION_KEY = "autoUpgradeVersion";
     public static final String UPGRADE_PREVIEW_KEY = "upgradePreview";
-
+    private static final Logger LOGGER = LoggerUtil.getLogger(WebsiteKvService.class);
     private final Provider<WebSite> websites;
 
     @Inject
@@ -34,7 +28,9 @@ public class WebsiteKvService {
         this.websites = Objects.requireNonNull(websites, "websites");
     }
 
-    /** Keep all operations on this application's database, including after another app starts. */
+    /**
+     * Keep all operations on this application's database, including after another app starts.
+     */
     public WebsiteKvService(DataSourceWrapper dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");
         this.websites = () -> new WebSite(dataSource);

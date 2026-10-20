@@ -15,12 +15,40 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class WebInterceptorContractsTest {
+
+    private static HttpRequest request(String uri) {
+        return request(uri, null, null);
+    }
+
+    private static HttpRequest request(String uri, String userAgent) {
+        return request(uri, userAgent, null);
+    }
+
+    private static HttpRequest request(String uri, String userAgent, String acceptLanguage) {
+        return (HttpRequest) Proxy.newProxyInstance(
+                WebInterceptorContractsTest.class.getClassLoader(),
+                new Class[]{HttpRequest.class},
+                (proxy, method, args) -> {
+                    if ("getUri".equals(method.getName())) {
+                        return uri;
+                    }
+                    if ("getHeader".equals(method.getName())) {
+                        if ("User-Agent".equals(args[0])) {
+                            return userAgent;
+                        }
+                        if ("Accept-Language".equals(args[0])) {
+                            return acceptLanguage;
+                        }
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "HttpRequestProxy";
+                    }
+                    return null;
+                });
+    }
 
     @Test
     public void shouldRenderDefault404ForPageRequests() {
@@ -157,37 +185,6 @@ public class WebInterceptorContractsTest {
             if (previousLanguage == null) I18nUtil.removeI18n();
             else I18nUtil.threadLocal.set(previousLanguage);
         }
-    }
-
-    private static HttpRequest request(String uri) {
-        return request(uri, null, null);
-    }
-
-    private static HttpRequest request(String uri, String userAgent) {
-        return request(uri, userAgent, null);
-    }
-
-    private static HttpRequest request(String uri, String userAgent, String acceptLanguage) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                WebInterceptorContractsTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getUri".equals(method.getName())) {
-                        return uri;
-                    }
-                    if ("getHeader".equals(method.getName())) {
-                        if ("User-Agent".equals(args[0])) {
-                            return userAgent;
-                        }
-                        if ("Accept-Language".equals(args[0])) {
-                            return acceptLanguage;
-                        }
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
     }
 
     private static class ResponseRecorder {

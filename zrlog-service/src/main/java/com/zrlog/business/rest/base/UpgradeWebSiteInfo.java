@@ -11,8 +11,13 @@ public class UpgradeWebSiteInfo implements Validator {
     private Boolean upgradePreview;
     private String upgradePackageSource;
 
-    public String getUpgradePackageSource() { return upgradePackageSource; }
-    public void setUpgradePackageSource(String value) { upgradePackageSource = value; }
+    public String getUpgradePackageSource() {
+        return upgradePackageSource;
+    }
+
+    public void setUpgradePackageSource(String value) {
+        upgradePackageSource = value;
+    }
 
     public Integer getAutoUpgradeVersion() {
         return autoUpgradeVersion;

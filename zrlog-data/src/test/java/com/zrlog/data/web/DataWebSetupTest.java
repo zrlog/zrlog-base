@@ -1,7 +1,5 @@
 package com.zrlog.data.web;
 
-import static org.junit.Assert.*;
-
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.http.server.ApplicationContext;
 import com.hibegin.http.server.di.SwsBindings;
@@ -11,13 +9,14 @@ import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.test.support.ZrLogTestDatabase;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.util.Collections;
 import java.util.List;
+
+import static org.junit.Assert.*;
 
 public class DataWebSetupTest {
     @Rule
@@ -55,15 +54,37 @@ public class DataWebSetupTest {
     }
 
     private static final class TestConfig extends ZrLogConfig {
-        private TestConfig() { super(19089, null, ""); }
+        private TestConfig() {
+            super(19089, null, "");
+        }
 
-        private void attachDatabase(DataSourceWrapper database) { this.dataSource = database; }
+        private void attachDatabase(DataSourceWrapper database) {
+            this.dataSource = database;
+        }
 
-        @Override public boolean isInstalled() { return dataSource != null; }
-        @Override public DataSourceWrapper configDatabase() { return dataSource; }
-        @Override protected TokenService initTokenService() { return null; }
-        @Override public List<IPlugin> getBasePluginList() { return Collections.emptyList(); }
+        @Override
+        public boolean isInstalled() {
+            return dataSource != null;
+        }
+
+        @Override
+        public DataSourceWrapper configDatabase() {
+            return dataSource;
+        }
+
+        @Override
+        protected TokenService initTokenService() {
+            return null;
+        }
+
+        @Override
+        public List<IPlugin> getBasePluginList() {
+            return Collections.emptyList();
+        }
+
         // The database fixture owns and restores its data source.
-        @Override public void stop() { }
+        @Override
+        public void stop() {
+        }
     }
 }

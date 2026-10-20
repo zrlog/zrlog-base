@@ -12,7 +12,9 @@ import com.zrlog.plugin.BaseStaticSitePlugin;
 import java.io.File;
 import java.util.Objects;
 
-/** Executes a static export request through the owning application's HTTP pipeline. */
+/**
+ * Executes a static export request through the owning application's HTTP pipeline.
+ */
 public final class StaticSiteRenderer {
     private final RequestConfig requestConfig;
     private final ResponseConfig responseConfig;
@@ -35,6 +37,7 @@ public final class StaticSiteRenderer {
             return new RenderedPage(request.getUri(), response.getCacheFile());
         }
     }
+
     static final class RenderedPage {
         final String uri;
         final File file;

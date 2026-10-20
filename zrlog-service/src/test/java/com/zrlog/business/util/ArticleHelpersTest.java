@@ -12,6 +12,14 @@ import static org.junit.Assert.assertNull;
 public class ArticleHelpersTest {
 
 
+    private static ArticleBasicDTO article(String title, String digest, String content) {
+        ArticleBasicDTO article = new ArticleBasicDTO();
+        article.setTitle(title);
+        article.setDigest(digest);
+        article.setContent(content);
+        return article;
+    }
+
     @Test
     public void shouldSkipEmptyKeywordWithoutRequiringGlobalConfig() {
         ArticleBasicDTO article = article("ZrLog title", "digest", "<p>content</p>");
@@ -50,14 +58,6 @@ public class ArticleHelpersTest {
 
         assertEquals("Plain title", article.getTitle());
         assertEquals("Hello <font color=\"#CC0000\">ZrLog</font>", article.getDigest());
-    }
-
-    private static ArticleBasicDTO article(String title, String digest, String content) {
-        ArticleBasicDTO article = new ArticleBasicDTO();
-        article.setTitle(title);
-        article.setDigest(digest);
-        article.setContent(content);
-        return article;
     }
 
 }

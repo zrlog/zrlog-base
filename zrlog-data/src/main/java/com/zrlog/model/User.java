@@ -1,7 +1,6 @@
 package com.zrlog.model;
 
 import com.hibegin.common.dao.BasePageableDAO;
-import com.hibegin.common.dao.DAO;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.common.cache.dto.UserBasicDTO;
 
@@ -17,10 +16,6 @@ import java.util.Map;
 public class User extends BasePageableDAO {
 
     private final DataSourceWrapper dataSource;
-
-    public User() {
-        this(DAO.getDefaultDataSource());
-    }
 
     @Inject
     public User(DataSourceWrapper dataSource) {

@@ -6,8 +6,9 @@ import static org.junit.Assert.assertTrue;
 
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
 import com.zrlog.business.updater.AutoUpgradeVersionType;
-import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.model.WebSite;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -33,7 +34,7 @@ public class WebsiteKvServiceDatabaseTest {
     @Test
     public void shouldReadWriteListAndRemoveWebsiteKvUsingInstallSchema() throws Exception {
         try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
-            WebsiteKvService service = new WebsiteKvService();
+            WebsiteKvService service = new WebsiteKvService(() -> new WebSite(ignored.dataSource()));
 
             assertTrue(service.putString("feature.alpha", "one"));
             assertEquals("one", service.getString("feature.alpha"));
@@ -86,7 +87,7 @@ public class WebsiteKvServiceDatabaseTest {
     @Test
     public void shouldBuildUpgradeWebsiteInfoFromRealWebsiteKv() throws Exception {
         try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
-            WebsiteKvService service = new WebsiteKvService();
+            WebsiteKvService service = new WebsiteKvService(() -> new WebSite(ignored.dataSource()));
 
             UpgradeWebSiteInfo defaults = service.upgradeWebSiteInfo();
             assertEquals(Integer.valueOf(AutoUpgradeVersionType.ONE_DAY.getCycle()),

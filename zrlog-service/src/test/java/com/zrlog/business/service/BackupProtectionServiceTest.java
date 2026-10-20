@@ -1,6 +1,8 @@
 package com.zrlog.business.service;
 
+import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.business.rest.response.BackupProtectionStatus;
+import com.zrlog.model.WebSite;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -21,7 +23,7 @@ public class BackupProtectionServiceTest {
     public void shouldBeReadyForRecentMatchingVerifiedBackup() {
         Map<String, Object> evidence = completeEvidence(SHA_A, SHA_A);
 
-        BackupProtectionStatus status = service(evidence).getStatus();
+        BackupProtectionStatus status = service(evidence, null).getStatus();
 
         assertEquals(BackupProtectionStatus.READY, status.getStatus());
         assertTrue(status.getReady());
@@ -30,7 +32,7 @@ public class BackupProtectionServiceTest {
 
     @Test
     public void shouldReportMissingEvidenceWithoutRequiringAcceptance() {
-        BackupProtectionStatus status = service(new HashMap<>()).getStatus();
+        BackupProtectionStatus status = service(new HashMap<>(), null).getStatus();
 
         assertEquals(BackupProtectionStatus.MISSING_BACKUP, status.getStatus());
         assertFalse(status.getReady());
@@ -43,32 +45,32 @@ public class BackupProtectionServiceTest {
         evidence.put(BackupProtectionService.LAST_BACKUP_AT,
                 String.valueOf(NOW - BackupProtectionService.BACKUP_MAX_AGE_MILLIS - 1));
 
-        assertEquals(BackupProtectionStatus.BACKUP_STALE, service(evidence).getStatus().getStatus());
+        assertEquals(BackupProtectionStatus.BACKUP_STALE, service(evidence, null).getStatus().getStatus());
     }
 
     @Test
     public void shouldRejectFailedOrStaleVerification() {
         Map<String, Object> failed = completeEvidence(SHA_A, SHA_A);
         failed.put(BackupProtectionService.LAST_VERIFICATION_SUCCESS, "false");
-        assertEquals(BackupProtectionStatus.VERIFICATION_FAILED, service(failed).getStatus().getStatus());
+        assertEquals(BackupProtectionStatus.VERIFICATION_FAILED, service(failed, null).getStatus().getStatus());
 
         Map<String, Object> stale = completeEvidence(SHA_A, SHA_A);
         stale.put(BackupProtectionService.LAST_VERIFIED_AT,
                 String.valueOf(NOW - BackupProtectionService.VERIFICATION_MAX_AGE_MILLIS - 1));
-        assertEquals(BackupProtectionStatus.VERIFICATION_STALE, service(stale).getStatus().getStatus());
+        assertEquals(BackupProtectionStatus.VERIFICATION_STALE, service(stale, null).getStatus().getStatus());
     }
 
     @Test
     public void shouldRejectChangedBackupAndMalformedEvidence() {
         assertEquals(BackupProtectionStatus.BACKUP_CHANGED_AFTER_VERIFICATION,
-                service(completeEvidence(SHA_A, SHA_B)).getStatus().getStatus());
+                service(completeEvidence(SHA_A, SHA_B), null).getStatus().getStatus());
 
         Map<String, Object> malformed = completeEvidence("not-sha256", SHA_A);
-        assertEquals(BackupProtectionStatus.INVALID_EVIDENCE, service(malformed).getStatus().getStatus());
+        assertEquals(BackupProtectionStatus.INVALID_EVIDENCE, service(malformed, null).getStatus().getStatus());
     }
 
-    private BackupProtectionService service(Map<String, Object> values) {
-        WebsiteKvService kvService = new WebsiteKvService() {
+    private BackupProtectionService service(Map<String, Object> values, DataSourceWrapper testDataSource) {
+        WebsiteKvService kvService = new WebsiteKvService(() -> new WebSite(testDataSource)) {
             @Override
             public Map<String, Object> getByNames(List<String> keys) {
                 return values;

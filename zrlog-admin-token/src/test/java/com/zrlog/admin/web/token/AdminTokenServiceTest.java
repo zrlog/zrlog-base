@@ -30,14 +30,11 @@ public class AdminTokenServiceTest {
     private boolean installed = true;
     private boolean staticHtml;
 
-    @org.junit.Before
-    public void clearGlobalConfig() {
-    }
-
     private long now = 1_700_000_000_000L;
 
     private AdminTokenService testService(long timeout) {
-        return new AdminTokenService(timeout, () -> installed, () -> staticHtml) {
+        return new AdminTokenService(timeout, () -> installed, () -> staticHtml, () -> { throw new IllegalStateException("No database in token unit tests"); },
+                () -> { throw new IllegalStateException("Preferences are overridden by this test"); }) {
             @Override protected long sessionTimeoutMinutes(int userId) { return personalTimeouts.getOrDefault(userId, timeout); }
             @Override protected long currentTimeMillis() { return now; }
             @Override protected com.zrlog.data.security.AccountAccess loadAccount(int userId) {

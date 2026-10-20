@@ -1,7 +1,6 @@
 package com.zrlog.model;
 
 import com.hibegin.common.dao.BasePageableDAO;
-import com.hibegin.common.dao.DAO;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequest;
@@ -16,10 +15,6 @@ import java.util.List;
  * 存放程序的友情链接，对应数据库 link 表
  */
 public class Link extends BasePageableDAO {
-
-    public Link() {
-        this(DAO.getDefaultDataSource());
-    }
 
     @Inject
     public Link(DataSourceWrapper dataSource) {

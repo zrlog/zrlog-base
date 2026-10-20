@@ -1,6 +1,5 @@
 package com.zrlog.test.support;
 
-import com.hibegin.common.dao.DAO;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.InMemoryDatabase;
 import com.hibegin.common.dao.SqlConvertUtils;
@@ -41,7 +40,7 @@ public final class ZrLogTestDatabase implements AutoCloseable {
                 : sqliteProperties(sqliteFile);
         InMemoryDatabase opened = null;
         try {
-            opened = InMemoryDatabase.open(properties, true);
+            opened = InMemoryDatabase.open(properties, false);
             try (InputStream input = ZrLogTestDatabase.class.getResourceAsStream("/init-table-structure.sql")) {
                 if (input == null) {
                     throw new IllegalStateException("Missing init-table-structure.sql; add zrlog-install-web with test scope");
@@ -100,7 +99,6 @@ public final class ZrLogTestDatabase implements AutoCloseable {
                     try { return method.invoke(db.database.dataSource(), args); }
                     catch (InvocationTargetException e) { throw e.getCause(); }
                 });
-        DAO.setDs(db.activeDataSource);
         return db;
     }
 

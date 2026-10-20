@@ -1,9 +1,12 @@
 package com.zrlog.business.updater;
 
+import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.util.EnvKit;
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
+import com.zrlog.business.service.UpgradeNoticeService;
 import com.zrlog.business.service.WebsiteKvService;
 import com.zrlog.common.vo.Version;
+import com.zrlog.model.WebSite;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import org.junit.Test;
@@ -50,7 +53,7 @@ public class UpdateVersionInfoPluginTest {
 
     @Test
     public void shouldExposeLifecycleWithoutStartingNetworkTask() {
-        UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin(new com.zrlog.business.service.UpgradeNoticeService(() -> false), () -> "zh_CN", null);
+        UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> { throw new IllegalStateException("Database is unavailable in this test"); })), () -> "zh_CN", null, new WebsiteKvService(() -> { throw new IllegalStateException("Database is unavailable in this test"); }));
 
         assertEquals(!EnvKit.isFaaSMode(), plugin.autoStart());
         assertFalse(plugin.isStarted());
@@ -65,7 +68,7 @@ public class UpdateVersionInfoPluginTest {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
                     String.valueOf(AutoUpgradeVersionType.NEVER.getCycle()), "");
-            UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin(new com.zrlog.business.service.UpgradeNoticeService(() -> false), () -> "zh_CN", null);
+            UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSite(db.dataSource()))), () -> "zh_CN", null, new WebsiteKvService(() -> new WebSite(db.dataSource())));
 
             assertTrue(plugin.start());
 
@@ -82,7 +85,7 @@ public class UpdateVersionInfoPluginTest {
                     String.valueOf(AutoUpgradeVersionType.ONE_MINUTE.getCycle()), "");
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     WebsiteKvService.UPGRADE_PREVIEW_KEY, "true", "");
-            TestUpdateVersionInfoPlugin plugin = new TestUpdateVersionInfoPlugin(new FakeVersionTimerTask(version("3.7.0")));
+            TestUpdateVersionInfoPlugin plugin = new TestUpdateVersionInfoPlugin(new FakeVersionTimerTask(version("3.7.0")), db.dataSource());
 
             assertTrue(plugin.start());
 
@@ -97,7 +100,7 @@ public class UpdateVersionInfoPluginTest {
     @Test
     public void shouldFetchLastVersionThroughVersionTaskAndNormalizeDisplayVersion() {
         FakeVersionTimerTask task = new FakeVersionTimerTask(version("3.8.0-SNAPSHOT"));
-        TestUpdateVersionInfoPlugin plugin = new TestUpdateVersionInfoPlugin(task);
+        TestUpdateVersionInfoPlugin plugin = new TestUpdateVersionInfoPlugin(task, null);
 
         Version version = plugin.getLastVersion(true);
 
@@ -108,7 +111,7 @@ public class UpdateVersionInfoPluginTest {
     @Test
     public void shouldReturnCachedTaskVersionWithoutRunningWhenFetchIsFalse() {
         FakeVersionTimerTask task = new FakeVersionTimerTask(version("3.9.0"));
-        TestUpdateVersionInfoPlugin plugin = new TestUpdateVersionInfoPlugin(task);
+        TestUpdateVersionInfoPlugin plugin = new TestUpdateVersionInfoPlugin(task, null);
 
         Version version = plugin.getLastVersion(false);
 
@@ -120,7 +123,7 @@ public class UpdateVersionInfoPluginTest {
     public void shouldSwallowVersionTaskFailureDuringManualFetch() {
         FakeVersionTimerTask task = new FakeVersionTimerTask(version("4.0.0"));
         task.throwOnRun = true;
-        TestUpdateVersionInfoPlugin plugin = new TestUpdateVersionInfoPlugin(task);
+        TestUpdateVersionInfoPlugin plugin = new TestUpdateVersionInfoPlugin(task, null);
 
         Version version = plugin.getLastVersion(true);
 
@@ -182,8 +185,8 @@ public class UpdateVersionInfoPluginTest {
         private final AtomicBoolean taskCreated = new AtomicBoolean();
         private Boolean upgradePreview;
 
-        TestUpdateVersionInfoPlugin(UpdateVersionTimerTask task) {
-            super(new com.zrlog.business.service.UpgradeNoticeService(() -> false), () -> "zh_CN", null);
+        TestUpdateVersionInfoPlugin(UpdateVersionTimerTask task, DataSourceWrapper testDataSource) {
+            super(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSite(testDataSource))), () -> "zh_CN", null, new WebsiteKvService(() -> new WebSite(testDataSource)));
             this.task = task;
         }
 

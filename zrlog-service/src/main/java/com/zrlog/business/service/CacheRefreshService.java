@@ -36,11 +36,6 @@ public class CacheRefreshService {
     private final Supplier<PluginCorePlugin> pluginCore;
     private final Supplier<List<StaticSitePlugin>> staticSites;
 
-    public CacheRefreshService(CacheService cacheService, Supplier<PluginCorePlugin> pluginCore,
-                               Supplier<List<StaticSitePlugin>> staticSites) {
-        this(cacheService, pluginCore, staticSites, WebSite::new);
-    }
-
     @Inject
     public CacheRefreshService(
             CacheService cacheService,

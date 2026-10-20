@@ -1,6 +1,5 @@
 package com.zrlog.business.util;
 
-import com.hibegin.common.dao.DAO;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.DatabaseConnectPoolInfo;
 import com.hibegin.common.util.SystemType;
@@ -25,6 +24,7 @@ import com.zrlog.common.cache.dto.UserBasicDTO;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
+import com.zrlog.model.WebSite;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.util.BlogBuildInfoUtil;
@@ -79,6 +79,8 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 public class ServiceUtilityFallbackTest {
+
+    private DataSourceWrapper queryDataSource;
 
     private com.zrlog.common.ZrLogConfig applicationConfig;
 
@@ -700,7 +702,7 @@ public class ServiceUtilityFallbackTest {
 
     @Test
     public void shouldReturnFallbackValuesWhenWebsiteKvDaoIsUnavailable() {
-        WebsiteKvService service = new WebsiteKvService();
+        WebsiteKvService service = new WebsiteKvService(() -> new WebSite(queryDataSource));
 
         assertNull(service.getString("missing"));
         assertEquals(Collections.emptyMap(), service.getByNames(Collections.singletonList("missing")));
@@ -713,15 +715,15 @@ public class ServiceUtilityFallbackTest {
 
     @Test
     public void shouldReturnFalseWhenWebsiteKvQuietWriteFails() throws Exception {
-        DataSourceWrapper previousDataSource = setDefaultDataSource(null);
+        DataSourceWrapper previousDataSource = setQueryDataSource(null);
         try {
-            setDefaultDataSource(dataSource(new FailingQueryRunner()));
-            WebsiteKvService service = new WebsiteKvService();
+            setQueryDataSource(dataSource(new FailingQueryRunner()));
+            WebsiteKvService service = new WebsiteKvService(() -> new WebSite(queryDataSource));
 
             assertFalse(service.putStringQuietly("missing", "value"));
             assertFalse(service.removeQuietly("missing"));
         } finally {
-            restoreDefaultDataSource(previousDataSource);
+            restoreQueryDataSource(previousDataSource);
         }
     }
 
@@ -734,19 +736,19 @@ public class ServiceUtilityFallbackTest {
     @Test
     public void shouldReportNoStaticRefreshWhenTheMatchingModuleIsAbsent() {
         com.zrlog.business.service.CacheRefreshService refresh = new com.zrlog.business.service.CacheRefreshService(
-                new FakeCacheService(0L), () -> null, Collections::emptyList);
+                new FakeCacheService(0L), () -> null, Collections::emptyList, () -> new WebSite(queryDataSource));
         assertFalse(refresh.refreshStaticSiteCache(request("https"), Collections.singletonList(StaticSiteType.BLOG)));
     }
 
     @Test
     public void shouldRefreshStaticSiteCacheWithPluginCoreNotification() throws Exception {
-        DataSourceWrapper previousDataSource = setDefaultDataSource(null);
+        DataSourceWrapper previousDataSource = setQueryDataSource(null);
         FakeQueryRunner queryRunner = new FakeQueryRunner();
         FakePluginCorePlugin pluginCorePlugin = new FakePluginCorePlugin();
         FakeStaticSitePlugin staticSitePlugin = new FakeStaticSitePlugin();
         try {
             PathUtil.setRootPath(temporaryFolder.newFolder("zrlog-cache-utils").getAbsolutePath());
-            setDefaultDataSource(dataSource(queryRunner));
+            setQueryDataSource(dataSource(queryRunner));
             applicationConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin);
 
             boolean refreshed = cacheRefresh(null).refreshStaticSiteCache(
@@ -760,7 +762,7 @@ public class ServiceUtilityFallbackTest {
             assertEquals("update website set value=? where name=?", queryRunner.sql);
             assertArrayEquals(new Object[]{"static-version", "test.static.version"}, queryRunner.params);
         } finally {
-            restoreDefaultDataSource(previousDataSource);
+            restoreQueryDataSource(previousDataSource);
         }
     }
 
@@ -823,11 +825,11 @@ public class ServiceUtilityFallbackTest {
 
     @Test
     public void shouldContinueStaticSiteRefreshWhenVersionWriteFails() throws Exception {
-        DataSourceWrapper previousDataSource = setDefaultDataSource(null);
+        DataSourceWrapper previousDataSource = setQueryDataSource(null);
         FakePluginCorePlugin pluginCorePlugin = new FakePluginCorePlugin();
         FakeStaticSitePlugin staticSitePlugin = new FakeStaticSitePlugin();
         try {
-            setDefaultDataSource(dataSource(new FailingQueryRunner()));
+            setQueryDataSource(dataSource(new FailingQueryRunner()));
             applicationConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin);
 
             boolean refreshed = cacheRefresh(null).refreshStaticSiteCache(
@@ -837,18 +839,18 @@ public class ServiceUtilityFallbackTest {
             assertEquals(1, staticSitePlugin.startCount);
             assertEquals(2, pluginCorePlugin.refreshCacheCount);
         } finally {
-            restoreDefaultDataSource(previousDataSource);
+            restoreQueryDataSource(previousDataSource);
         }
     }
 
     @Test
     public void shouldUpdateCacheAndRefreshStaticSiteWhenStaticHtmlIsEnabled() throws Exception {
-        DataSourceWrapper previousDataSource = setDefaultDataSource(null);
+        DataSourceWrapper previousDataSource = setQueryDataSource(null);
         FakePluginCorePlugin pluginCorePlugin = new FakePluginCorePlugin();
         FakeStaticSitePlugin staticSitePlugin = new FakeStaticSitePlugin();
         FakeCacheService cacheService = new FakeCacheService(99L, true, "blog.example.com");
         try {
-            setDefaultDataSource(dataSource(new FakeQueryRunner()));
+            setQueryDataSource(dataSource(new FakeQueryRunner()));
             applicationConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin, cacheService);
 
             cacheRefresh(cacheService).updateCache( false, request("https"), Collections.singletonList(StaticSiteType.BLOG));
@@ -858,7 +860,7 @@ public class ServiceUtilityFallbackTest {
             assertEquals(3, pluginCorePlugin.refreshCacheCount);
             assertEquals("static-version", pluginCorePlugin.lastCacheVersion);
         } finally {
-            restoreDefaultDataSource(previousDataSource);
+            restoreQueryDataSource(previousDataSource);
         }
     }
 
@@ -883,7 +885,7 @@ public class ServiceUtilityFallbackTest {
         ZrLogConfig config = applicationConfig;
         return new com.zrlog.business.service.CacheRefreshService(cache == null ? new FakeCacheService(0L) : cache,
                 () -> config == null ? null : config.getPlugin(PluginCorePlugin.class),
-                () -> config == null ? Collections.emptyList() : config.getPluginsByClazz(StaticSitePlugin.class));
+                () -> config == null ? Collections.emptyList() : config.getPluginsByClazz(StaticSitePlugin.class), () -> new WebSite(queryDataSource));
     }
 
     private static void waitUntil(BooleanSupplier condition) throws InterruptedException {
@@ -912,14 +914,14 @@ public class ServiceUtilityFallbackTest {
                 });
     }
 
-    private static DataSourceWrapper setDefaultDataSource(DataSourceWrapper dataSource) {
-        DataSourceWrapper previous = DAO.getDefaultDataSource();
-        DAO.setDs(dataSource);
+    private DataSourceWrapper setQueryDataSource(DataSourceWrapper dataSource) {
+        DataSourceWrapper previous = queryDataSource;
+        queryDataSource = dataSource;
         return previous;
     }
 
-    private static void restoreDefaultDataSource(DataSourceWrapper previousDataSource) {
-        DAO.setDs(previousDataSource);
+    private void restoreQueryDataSource(DataSourceWrapper previousDataSource) {
+        queryDataSource = previousDataSource;
     }
 
     private static byte[] pluginCoreJar() throws IOException {

@@ -9,10 +9,11 @@ import com.zrlog.common.cache.dto.TypeDTO;
 import com.zrlog.common.cache.dto.UserBasicDTO;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
+import com.zrlog.data.di.DaggerDataComponent;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
-import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.List;
@@ -20,10 +21,10 @@ import java.util.Map;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import sun.misc.Unsafe;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import sun.misc.Unsafe;
 
 @RunWith(Parameterized.class)
 public class CacheServiceImplDatabaseTest {
@@ -51,7 +52,7 @@ public class CacheServiceImplDatabaseTest {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     "zrlogSqlVersion", "7", "");
 
-            CacheServiceImpl service = new CacheServiceImpl(applicationConfig::isInstalled);
+            CacheServiceImpl service = ((CacheServiceImpl) DaggerDataComponent.factory().create(() -> db.dataSource(), applicationConfig::isInstalled).cache());
 
             assertEquals(7L, service.getCurrentSqlVersion());
             assertEquals(99L, service.getWebSiteVersion());
@@ -74,7 +75,7 @@ public class CacheServiceImplDatabaseTest {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     "default_setting", "{\"color\":\"blue\"}", "");
 
-            CacheServiceImpl service = new CacheServiceImpl(applicationConfig::isInstalled);
+            CacheServiceImpl service = ((CacheServiceImpl) DaggerDataComponent.factory().create(() -> db.dataSource(), applicationConfig::isInstalled).cache());
 
             assertEquals(-1L, service.getCurrentSqlVersion());
             assertEquals(0L, service.getWebSiteVersion());
@@ -98,7 +99,7 @@ public class CacheServiceImplDatabaseTest {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     "author", "Installed Author", "");
 
-            PublicWebSiteInfo info = new CacheServiceImpl(applicationConfig::isInstalled).getPublicWebSiteInfo();
+            PublicWebSiteInfo info = ((CacheServiceImpl) DaggerDataComponent.factory().create(() -> db.dataSource(), applicationConfig::isInstalled).cache()).getPublicWebSiteInfo();
 
             assertEquals("Installed Site", info.getTitle());
             assertEquals("Installed Author", info.getAuthor());

@@ -1,9 +1,10 @@
 package com.zrlog.data.service;
 
 import com.zrlog.common.vo.LockVO;
-import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.data.di.DaggerDataComponent;
+import com.zrlog.model.WebSite;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
-import com.zrlog.data.util.DistributedLockManager;
+import com.zrlog.test.support.ZrLogTestDatabase;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -33,20 +34,20 @@ public class DistributedLockDatabaseTest {
     @Test
     public void shouldStoreListAndReleaseDistributedLocksUsingWebsiteTable() throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-            DistributedLock first = new DistributedLock("cache");
-            DistributedLock second = new DistributedLock("cache");
+            DistributedLock first = new DistributedLock(() -> new WebSite(db.dataSource()), "cache");
+            DistributedLock second = new DistributedLock(() -> new WebSite(db.dataSource()), "cache");
 
             assertTrue(first.tryLock());
             assertFalse(second.tryLock());
             assertFalse(second.tryLock(1, TimeUnit.MILLISECONDS));
 
-            List<LockVO> locks = DistributedLockManager.getInstance().getLocks();
+            List<LockVO> locks = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).lockManager().getLocks();
 
             assertEquals(1, locks.size());
             assertEquals("cache", locks.get(0).getName());
             assertTrue(locks.get(0).getRemark().startsWith("Created at "));
 
-            DistributedLockManager.getInstance().releaseLock("cache");
+            DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).lockManager().releaseLock("cache");
 
             assertEquals(0L, ((Number) db.scalar("select count(1) from website where name=?",
                     DistributedLock.LOCK_PREFIX + "cache")).longValue());
@@ -57,7 +58,7 @@ public class DistributedLockDatabaseTest {
 
     @Test
     public void shouldRejectUnsupportedOrUnsafeLockOperations() {
-        DistributedLock lock = new DistributedLock("cache");
+        DistributedLock lock = new DistributedLock(() -> { throw new IllegalStateException("Database is unavailable in this test"); }, "cache");
 
         assertThrows(UnsupportedOperationException.class, lock::lock);
         assertThrows(UnsupportedOperationException.class, lock::lockInterruptibly);

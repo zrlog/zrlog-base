@@ -53,17 +53,6 @@ public class CacheServiceImpl implements CacheService {
     private final jakarta.inject.Provider<User> users;
     private final BaseDataDbService baseData;
 
-    public CacheServiceImpl(BooleanSupplier installed) {
-        this(
-                installed,
-                WebSite::new,
-                Type::new,
-                Tag::new,
-                User::new,
-                new BaseDataDbService(),
-                DistributedLock::new);
-    }
-
     @Inject
     public CacheServiceImpl(
             BooleanSupplier installed,

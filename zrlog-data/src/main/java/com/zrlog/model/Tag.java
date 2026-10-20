@@ -1,7 +1,6 @@
 package com.zrlog.model;
 
 import com.hibegin.common.dao.BasePageableDAO;
-import com.hibegin.common.dao.DAO;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.ResultBeanUtils;
 import com.hibegin.common.dao.dto.PageData;
@@ -25,10 +24,6 @@ public class Tag extends BasePageableDAO {
     private final DataSourceWrapper dataSource;
 
     private static final Logger LOGGER = LoggerUtil.getLogger(Tag.class);
-
-    public Tag() {
-        this(DAO.getDefaultDataSource());
-    }
 
     @Inject
     public Tag(DataSourceWrapper dataSource) {

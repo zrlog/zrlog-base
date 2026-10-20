@@ -11,18 +11,21 @@ import static org.junit.Assert.*;
 
 public class ZrLogTestDatabaseTest {
 
-    @Test public void schemaFixturesAreIsolatedAndRestoreThePreviousDao() throws Exception {
+    @Test public void schemaFixturesAreIsolatedWithoutChangingTheDefaultDao() throws Exception {
+        var previous = DAO.getDefaultDataSource();
         for (ZrLogTestDatabase.DatabaseType type : ZrLogTestDatabase.DatabaseType.values()) {
             try (ZrLogTestDatabase outer = ZrLogTestDatabase.open(type)) {
                 outer.putWebsite("title", "outer");
                 try (ZrLogTestDatabase inner = ZrLogTestDatabase.open(type)) {
                     assertEquals(0L, ((Number) inner.scalar("select count(*) from website")).longValue());
                     inner.putWebsite("title", "inner");
-                    assertEquals("inner", new DAO().queryFirstObj("select value from website where name='title'"));
+                    assertSame(previous, DAO.getDefaultDataSource());
+                    assertEquals("inner", new DAO(inner.dataSource()).queryFirstObj("select value from website where name='title'"));
                     // Use the installer's real schema; no test-only column patches.
                     inner.queryList("select sticky, extensions from log");
                 }
-                assertEquals("outer", new DAO().queryFirstObj("select value from website where name='title'"));
+                assertSame(previous, DAO.getDefaultDataSource());
+                assertEquals("outer", new DAO(outer.dataSource()).queryFirstObj("select value from website where name='title'"));
                 assertEquals("outer", outer.scalar("select value from website where name=?", "title"));
             }
         }

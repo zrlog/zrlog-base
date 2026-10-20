@@ -4,8 +4,9 @@ import com.zrlog.common.CacheService;
 import com.zrlog.common.cache.dto.TagDTO;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.data.cache.CacheServiceImpl;
-import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.data.di.DaggerDataComponent;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
@@ -35,7 +36,7 @@ public class BaseDataDbServiceDatabaseTest {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
 
-            BaseDataInitVO init = new BaseDataDbService().queryCacheInit(Runnable::run);
+            BaseDataInitVO init = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).baseData().queryCacheInit(Runnable::run);
 
             assertEquals("ZrLog Test", init.getWebSite().getTitle());
             assertEquals(Long.valueOf(2), init.getStatistics().getTotalArticleSize());
@@ -59,7 +60,7 @@ public class BaseDataDbServiceDatabaseTest {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
 
-            CacheServiceImpl cacheService = new CacheServiceImpl(() -> true);
+            CacheServiceImpl cacheService = ((CacheServiceImpl) DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).cache());
             BaseDataInitVO init = cacheService.getInitData();
             Long firstVersion = init.getVersion();
             BaseDataInitVO refreshed = cacheService.refreshInitData();
@@ -88,7 +89,7 @@ public class BaseDataDbServiceDatabaseTest {
             insertPlugin(db, 4, "links");
             insertPlugin(db, 5, "other");
 
-            BaseDataInitVO init = new BaseDataDbService().queryCacheInit(Runnable::run);
+            BaseDataInitVO init = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).baseData().queryCacheInit(Runnable::run);
 
             assertEquals(1, init.getPlugins().size());
             assertEquals("other", init.getPlugins().get(0).getPluginName());
@@ -105,7 +106,7 @@ public class BaseDataDbServiceDatabaseTest {
             try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 db.update("drop table " + table);
 
-                BaseDataInitVO init = new BaseDataDbService().queryCacheInit(Runnable::run);
+                BaseDataInitVO init = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).baseData().queryCacheInit(Runnable::run);
 
                 assertNotNull(init);
                 assertNotNull(init.getWebSite());

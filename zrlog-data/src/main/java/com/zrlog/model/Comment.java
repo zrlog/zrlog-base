@@ -1,7 +1,6 @@
 package com.zrlog.model;
 
 import com.hibegin.common.dao.BasePageableDAO;
-import com.hibegin.common.dao.DAO;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequest;
@@ -28,10 +27,6 @@ public class Comment extends BasePageableDAO {
     private final DataSourceWrapper dataSource;
 
     public static final String TABLE_NAME = "comment";
-
-    public Comment() {
-        this(DAO.getDefaultDataSource());
-    }
 
     @Inject
     public Comment(DataSourceWrapper dataSource) {

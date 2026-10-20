@@ -34,11 +34,6 @@ public class WebsiteKvService {
         this.websites = Objects.requireNonNull(websites, "websites");
     }
 
-    /** Existing callers resolve the default database when an operation starts. */
-    public WebsiteKvService() {
-        this.websites = WebSite::new;
-    }
-
     /** Keep all operations on this application's database, including after another app starts. */
     public WebsiteKvService(DataSourceWrapper dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");

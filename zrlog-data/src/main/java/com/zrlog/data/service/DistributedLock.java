@@ -30,10 +30,6 @@ public class DistributedLock implements Lock {
 
     private final jakarta.inject.Provider<WebSite> websites;
 
-    public DistributedLock(String lockKey) {
-        this(WebSite::new, lockKey);
-    }
-
     @AssistedInject
     public DistributedLock(jakarta.inject.Provider<WebSite> websites, @Assisted String lockKey) {
         this.websites = Objects.requireNonNull(websites);

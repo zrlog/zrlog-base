@@ -21,6 +21,7 @@ import com.zrlog.model.Log;
 import com.zrlog.model.LogNav;
 import com.zrlog.model.Plugin;
 import com.zrlog.model.Tag;
+import com.zrlog.model.Type;
 import com.zrlog.model.User;
 import com.zrlog.model.WebSite;
 
@@ -44,7 +45,7 @@ public class BaseDataDbService {
     private final jakarta.inject.Provider<LogNav> logNavProvider;
     private final jakarta.inject.Provider<Plugin> pluginProvider;
     private final jakarta.inject.Provider<Tag> tagProvider;
-    private final jakarta.inject.Provider<com.zrlog.model.Type> typeProvider;
+    private final jakarta.inject.Provider<Type> typeProvider;
     private final jakarta.inject.Provider<User> userProvider;
     private final jakarta.inject.Provider<WebSite> webSiteProvider;
 
@@ -55,7 +56,7 @@ public class BaseDataDbService {
             jakarta.inject.Provider<LogNav> logNavProvider,
             jakarta.inject.Provider<Plugin> pluginProvider,
             jakarta.inject.Provider<Tag> tagProvider,
-            jakarta.inject.Provider<com.zrlog.model.Type> typeProvider,
+            jakarta.inject.Provider<Type> typeProvider,
             jakarta.inject.Provider<User> userProvider,
             jakarta.inject.Provider<WebSite> webSiteProvider) {
         this.linkProvider = Objects.requireNonNull(linkProvider);
@@ -66,18 +67,6 @@ public class BaseDataDbService {
         this.typeProvider = Objects.requireNonNull(typeProvider);
         this.userProvider = Objects.requireNonNull(userProvider);
         this.webSiteProvider = Objects.requireNonNull(webSiteProvider);
-    }
-
-    public BaseDataDbService() {
-        this(
-                Link::new,
-                Log::new,
-                LogNav::new,
-                Plugin::new,
-                Tag::new,
-                com.zrlog.model.Type::new,
-                User::new,
-                WebSite::new);
     }
 
     private static final Logger LOGGER = LoggerUtil.getLogger(BaseDataDbService.class);

@@ -1,14 +1,14 @@
 package com.zrlog.business.service;
 
-import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.DAO;
-import com.zrlog.business.di.DaggerServiceComponent;
-import com.zrlog.data.di.DaggerDataComponent;
+import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.SqlConvertUtils;
-import com.zrlog.test.support.ZrLogTestDatabase;
-import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
+import com.zrlog.business.di.DaggerServiceComponent;
 import com.zrlog.business.version.UpgradeVersionHandler;
 import com.zrlog.common.CacheService;
+import com.zrlog.data.di.DaggerDataComponent;
+import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
+import com.zrlog.test.support.ZrLogTestDatabase;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -108,7 +108,7 @@ public class DbUpgradeServiceDatabaseTest {
             System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
             try (ZrLogTestDatabase first = ZrLogTestDatabase.open(databaseType);
                  ZrLogTestDatabase second = ZrLogTestDatabase.open(databaseType)) {
-                DAO.setDs(null);
+                org.junit.Assert.assertNull(DAO.getDefaultDataSource());
                 upgradeService(first.dataSource(), UpgradeVersionHandler.SQL_VERSION - 1).tryDoUpgrade();
                 assertEquals("isolated", first.scalar(
                         "select value from website where name=?", "db.upgrade.marker"));

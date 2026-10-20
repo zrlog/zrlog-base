@@ -29,7 +29,7 @@ public class DataComponentDatabaseTest {
                 ZrLogTestDatabase second = ZrLogTestDatabase.open(type)) {
             DataComponent a = DaggerDataComponent.factory().create(first::dataSource, () -> true);
             DataComponent b = DaggerDataComponent.factory().create(second::dataSource, () -> true);
-            DAO.setDs(null);
+            org.junit.Assert.assertNull(DAO.getDefaultDataSource());
             a.website().updateByKV("title", "first");
             b.website().updateByKV("title", "second");
 

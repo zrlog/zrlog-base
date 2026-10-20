@@ -55,10 +55,6 @@ public class AdminTokenService implements TokenService {
     private final BooleanSupplier staticHtml;
     private final Map<Integer, String> userSecretKeyCacheMap = new ConcurrentHashMap<>();
 
-    public AdminTokenService(long sessionTimeoutInMinutes, BooleanSupplier installed, BooleanSupplier staticHtml) {
-        this(sessionTimeoutInMinutes, installed, staticHtml, User::new, UserPreferenceStore::new);
-    }
-
     @Inject
     public AdminTokenService(
             @Named("adminSessionTimeoutMinutes") long sessionTimeoutInMinutes,

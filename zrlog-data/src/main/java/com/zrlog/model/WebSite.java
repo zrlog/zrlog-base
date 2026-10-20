@@ -77,10 +77,6 @@ public class WebSite extends DAO {
         websitePublicQueryKeys.addAll(Arrays.asList(listNum));
     }
 
-    public WebSite() {
-        this(DAO.getDefaultDataSource());
-    }
-
     @Inject
     public WebSite(DataSourceWrapper dataSource) {
         super(dataSource);

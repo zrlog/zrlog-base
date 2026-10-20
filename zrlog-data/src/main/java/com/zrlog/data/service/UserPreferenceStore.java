@@ -23,10 +23,6 @@ public class UserPreferenceStore {
         this.userProvider = Objects.requireNonNull(userProvider);
     }
 
-    public UserPreferenceStore() {
-        this(User::new);
-    }
-
     private static final Gson GSON = new Gson();
     private static final long UPDATE_RETRY_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(5);
     public static final long MIN_SESSION_MINUTES = 6;

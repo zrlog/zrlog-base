@@ -16,24 +16,14 @@ import java.util.Objects;
  */
 public class DistributedLockManager {
 
-    private static final DistributedLockManager instance = new DistributedLockManager();
-
     private final jakarta.inject.Provider<WebSite> websites;
     private final DistributedLock.Factory locks;
-
-    private DistributedLockManager() {
-        this(WebSite::new, DistributedLock::new);
-    }
 
     @Inject
     public DistributedLockManager(
             jakarta.inject.Provider<WebSite> websites, DistributedLock.Factory locks) {
         this.websites = Objects.requireNonNull(websites);
         this.locks = Objects.requireNonNull(locks);
-    }
-
-    public static DistributedLockManager getInstance() {
-        return instance;
     }
 
     public List<LockVO> getLocks() throws Exception {

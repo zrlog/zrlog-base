@@ -1,7 +1,6 @@
 package com.zrlog.model;
 
 import com.hibegin.common.dao.BasePageableDAO;
-import com.hibegin.common.dao.DAO;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequest;
@@ -16,10 +15,6 @@ import java.util.List;
  * 存放导航条的信息，对应数据库的 lognav 表
  */
 public class LogNav extends BasePageableDAO {
-
-    public LogNav() {
-        this(DAO.getDefaultDataSource());
-    }
 
     @Inject
     public LogNav(DataSourceWrapper dataSource) {

@@ -1,7 +1,5 @@
 package com.zrlog.data.security;
 
-import com.zrlog.model.User;
-import java.sql.SQLException;
 import java.util.*;
 
 /** Current database permissions; never trust roles supplied by a client or an old token. */
@@ -23,10 +21,6 @@ public final class AccountAccess {
         this.role = role;
         this.enabled = enabled && ROLES.contains(role);
         this.authVersion = authVersion;
-    }
-
-    public static AccountAccess load(int userId) throws SQLException {
-        return from(new User().loadById(userId));
     }
 
     public static AccountAccess from(Map<String, Object> row) {

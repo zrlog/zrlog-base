@@ -45,10 +45,6 @@ public class BackupProtectionService {
     private final WebsiteKvService websiteKvService;
     private final LongSupplier currentTimeMillis;
 
-    public BackupProtectionService() {
-        this(new WebsiteKvService(), System::currentTimeMillis);
-    }
-
     @Inject
     public BackupProtectionService(WebsiteKvService websiteKvService) {
         this(websiteKvService, System::currentTimeMillis);

@@ -32,14 +32,6 @@ public class UpgradeService {
     private final WebsiteKvService websiteKv;
     private final BackupProtectionService backupProtectionService;
 
-    public UpgradeService(Updater updater, UpgradeNoticeService upgradeNoticeService) {
-        this(updater, upgradeNoticeService, new BackupProtectionService());
-    }
-
-    UpgradeService(Updater updater, UpgradeNoticeService upgradeNoticeService, BackupProtectionService backupProtectionService) {
-        this(() -> updater, upgradeNoticeService, backupProtectionService, new WebsiteKvService());
-    }
-
     @Inject
     public UpgradeService(
             Supplier<Updater> updater,

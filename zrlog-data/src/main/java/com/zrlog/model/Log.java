@@ -1,7 +1,6 @@
 package com.zrlog.model;
 
 import com.hibegin.common.dao.BasePageableDAO;
-import com.hibegin.common.dao.DAO;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.ResultBeanUtils;
 import com.hibegin.common.dao.ResultValueConvertUtils;
@@ -36,10 +35,6 @@ public class Log extends BasePageableDAO implements Serializable {
     private final DataSourceWrapper dataSource;
 
     public static final String TABLE_NAME = "log";
-
-    public Log() {
-        this(DAO.getDefaultDataSource());
-    }
 
     @Inject
     public Log(DataSourceWrapper dataSource) {

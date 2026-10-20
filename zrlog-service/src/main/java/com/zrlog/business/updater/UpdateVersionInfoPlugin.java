@@ -38,10 +38,6 @@ public class UpdateVersionInfoPlugin implements IPlugin {
     private final Supplier<String> language;
     private final CommandLineUpgradeNotice commandLineNotice;
 
-    public UpdateVersionInfoPlugin(UpgradeNoticeService notices, Supplier<String> language, Updater updater) {
-        this(notices, language, updater, new WebsiteKvService());
-    }
-
     public UpdateVersionInfoPlugin(
             UpgradeNoticeService notices,
             Supplier<String> language,

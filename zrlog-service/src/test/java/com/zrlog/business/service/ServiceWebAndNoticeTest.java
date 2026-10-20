@@ -1,5 +1,6 @@
 package com.zrlog.business.service;
 
+
 import com.google.gson.Gson;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.http.server.api.HttpRequest;
@@ -64,8 +65,8 @@ public class ServiceWebAndNoticeTest {
 
     @Test
     public void shouldBuildEmptyUpgradeNoticeWhenVersionIsMissing() {
-        CheckVersionResponse nullResponse = new UpgradeNoticeService(() -> false).buildResponse(null);
-        CheckVersionResponse missingDate = new UpgradeNoticeService(() -> false).buildResponse(new Version());
+        CheckVersionResponse nullResponse = new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> { throw new IllegalStateException("Database is unavailable in this test"); })).buildResponse(null);
+        CheckVersionResponse missingDate = new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> { throw new IllegalStateException("Database is unavailable in this test"); })).buildResponse(new Version());
 
         assertFalse(nullResponse.getUpgrade());
         assertNull(nullResponse.getVersion());
@@ -81,7 +82,7 @@ public class ServiceWebAndNoticeTest {
         version.setReleaseDate("2099-01-01 00:00");
         version.setBuildDate(new Date(System.currentTimeMillis() + 86_400_000L));
 
-        CheckVersionResponse response = new UpgradeNoticeService(() -> false).buildResponse(version);
+        CheckVersionResponse response = new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> { throw new IllegalStateException("Database is unavailable in this test"); })).buildResponse(version);
 
         assertTrue(response.getUpgrade());
         assertEquals("99.0.0", response.getVersion().getVersion());
@@ -90,7 +91,7 @@ public class ServiceWebAndNoticeTest {
 
     @Test
     public void shouldReturnEmptyNoticeWhenKvStoreIsUnavailable() {
-        CheckVersionResponse response = new UpgradeNoticeService(() -> false).getNotice();
+        CheckVersionResponse response = new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> { throw new IllegalStateException("Database is unavailable in this test"); })).getNotice();
 
         assertFalse(response.getUpgrade());
         assertNull(response.getVersion());
@@ -276,6 +277,9 @@ public class ServiceWebAndNoticeTest {
     }
 
     private static class FakeWebsiteKvService extends WebsiteKvService {
+        FakeWebsiteKvService() {
+            super(() -> { throw new AssertionError("Unexpected database access"); });
+        }
         private String storedJson;
         private String putKey;
         private String putValue;

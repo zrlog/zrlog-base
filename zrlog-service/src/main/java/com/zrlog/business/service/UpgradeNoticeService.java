@@ -24,10 +24,6 @@ public class UpgradeNoticeService {
 
     private final BooleanSupplier installed;
 
-    public UpgradeNoticeService(BooleanSupplier installed) {
-        this(installed, new WebsiteKvService());
-    }
-
     @Inject
     public UpgradeNoticeService(BooleanSupplier installed, WebsiteKvService kvService) {
         this.installed = Objects.requireNonNull(installed);

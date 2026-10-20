@@ -198,6 +198,32 @@ public class BaseDataDbServiceDatabaseTest {
     }
 
     @Test
+    public void shouldMergeTagCaseVariantsAndCountEachPublicArticleOnce() throws Exception {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
+            seedContent(db);
+            db.update("update log set keywords=? where logId=?", "Silent Hill,SILENT HILL,silent hill", 1);
+            db.update("update log set keywords=? where logId=?", "SILENT HILL", 2);
+            CacheService cache = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).cache();
+
+            BaseDataInitVO refreshed = cache.refreshInitData();
+
+            assertEquals(1, refreshed.getTags().size());
+            TagDTO tag = refreshed.getTags().get(0);
+            assertTrue("Silent Hill".equalsIgnoreCase(tag.getText()));
+            assertTrue(List.of("Silent Hill", "SILENT HILL", "silent hill").contains(tag.getText()));
+            assertEquals(Long.valueOf(2), tag.getCount());
+            assertEquals(Long.valueOf(tag.getText().hashCode()), tag.getKeycode());
+            assertEquals(1L, refreshed.getStatistics().getTotalTagSize().longValue());
+            assertEquals(1, db.queryList("select text,count from tag").size());
+            assertEquals(2, ((Number) db.queryOne("select count from tag").get("count")).intValue());
+            CacheService reloaded = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).cache();
+            assertEquals(1, reloaded.getTags().size());
+            assertEquals(tag.getText(), reloaded.getTags().get(0).getText());
+            assertEquals(Long.valueOf(2), reloaded.getTags().get(0).getCount());
+        }
+    }
+
+    @Test
     public void shouldRemoveEmptyDataPluginsFromCacheInit() throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             insertPlugin(db, 1, "tags");

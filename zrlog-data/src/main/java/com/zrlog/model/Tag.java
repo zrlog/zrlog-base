@@ -36,7 +36,8 @@ public class Tag extends BasePageableDAO {
     }
 
     private Set<String> strToSet(String str) {
-        Set<String> tags = new HashSet<>();
+        // A case variant in the same article still represents one tag.
+        Set<String> tags = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         for (String tag : str.split(",")) {
             if (!tag.trim().isEmpty()) {
                 tags.add(tag.trim());
@@ -82,7 +83,8 @@ public class Tag extends BasePageableDAO {
 
     public List<TagDTO> refreshTag() throws SQLException {
         execute("delete from " + tableName);
-        Map<String, Integer> countMap = new HashMap<>();
+        // Preserve the first spelling and merge case variants before the unique-index insert.
+        Map<String, Integer> countMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         List<Map<String, Object>> logs =
                 new Log(dataSource)
                         .queryListWithParams(

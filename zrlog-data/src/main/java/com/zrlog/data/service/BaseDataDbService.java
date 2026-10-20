@@ -21,7 +21,9 @@ import jakarta.inject.Inject;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -109,16 +111,16 @@ public class BaseDataDbService {
         PublicWebSiteInfo refreshWebSite = webSiteProvider.get().getPublicWebSite();
         cacheInit.setWebSite(refreshWebSite);
         cacheInit.setWebSiteVersion(getWebSiteVersion(refreshWebSite));
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        Map<String, CompletableFuture<Void>> futures = new LinkedHashMap<>();
         BaseDataInitVO.Statistics statistics = new BaseDataInitVO.Statistics();
-        futures.add(
+        futures.put("article-statistics",
                 CompletableFuture.runAsync(
                         () -> {
                             statistics.setTotalArticleSize(logProvider.get().getVisitorCount());
                             cacheInit.setStatistics(statistics);
                         },
                         executor));
-        futures.add(
+        futures.put("links",
                 CompletableFuture.runAsync(
                         () -> {
                             try {
@@ -128,7 +130,7 @@ public class BaseDataDbService {
                             }
                         },
                         executor));
-        futures.add(
+        futures.put("types-and-category-articles",
                 CompletableFuture.supplyAsync(
                         () -> {
                             try {
@@ -143,7 +145,7 @@ public class BaseDataDbService {
                         executor)
                         .thenCompose(types -> loadTypeHotLogs(types, executor))
                         .thenAccept(cacheInit::setTypeHotLogs));
-        futures.add(
+        futures.put("recent-articles",
                 CompletableFuture.runAsync(
                         () -> {
                             // Last article
@@ -157,7 +159,7 @@ public class BaseDataDbService {
                                             .collect(Collectors.toList()));
                         },
                         executor));
-        futures.add(
+        futures.put("navigation",
                 CompletableFuture.runAsync(
                         () -> {
                             try {
@@ -167,7 +169,7 @@ public class BaseDataDbService {
                             }
                         },
                         executor));
-        futures.add(
+        futures.put("plugins",
                 CompletableFuture.runAsync(
                         () -> {
                             try {
@@ -177,7 +179,7 @@ public class BaseDataDbService {
                             }
                         },
                         executor));
-        futures.add(
+        futures.put("archives",
                 CompletableFuture.runAsync(
                         () -> {
                             try {
@@ -189,7 +191,7 @@ public class BaseDataDbService {
                             }
                         },
                         executor));
-        futures.add(
+        futures.put("users",
                 CompletableFuture.runAsync(
                         () -> {
                             try {
@@ -199,7 +201,7 @@ public class BaseDataDbService {
                             }
                         },
                         executor));
-        futures.add(
+        futures.put("tags",
                 CompletableFuture.runAsync(
                         () -> {
                             try {
@@ -210,7 +212,7 @@ public class BaseDataDbService {
                             statistics.setTotalTagSize((long) cacheInit.getTags().size());
                         },
                         executor));
-        futures.add(
+        futures.put("template-config",
                 CompletableFuture.runAsync(
                         () -> {
                             String template = refreshWebSite.getTemplate();
@@ -225,9 +227,18 @@ public class BaseDataDbService {
                             }
                         }));
         try {
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-        } catch (Exception e) {
-            LOGGER.warning("Load data error " + e.getMessage());
+            CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0])).join();
+        } catch (CompletionException e) {
+            // allOf exposes only one failure; report every failed load with its original cause.
+            futures.forEach((task, future) -> {
+                if (future.isCompletedExceptionally()) {
+                    try {
+                        future.join();
+                    } catch (CompletionException failure) {
+                        LOGGER.log(Level.WARNING, "Load data error [task=" + task + "]", failure.getCause());
+                    }
+                }
+            });
         }
         if (cacheInit.getTags() == null || cacheInit.getTags().isEmpty()) {
             cacheInit.getPlugins().stream().filter(e -> Objects.equals(e.getPluginName(), "tags")).findFirst().ifPresent(e -> {

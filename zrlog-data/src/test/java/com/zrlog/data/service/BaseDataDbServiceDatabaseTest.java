@@ -13,6 +13,16 @@ import org.junit.runners.Parameterized;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.*;
 
@@ -95,6 +105,70 @@ public class BaseDataDbServiceDatabaseTest {
             assertEquals(2, init.getTypeHotLogs().get(0).getLogs().size());
             assertEquals("admin", init.getUsers().get(0).getUserName());
             assertEquals("bar", init.getTemplateConfigCacheMap().get("default").get("foo"));
+        }
+    }
+
+    @Test
+    public void shouldWaitForCategoryArticlesBeforeReturningSharedCache() throws Exception {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
+            seedContent(db);
+            db.update("insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
+                    2, "empty", "Empty category", "No articles");
+            var data = DaggerDataComponent.factory().create(db::dataSource, () -> true);
+            ExecutorService caller = Executors.newSingleThreadExecutor();
+            ExecutorService workers = Executors.newFixedThreadPool(4);
+            CountDownLatch releaseInitialLoads = new CountDownLatch(1);
+            CountDownLatch initialLoadQueued = new CountDownLatch(1);
+            CountDownLatch categoryLoadsQueued = new CountDownLatch(2);
+            BlockingQueue<Runnable> deferredLoads = new LinkedBlockingQueue<>();
+            AtomicReference<Thread> loadingThread = new AtomicReference<>();
+            Executor executor = task -> {
+                if (Thread.currentThread() == loadingThread.get()) {
+                    initialLoadQueued.countDown();
+                    workers.execute(() -> {
+                        try {
+                            if (!releaseInitialLoads.await(5, TimeUnit.SECONDS)) {
+                                throw new AssertionError("Initial cache loads were not released");
+                            }
+                            task.run();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            throw new AssertionError(e);
+                        }
+                    });
+                } else {
+                    deferredLoads.add(task);
+                    categoryLoadsQueued.countDown();
+                }
+            };
+            try {
+                Future<BaseDataInitVO> refresh = caller.submit(() -> {
+                    loadingThread.set(Thread.currentThread());
+                    return data.baseData().queryCacheInit(executor);
+                });
+                assertTrue(initialLoadQueued.await(5, TimeUnit.SECONDS));
+                assertThrows(TimeoutException.class, () -> refresh.get(200, TimeUnit.MILLISECONDS));
+                releaseInitialLoads.countDown();
+                assertTrue(categoryLoadsQueued.await(5, TimeUnit.SECONDS));
+                assertThrows(TimeoutException.class, () -> refresh.get(200, TimeUnit.MILLISECONDS));
+                Runnable task;
+                while ((task = deferredLoads.poll()) != null) {
+                    workers.execute(task);
+                }
+                BaseDataInitVO init = refresh.get(5, TimeUnit.SECONDS);
+                assertEquals(2, init.getTags().size());
+                assertEquals(2, init.getTypeHotLogs().size());
+                assertEquals("tech", init.getTypeHotLogs().get(0).getTypeAlias());
+                assertEquals(2, init.getTypeHotLogs().get(0).getLogs().size());
+                assertEquals("empty", init.getTypeHotLogs().get(1).getTypeAlias());
+                assertTrue(init.getTypeHotLogs().get(1).getLogs().isEmpty());
+            } finally {
+                releaseInitialLoads.countDown();
+                caller.shutdownNow();
+                workers.shutdownNow();
+                assertTrue(caller.awaitTermination(5, TimeUnit.SECONDS));
+                assertTrue(workers.awaitTermination(5, TimeUnit.SECONDS));
+            }
         }
     }
 

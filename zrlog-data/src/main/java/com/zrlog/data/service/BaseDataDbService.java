@@ -85,6 +85,24 @@ public class BaseDataDbService {
         return BeanUtil.convert(log, HotLogBasicInfoEntry.class);
     }
 
+    private CompletableFuture<List<HotTypeLogInfo>> loadTypeHotLogs(List<TypeDTO> types, Executor executor) {
+        List<CompletableFuture<HotTypeLogInfo>> loads = new ArrayList<>();
+        for (TypeDTO type : types) {
+            loads.add(CompletableFuture.supplyAsync(() -> {
+                HotTypeLogInfo info = new HotTypeLogInfo();
+                info.setTypeAlias(type.getAlias());
+                info.setTypeName(type.getTypeName());
+                info.setTypeId(type.getId());
+                info.setLogs(logProvider.get().findByTypeAlias(1, 6, type.getAlias()).getRows()
+                        .stream().map(this::convertToBasicVO).collect(Collectors.toList()));
+                return info;
+            }, executor));
+        }
+        // Include every category load in the parent future before publishing the list.
+        return CompletableFuture.allOf(loads.toArray(new CompletableFuture[0]))
+                .thenApply(ignored -> loads.stream().map(CompletableFuture::join).collect(Collectors.toList()));
+    }
+
     public BaseDataInitVO queryCacheInit(Executor executor) {
         BaseDataInitVO cacheInit = new BaseDataInitVO();
         // first set website info
@@ -111,46 +129,20 @@ public class BaseDataDbService {
                         },
                         executor));
         futures.add(
-                CompletableFuture.runAsync(
+                CompletableFuture.supplyAsync(
                         () -> {
                             try {
-                                cacheInit.setTypes(typeProvider.get().findAll());
-                                statistics.setTotalTypeSize((long) cacheInit.getTypes().size());
-                                List<TypeDTO> types = cacheInit.getTypes();
-                                List<HotTypeLogInfo> indexHotLog = new ArrayList<>();
-                                cacheInit.setTypeHotLogs(indexHotLog);
-                                // 设置分类Hot
-                                for (TypeDTO type : types) {
-                                    futures.add(
-                                            CompletableFuture.runAsync(
-                                                    () -> {
-                                                        HotTypeLogInfo hotTypeLogInfo =
-                                                                new HotTypeLogInfo();
-                                                        String alias = type.getAlias();
-                                                        hotTypeLogInfo.setTypeAlias(alias);
-                                                        hotTypeLogInfo.setTypeName(
-                                                                type.getTypeName());
-                                                        hotTypeLogInfo.setTypeId(type.getId());
-                                                        hotTypeLogInfo.setLogs(
-                                                                logProvider
-                                                                        .get()
-                                                                        .findByTypeAlias(
-                                                                                1, 6, alias)
-                                                                        .getRows()
-                                                                        .stream()
-                                                                        .map(this::convertToBasicVO)
-                                                                        .collect(
-                                                                                Collectors
-                                                                                        .toList()));
-                                                        indexHotLog.add(hotTypeLogInfo);
-                                                    },
-                                                    executor));
-                                }
+                                List<TypeDTO> types = typeProvider.get().findAll();
+                                cacheInit.setTypes(types);
+                                statistics.setTotalTypeSize((long) types.size());
+                                return types;
                             } catch (SQLException e) {
                                 throw new DAOException(e);
                             }
                         },
-                        executor));
+                        executor)
+                        .thenCompose(types -> loadTypeHotLogs(types, executor))
+                        .thenAccept(cacheInit::setTypeHotLogs));
         futures.add(
                 CompletableFuture.runAsync(
                         () -> {

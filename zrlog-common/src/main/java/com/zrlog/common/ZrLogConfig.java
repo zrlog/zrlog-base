@@ -27,7 +27,10 @@ import javax.sql.DataSource;
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.util.*;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -53,6 +56,8 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
     protected final ServerConfig serverConfig;
     protected DataSourceWrapper dataSource;
     protected ZrLogHttpRequestListener zrLogHttpRequestListener = new ZrLogHttpRequestListener();
+    private final Object stopMonitor = new Object();
+    private boolean stopped;
     private boolean webSetupsInitialized;
     private volatile boolean databaseInitialized;
 
@@ -178,7 +183,46 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         return webSetups.stream().filter(capability::isInstance).map(capability::cast).findFirst().orElse(null);
     }
 
+    /**
+     * Stop work owned by this configuration once, including overlapping TERM and
+     * JVM shutdown-hook calls. Host-specific cleanup belongs in the stop hooks.
+     */
     public void stop() {
+        // Requests may still call synchronized configDatabase() while draining.
+        synchronized (stopMonitor) {
+            if (stopped) {
+                return;
+            }
+            stopped = true;
+            try {
+                try {
+                    beforeStop();
+                } finally {
+                    stopRequestExecutors();
+                }
+            } finally {
+                try {
+                    stopSharedResources();
+                } finally {
+                    try {
+                        afterStop();
+                    } finally {
+                        serverConfig.getRequestCheckerExecutor().shutdownNow();
+                    }
+                }
+            }
+        }
+    }
+
+    /** Stop the host from accepting new work before draining HTTP executors. */
+    protected void beforeStop() {
+    }
+
+    /** Release host-specific resources after HTTP work and shared resources close. */
+    protected void afterStop() {
+    }
+
+    private void stopSharedResources() {
         try {
             plugins.forEach(IPlugin::stop);
             plugins.clear();
@@ -189,6 +233,65 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
             LOGGER.log(Level.SEVERE, "", e);
         } finally {
             HttpUtil.getInstance().closeHttpClient();
+        }
+    }
+
+    private static ExecutorService executorService(Executor executor) {
+        return executor instanceof ExecutorService ? (ExecutorService) executor : null;
+    }
+
+    private static void awaitExecutor(ExecutorService executor, long deadline) throws InterruptedException {
+        if (executor != null) {
+            executor.awaitTermination(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+        }
+    }
+
+    private void stopRequestExecutors() {
+        ExecutorService decode = executorService(serverConfig.getDecodeExecutor());
+        ExecutorService request = executorService(serverConfig.getRequestExecutor());
+        long started = System.nanoTime();
+        long gracefulDeadline = started + TimeUnit.SECONDS.toNanos(5);
+        long finalDeadline = started + TimeUnit.SECONDS.toNanos(10);
+        boolean interrupted = Thread.interrupted();
+        try {
+            if (decode != null) {
+                decode.shutdown();
+            }
+            // Decoders can still submit requests, so drain them before closing
+            // the request executor. Keep plugins and the database alive meanwhile.
+            if (!interrupted) {
+                awaitExecutor(decode, gracefulDeadline);
+            }
+            if (request != null) {
+                request.shutdown();
+            }
+            if (!interrupted) {
+                awaitExecutor(request, gracefulDeadline);
+            }
+        } catch (InterruptedException e) {
+            interrupted = true;
+        } finally {
+            ExecutorService[] executors = {decode, request};
+            for (ExecutorService executor : executors) {
+                if (executor != null && !executor.isTerminated()) {
+                    executor.shutdownNow();
+                }
+            }
+            for (ExecutorService executor : executors) {
+                if (!interrupted) {
+                    try {
+                        awaitExecutor(executor, finalDeadline);
+                    } catch (InterruptedException e) {
+                        interrupted = true;
+                    }
+                }
+                if (executor != null && !executor.isTerminated()) {
+                    LOGGER.warning("HTTP executor did not terminate during shutdown");
+                }
+            }
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 

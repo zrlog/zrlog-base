@@ -64,8 +64,7 @@ public class UpdateVersionInfoPlugin implements IPlugin {
         Version copyVersion = BeanUtil.convert(version, Version.class);
         copyVersion.setType(I18nUtil.getBackendStringFromRes(
                 isPreviewVersion(version) ? "version.type.preview" : "version.type.release"));
-        //不在页面展示SNAPSHOT
-        copyVersion.setVersion(version.getVersion().replaceAll("-SNAPSHOT", ""));
+        // Preserve the manifest identity, including -SNAPSHOT, in every consumer.
         return copyVersion;
     }
 

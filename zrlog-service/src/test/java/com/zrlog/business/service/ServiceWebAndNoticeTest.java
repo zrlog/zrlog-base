@@ -113,7 +113,7 @@ public class ServiceWebAndNoticeTest {
     }
 
     @Test
-    public void shouldNormalizePreviewUpgradeNoticeForDisplay() {
+    public void shouldPreserveCompletePreviewVersionInUpgradeNotice() {
         Version version = new Version();
         version.setBuildId("future-build");
         version.setVersion("99.0.0-SNAPSHOT");
@@ -125,7 +125,7 @@ public class ServiceWebAndNoticeTest {
         })).buildResponse(version);
 
         assertTrue(response.getUpgrade());
-        assertEquals("99.0.0", response.getVersion().getVersion());
+        assertEquals("99.0.0-SNAPSHOT", response.getVersion().getVersion());
         assertNotNull(response.getVersion().getType());
     }
 

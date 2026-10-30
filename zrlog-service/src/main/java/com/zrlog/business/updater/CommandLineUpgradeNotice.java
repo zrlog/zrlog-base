@@ -68,7 +68,7 @@ final class CommandLineUpgradeNotice {
         if (StringUtils.isEmpty(version)) {
             return "unknown";
         }
-        return version.replace("-SNAPSHOT", "");
+        return version;
     }
 
     private static String quote(String path) {

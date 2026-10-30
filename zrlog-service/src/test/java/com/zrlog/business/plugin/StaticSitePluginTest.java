@@ -415,6 +415,160 @@ public class StaticSitePluginTest {
         void run() throws Exception;
     }
 
+    private static StaticGenerationBudget budget(long millis) {
+        return new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(millis), () -> {});
+    }
+
+    private static StaticSiteRenderer renderer(ServerConfig config, Class<? extends Interceptor> interceptor) {
+        config.addInterceptor(interceptor);
+        ApplicationContext context = new ApplicationContext(config);
+        context.init();
+        return new StaticSiteRenderer(new com.hibegin.http.server.config.RequestConfig(),
+                new com.hibegin.http.server.config.ResponseConfig(), context);
+    }
+
+    @Test
+    public void boundedFetchCompletesDiscoveredPagesOnTheCallingThread() throws Exception {
+        TestStaticSitePlugin plugin = new TestStaticSitePlugin() {
+            @Override public Executor getExecutorService() { throw new AssertionError("Detached page work"); }
+        };
+        plugin.handleStatusPageMap.put("/index.html", StaticSitePlugin.HandleState.NEW);
+        StaticFetchInterceptor.pages.put("/index.html", "<a href=\"/next.html\">next</a>");
+        StaticFetchInterceptor.pages.put("/next.html", "complete");
+        withSite(plugin, true, "blog.example.com", config -> {
+            plugin.doFetchWithinBudget(renderer(config, StaticFetchInterceptor.class), budget(5000));
+            assertEquals(2, plugin.handleStatusPageMap.size());
+            assertTrue(plugin.handleStatusPageMap.values().stream().allMatch(state -> state == StaticSitePlugin.HandleState.HANDLED));
+            assertEquals("complete", Files.readString(plugin.getCacheFile("/next.html").toPath()));
+            assertEquals(plugin.getSiteVersion(), Files.readString(plugin.getCacheFile(plugin.getVersionFileName()).toPath()));
+        });
+    }
+
+    @Test
+    public void boundedVersionPreservesExistingHashAndDuplicateFileSemantics() throws Exception {
+        TestStaticSitePlugin plugin = new TestStaticSitePlugin();
+        File first = temporaryFolder.newFile();
+        File second = temporaryFolder.newFile();
+        Files.writeString(first.toPath(), "中文缓存");
+        Files.write(second.toPath(), new byte[20000]);
+        plugin.cacheFiles.add(second);
+        plugin.cacheFiles.add(first);
+        plugin.cacheFiles.add(second);
+        assertEquals(plugin.getSiteVersion(), plugin.getSiteVersionWithinBudget(budget(5000)));
+    }
+
+    @Test
+    public void missingBodyFailsWithoutReplacingThePreviousVersion() throws Exception {
+        TestStaticSitePlugin plugin = new TestStaticSitePlugin();
+        plugin.handleStatusPageMap.put("/empty.html", StaticSitePlugin.HandleState.NEW);
+        withSite(plugin, true, "blog.example.com", config -> {
+            File marker = plugin.getCacheFile(plugin.getVersionFileName());
+            Files.createDirectories(marker.toPath().getParent());
+            Files.writeString(marker.toPath(), "previous");
+            StaticSiteRenderer renderer = renderer(config, NoBodyInterceptor.class);
+            assertThrows(java.io.IOException.class, () -> plugin.doFetchWithinBudget(renderer, budget(5000)));
+            assertEquals(StaticSitePlugin.HandleState.RE_FETCH, plugin.handleStatusPageMap.get("/empty.html"));
+            assertEquals("previous", Files.readString(marker.toPath()));
+        });
+    }
+
+    @Test
+    public void revokedFenceStopsBeforeTheNextPageAndVersion() throws Exception {
+        TestStaticSitePlugin plugin = new TestStaticSitePlugin();
+        plugin.handleStatusPageMap.put("/a.html", StaticSitePlugin.HandleState.NEW);
+        plugin.handleStatusPageMap.put("/b.html", StaticSitePlugin.HandleState.NEW);
+        withSite(plugin, true, "blog.example.com", config -> {
+            StaticGenerationBudget budget = new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(5000), () -> {
+                if (plugin.handleStatusPageMap.get("/a.html") == StaticSitePlugin.HandleState.HANDLED)
+                    throw new IllegalStateException("revoked");
+            });
+            assertThrows(IllegalStateException.class,
+                    () -> plugin.doFetchWithinBudget(renderer(config, StaticFetchInterceptor.class), budget));
+            assertTrue(plugin.getCacheFile("/a.html").isFile());
+            assertFalse(plugin.getCacheFile("/b.html").exists());
+            assertFalse(plugin.getCacheFile(plugin.getVersionFileName()).exists());
+        });
+    }
+
+    @Test
+    public void expiredBudgetDoesNotModifyPagesOrVersion() throws Exception {
+        TestStaticSitePlugin plugin = new TestStaticSitePlugin();
+        plugin.handleStatusPageMap.put("/index.html", StaticSitePlugin.HandleState.NEW);
+        withSite(plugin, true, "blog.example.com", () -> {
+            assertThrows(IllegalStateException.class, () -> plugin.doFetchWithinBudget(null, budget(0)));
+            assertFalse(plugin.getCacheFile("/index.html").exists());
+            assertFalse(plugin.getCacheFile(plugin.getVersionFileName()).exists());
+        });
+    }
+
+    @Test
+    public void parseLockContentionUsesTheRemainingBudget() throws Exception {
+        TestStaticSitePlugin plugin = new TestStaticSitePlugin();
+        plugin.handleStatusPageMap.put("/index.html", StaticSitePlugin.HandleState.NEW);
+        java.util.concurrent.CountDownLatch held = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        Thread owner = new Thread(() -> {
+            plugin.parseLock.lock();
+            try { held.countDown(); release.await(); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+            finally { plugin.parseLock.unlock(); }
+        });
+        owner.start();
+        try {
+            assertTrue(held.await(2, java.util.concurrent.TimeUnit.SECONDS));
+            withSite(plugin, true, "blog.example.com", config -> {
+                StaticSiteRenderer renderer = renderer(config, StaticFetchInterceptor.class);
+                long start = System.nanoTime();
+                assertThrows(IllegalStateException.class, () -> plugin.doFetchWithinBudget(renderer, budget(150)));
+                assertTrue(java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < 2000);
+                assertFalse(plugin.getCacheFile(plugin.getVersionFileName()).exists());
+            });
+        } finally {
+            release.countDown();
+            owner.join(2000);
+            assertFalse(owner.isAlive());
+        }
+    }
+
+    @Test
+    public void boundedRemoteVersionRejectsOversizedBody() throws Exception {
+        TestStaticSitePlugin plugin = new TestStaticSitePlugin();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/static/version.txt", exchange -> {
+            exchange.sendResponseHeaders(200, 4096);
+            try { exchange.getResponseBody().write(new byte[4096]); }
+            finally { exchange.close(); }
+        });
+        server.start();
+        try {
+            withSite(plugin, true, "127.0.0.1:" + server.getAddress().getPort(), () ->
+                    assertThrows(java.io.IOException.class, () -> plugin.isSynchronizedWithinBudget("http", 5000)));
+        } finally { server.stop(0); }
+    }
+
+    @Test
+    public void boundedRemoteVersionDeadlineIncludesTheResponseBody() throws Exception {
+        TestStaticSitePlugin plugin = new TestStaticSitePlugin();
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/static/version.txt", exchange -> {
+            exchange.sendResponseHeaders(200, 10);
+            exchange.getResponseBody().write('0');
+            exchange.getResponseBody().flush();
+            try { release.await(3, java.util.concurrent.TimeUnit.SECONDS); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+            finally { exchange.close(); }
+        });
+        server.start();
+        try {
+            withSite(plugin, true, "127.0.0.1:" + server.getAddress().getPort(), () -> {
+                long start = System.nanoTime();
+                assertThrows(java.io.IOException.class, () -> plugin.isSynchronizedWithinBudget("http", 200));
+                assertTrue(java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < 2000);
+            });
+        } finally { release.countDown(); server.stop(0); }
+    }
+
     private interface ConfigThrowingRunnable {
         void run(ServerConfig config) throws Exception;
     }

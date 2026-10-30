@@ -21,6 +21,7 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.plugin.PluginAdminAppearance;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.I18nUtil;
+import com.zrlog.util.ExecutionDeadline;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +29,8 @@ import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -44,10 +47,16 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
     private final String token;
     private volatile String pluginServerBaseUrl;
     private volatile String pendingPluginServerBaseUrl;
+    private ExecutionDeadline pendingStartupDeadline;
     private long pluginServerGeneration;
 
     public PluginCorePluginImpl(File dbPropertiesPath, String contextPath, IntSupplier hostPort,
                                 Supplier<PublicWebSiteInfo> siteInfo) {
+        this(dbPropertiesPath, siteInfo, onStop -> new PluginCoreProcessImpl(onStop, contextPath, hostPort));
+    }
+
+    PluginCorePluginImpl(File dbPropertiesPath, Supplier<PublicWebSiteInfo> siteInfo,
+                         Function<Runnable, PluginCoreProcess> processFactory) {
         this.dbPropertiesPath = dbPropertiesPath;
         this.siteInfo = Objects.requireNonNull(siteInfo);
         String args = ConfigKit.get("pluginJvmArgs", "-Xms8m -Xmx64m -Dfile.encoding=UTF-8");
@@ -55,7 +64,7 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
             args += " -Dsws.run.mode=dev";
         }
         this.pluginJvmArgs = args;
-        this.pluginCoreProcess = new PluginCoreProcessImpl(this::stop, contextPath, hostPort);
+        this.pluginCoreProcess = Objects.requireNonNull(processFactory.apply(this::stop));
         this.token = UUID.randomUUID().toString().replace("-", "");
     }
 
@@ -106,6 +115,14 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
             LOGGER.log(Level.WARNING, "plugin-core readiness failed at " + pluginServerBaseUrl, lastFailure);
         }
         return false;
+    }
+
+    @Override
+    public boolean supportsHostScheduler() { return true; }
+
+    @Override
+    public void setExternallyScheduled(boolean externallyScheduled) {
+        pluginCoreProcess.setExternallyScheduled(externallyScheduled);
     }
 
     @Override
@@ -171,15 +188,7 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
     }
 
     private boolean waitToStarted() {
-        lock.lock();
-        try {
-            if (this.isStarted()) {
-                return true;
-            }
-            return this.start();
-        } finally {
-            lock.unlock();
-        }
+        return isStarted() || start();
     }
 
     private String requirePluginServerBaseUrl() throws IOException {
@@ -205,6 +214,79 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
             HttpUtil.getInstance().sendPostRequest(forwardUrl, IOUtil.getByteByInputStream(request.getInputStream()), handle, genHeaderMapByRequest(request, adminTokenVO));
         }
         return handle;
+    }
+
+    @Override
+    public String renderViewWithinBudget(String uri, HttpRequest source, StaticGenerationBudget budget)
+            throws IOException, InterruptedException {
+        budget.check();
+        if (budget.executionId() == null || !budget.executionId().matches("[a-zA-Z0-9_.-]{1,128}") || budget.actorId() < 1)
+            throw new IllegalArgumentException("Static plugin views require an execution identity");
+        java.net.URI view = parsePublicViewUri(uri);
+        String path = view.getPath();
+        int slash = path.indexOf('/', 1);
+        String name = slash < 0 ? path.substring(1) : path.substring(1, slash);
+        String action = slash < 0 ? "/" : path.substring(slash);
+        String encodedAction;
+        try { encodedAction = new java.net.URI(null, null, action, null).toASCIIString(); }
+        catch (URISyntaxException invalid) { throw new IOException("Invalid plugin view path", invalid); }
+        String baseUrl = pluginServerBaseUrl;
+        long requestMillis = Math.min(650000, budget.remainingMillis());
+        if (baseUrl == null || requestMillis < 12000) throw new IOException("Plugin view execution budget is unavailable");
+        String invocationId = java.util.UUID.randomUUID().toString();
+        String query = view.getRawQuery() == null ? "" : view.getRawQuery();
+        if (source.getQueryStr() != null && !source.getQueryStr().isEmpty())
+            query += (query.isEmpty() ? "" : "&") + source.getQueryStr();
+        if (query.length() > 8192) throw new IllegalArgumentException("Plugin view query is too large");
+        String target = baseUrl + "/internal/runtime-scheduler/render-view" + (query.isEmpty() ? "" : "?" + query);
+        var builder = java.net.http.HttpRequest.newBuilder(java.net.URI.create(target))
+                .timeout(java.time.Duration.ofMillis(requestMillis))
+                .header("X-Plugin-Token", token).header("X-ZrLog-Actor-Id", String.valueOf(budget.actorId()))
+                .header("X-ZrLog-Trigger-Id", budget.executionId()).header("X-ZrLog-Request-Id", invocationId)
+                .header("X-ZrLog-Plugin-Name", name).header("X-ZrLog-View-Path", encodedAction)
+                .header("X-ZrLog-Budget-Millis", String.valueOf(requestMillis - 5000));
+        Map<String, String> publicHeaders = genHeaderMapByRequest(source, null);
+        for (String key : java.util.List.of("User-Agent", "Blog-Version", "Current-Locale", "AccessUrl", "Full-Url",
+                "Dark-Mode", "Admin-Theme", "Admin-Compact-Mode", "Admin-Color-Primary")) {
+            String value = publicHeaders.get(key);
+            if (value != null) builder.header("User-Agent".equals(key) ? "X-ZrLog-View-User-Agent" : key, value);
+        }
+        budget.check();
+        var response = HttpUtil.getInstance().sendDirectRequest(builder.POST(java.net.http.HttpRequest.BodyPublishers.noBody()).build(),
+                ExecutionDeadline.afterMillis(budget.remainingMillis()).capMillis(requestMillis), 16 * 1024 * 1024);
+        budget.check();
+        if (response.statusCode() != 200 || !"1".equals(response.headers().firstValue("X-ZrLog-Scheduler-Protocol").orElse(null)))
+            throw new IOException("Plugin view completion is unavailable");
+        try {
+            PluginViewRenderResult result = new Gson().fromJson(response.body(), PluginViewRenderResult.class);
+            if (result == null || !budget.executionId().equals(result.triggerId) || !invocationId.equals(result.requestId)
+                    || !result.completed || result.outcomeUncertain || result.content == null
+                    || result.content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 2 * 1024 * 1024)
+                throw new IllegalArgumentException();
+            return result.content;
+        } catch (RuntimeException invalid) { throw new IOException("Plugin view did not return confirmed content"); }
+    }
+
+    static java.net.URI parsePublicViewUri(String value) {
+        if (value == null || value.length() > 10000) throw new IllegalArgumentException("Invalid plugin view URI");
+        java.net.URI uri = java.net.URI.create(java.net.URI.create(value).toASCIIString());
+        String path = uri.getPath();
+        if (uri.isAbsolute() || uri.getRawAuthority() != null || uri.getRawFragment() != null || path == null
+                || !path.startsWith("/") || path.length() > 1153 || path.contains("\\")
+                || uri.getRawQuery() != null && uri.getRawQuery().length() > 8192)
+            throw new IllegalArgumentException("Invalid plugin view URI");
+        String[] segments = path.substring(1).split("/", -1);
+        if (segments.length == 0 || !segments[0].matches("[a-zA-Z0-9_-]{1,128}"))
+            throw new IllegalArgumentException("Invalid plugin view name");
+        String action = path.substring(segments[0].length() + 1);
+        if (action.length() > 1024 || action.startsWith("//") || action.contains("?") || action.contains("#"))
+            throw new IllegalArgumentException("Invalid plugin view path");
+        for (String segment : segments) {
+            if (".".equals(segment) || "..".equals(segment)) throw new IllegalArgumentException("Invalid plugin view path");
+            for (int i = 0; i < segment.length(); i++) if (Character.isISOControl(segment.charAt(i)))
+                throw new IllegalArgumentException("Invalid plugin view path");
+        }
+        return uri;
     }
 
     @Override
@@ -257,6 +339,7 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
             if (isStarted()) {
                 return true;
             }
+            discardExpiredStartup(ExecutionDeadline.afterMillis(5000));
             serverUrl = pendingPluginServerBaseUrl;
             if (Objects.isNull(serverUrl)) {
                 //加载 ZrLog 提供的插件
@@ -270,6 +353,7 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
                 }
                 serverUrl = "http://127.0.0.1:" + port;
                 this.pendingPluginServerBaseUrl = serverUrl;
+                this.pendingStartupDeadline = null;
                 pluginServerGeneration++;
             }
             serverGeneration = pluginServerGeneration;
@@ -293,8 +377,11 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
             if (!Objects.equals(pendingPluginServerBaseUrl, serverUrl)) {
                 return false;
             }
+            if (pendingStartupDeadline != null && !pluginCoreProcess.confirmStarted(
+                    java.net.URI.create(serverUrl).getPort(), pendingStartupDeadline)) return false;
             this.pluginServerBaseUrl = serverUrl;
             this.pendingPluginServerBaseUrl = null;
+            this.pendingStartupDeadline = null;
             return true;
         } finally {
             lock.unlock();
@@ -318,6 +405,7 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
             pluginServerGeneration++;
             pluginServerBaseUrl = null;
             pendingPluginServerBaseUrl = null;
+            pendingStartupDeadline = null;
             pluginCoreProcess.stopPluginCore();
             return true;
         } finally {
@@ -332,6 +420,192 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
         }
         refreshCacheWithRetry(EnvKit.isFaaSMode() ? Integer.MAX_VALUE : 5, cacheVersion);
         return true;
+    }
+
+    @Override
+    public boolean refreshCacheWithinBudget(String cacheVersion, String triggerId, int actorId, long remainingMillis)
+            throws IOException, InterruptedException {
+        if (triggerId == null || !triggerId.matches("[a-zA-Z0-9_.-]{1,128}") || actorId < 1
+                || cacheVersion == null || !cacheVersion.matches("[a-zA-Z0-9_.-]{1,128}"))
+            throw new IllegalArgumentException("Invalid cache refresh identity");
+        String baseUrl = pluginServerBaseUrl;
+        if (remainingMillis < 12000 || !isStarted() || baseUrl == null) return false;
+        long requestMillis = Math.min(remainingMillis, 650000);
+        ExecutionDeadline deadline = ExecutionDeadline.afterMillis(requestMillis);
+        var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create(baseUrl + "/internal/runtime-scheduler/refresh-cache"))
+                .timeout(java.time.Duration.ofMillis(requestMillis))
+                .header("X-Plugin-Token", token)
+                .header("X-ZrLog-Actor-Id", String.valueOf(actorId))
+                .header("X-ZrLog-Trigger-Id", triggerId)
+                .header("X-ZrLog-Cache-Version", cacheVersion)
+                .header("X-ZrLog-Budget-Millis", String.valueOf(requestMillis - 5000))
+                .POST(java.net.http.HttpRequest.BodyPublishers.noBody()).build();
+        // Single attempt: a lost response does not prove the plugin had no effects.
+        var response = HttpUtil.getInstance().sendDirectRequest(request, deadline, 65536);
+        if (java.util.Set.of(401, 403, 404, 405).contains(response.statusCode())) return false;
+        if (response.statusCode() != 200 || !"1".equals(response.headers().firstValue("X-ZrLog-Scheduler-Protocol").orElse(null)))
+            throw new IOException("Plugin cache refresh outcome unavailable");
+        try {
+            PluginCacheRefreshResult result = new com.google.gson.Gson().fromJson(response.body(), PluginCacheRefreshResult.class);
+            if (result == null || !triggerId.equals(result.triggerId) || !cacheVersion.equals(result.cacheVersion)
+                    || result.successCount < 0 || result.failedCount < 0 || result.unsupportedCount < 0
+                    || result.completed && (result.outcomeUncertain || result.failedCount != 0 || result.unsupportedCount != 0))
+                throw new IllegalArgumentException();
+            return result.completed;
+        } catch (RuntimeException malformed) { throw new IOException("Plugin cache refresh response is invalid"); }
+    }
+
+    @Override
+    public PluginSchedulerTickResult tickScheduledTasks(String triggerId, int actorId, long remainingMillis)
+            throws IOException, InterruptedException {
+        if (triggerId == null || !triggerId.matches("[a-zA-Z0-9_.-]{1,128}") || actorId < 1) {
+            throw new IllegalArgumentException("Invalid scheduler identity");
+        }
+        if (remainingMillis < 7000) return null;
+        long requestMillis = Math.min(650000, remainingMillis);
+        ExecutionDeadline deadline = ExecutionDeadline.afterMillis(requestMillis);
+        if (!isStarted() && !startWithinBudget(deadline.reserveMillis(7000).capMillis(30000))) return null;
+        String baseUrl = pluginServerBaseUrl;
+        requestMillis = deadline.remainingMillis();
+        if (baseUrl == null || requestMillis < 6000) return null;
+        var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create(baseUrl + "/internal/runtime-scheduler/tick"))
+                .timeout(java.time.Duration.ofMillis(requestMillis))
+                .header("X-Plugin-Token", token)
+                .header("X-ZrLog-Actor-Id", String.valueOf(actorId))
+                .header("X-ZrLog-Trigger-Id", triggerId)
+                .header("X-ZrLog-Budget-Millis", String.valueOf(requestMillis - 5000))
+                .POST(java.net.http.HttpRequest.BodyPublishers.noBody()).build();
+        // Never use the browser proxy path, redirect, retry, or start a process after the tick was submitted.
+        var response = HttpUtil.getInstance().sendDirectRequest(request, deadline, 262144);
+        if (java.util.Set.of(401, 403, 404, 405).contains(response.statusCode())) return null;
+        if (response.statusCode() != 200 || !"1".equals(response.headers().firstValue("X-ZrLog-Scheduler-Protocol").orElse(null))
+                || response.body().length() > 262144) throw new IOException("Plugin scheduler outcome unavailable");
+        try {
+            PluginSchedulerTickResult result = new com.google.gson.Gson().fromJson(response.body(), PluginSchedulerTickResult.class);
+            if (result == null || !triggerId.equals(result.triggerId) || result.children == null || result.children.size() > 64
+                    || result.executedCount < 0 || result.failedCount < 0 || result.skippedCount < 0 || result.uncertainCount < 0
+                    || result.uncertainCount > result.failedCount) throw new IllegalArgumentException();
+            int completed = 0, failed = 0, uncertain = 0;
+            for (PluginSchedulerTickResult.Child child : result.children) {
+                if (child == null || child.automationId == null || child.name == null || child.status == null
+                        || !java.util.Set.of("success", "error", "uncertain", "skipped").contains(child.status)) {
+                    throw new IllegalArgumentException();
+                }
+                if (!"skipped".equals(child.status) && (child.runId == null || child.runId.isBlank())) throw new IllegalArgumentException();
+                if ("success".equals(child.status)) completed++;
+                if ("error".equals(child.status) || "uncertain".equals(child.status)) failed++;
+                if ("uncertain".equals(child.status)) uncertain++;
+            }
+            if (completed != result.executedCount || failed != result.failedCount || uncertain != result.uncertainCount) {
+                throw new IllegalArgumentException();
+            }
+            return result;
+        } catch (RuntimeException malformed) {
+            throw new IOException("Plugin scheduler response is invalid");
+        }
+    }
+
+    @Override
+    public boolean startWithinBudget(long remainingMillis) throws InterruptedException {
+        if (remainingMillis < 1) return false;
+        return startWithinBudget(ExecutionDeadline.afterMillis(Math.min(remainingMillis, 30000)));
+    }
+
+    private boolean startWithinBudget(ExecutionDeadline deadline) throws InterruptedException {
+        if (deadline.remainingMillis() == 0 || Thread.currentThread().isInterrupted()) return false;
+        String serverUrl;
+        long generation;
+        boolean owner = false;
+        ExecutionDeadline readinessDeadline = deadline;
+        if (!lock.tryLock(deadline.remainingMillis(), TimeUnit.MILLISECONDS)) return false;
+        try {
+            if (isStarted()) return true;
+            discardExpiredStartup(deadline);
+            serverUrl = pendingPluginServerBaseUrl;
+            if (serverUrl == null) {
+                readinessDeadline = deadline.reserveMillis(Math.min(5000, deadline.remainingMillis() / 4));
+                if (readinessDeadline.remainingMillis() == 0) return false;
+                int port = pluginCoreProcess.pluginServerStart(dbPropertiesPath.toString(), pluginJvmArgs,
+                        PathUtil.getStaticPath(), BlogBuildInfoUtil.getVersion(), token, readinessDeadline);
+                if (port <= 0) return false;
+                serverUrl = "http://127.0.0.1:" + port;
+                pendingPluginServerBaseUrl = serverUrl;
+                pendingStartupDeadline = readinessDeadline;
+                pluginServerGeneration++;
+                owner = true;
+            } else if (pendingStartupDeadline != null) {
+                readinessDeadline = deadline.capMillis(Math.min(86400000, pendingStartupDeadline.remainingMillis()));
+            }
+            generation = pluginServerGeneration;
+        } finally { lock.unlock(); }
+        try {
+            if (!waitToStarted(serverUrl, readinessDeadline)) return false;
+            if (!lock.tryLock(deadline.remainingMillis(), TimeUnit.MILLISECONDS)) return false;
+            try {
+                if (generation != pluginServerGeneration) return false;
+                if (Objects.equals(pluginServerBaseUrl, serverUrl)) return true;
+                if (!Objects.equals(pendingPluginServerBaseUrl, serverUrl)) return false;
+                if (pendingStartupDeadline != null && !pluginCoreProcess.confirmStarted(
+                        java.net.URI.create(serverUrl).getPort(), deadline)) return false;
+                pluginServerBaseUrl = serverUrl;
+                pendingPluginServerBaseUrl = null;
+                pendingStartupDeadline = null;
+                return true;
+            } finally { lock.unlock(); }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw interrupted;
+        } finally {
+            if (owner) {
+                // Cleanup still runs when the caller was interrupted, without clearing its interrupt flag.
+                boolean acquired;
+                try {
+                    acquired = Thread.currentThread().isInterrupted() ? lock.tryLock()
+                            : lock.tryLock(deadline.remainingMillis(), TimeUnit.MILLISECONDS);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    acquired = lock.tryLock();
+                }
+                if (acquired) {
+                    try {
+                        if (generation == pluginServerGeneration && Objects.equals(pendingPluginServerBaseUrl, serverUrl)) {
+                            pluginCoreProcess.cancelStartup(java.net.URI.create(serverUrl).getPort(), deadline);
+                            pendingPluginServerBaseUrl = null;
+                            pendingStartupDeadline = null;
+                            pluginServerGeneration++;
+                        }
+                    } finally { lock.unlock(); }
+                }
+            }
+        }
+    }
+
+    private void discardExpiredStartup(ExecutionDeadline deadline) {
+        if (pendingStartupDeadline != null && pendingStartupDeadline.remainingMillis() == 0
+                && pendingPluginServerBaseUrl != null) {
+            pluginCoreProcess.cancelStartup(java.net.URI.create(pendingPluginServerBaseUrl).getPort(), deadline);
+            pendingPluginServerBaseUrl = null;
+            pendingStartupDeadline = null;
+            pluginServerGeneration++;
+        }
+    }
+
+    private boolean waitToStarted(String baseUrl, ExecutionDeadline deadline) throws InterruptedException {
+        while (deadline.remainingMillis() > 0) {
+            try {
+                var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create(baseUrl + "/api/status?token=" + token))
+                        .GET().build();
+                var response = HttpUtil.getInstance().sendDirectRequest(request, deadline.capMillis(1000), 65536);
+                PluginStatusResponse status = response.statusCode() == 200
+                        ? new Gson().fromJson(response.body(), PluginStatusResponse.class) : null;
+                if (status != null && status.getStatus() == PluginCoreStatus.STARTED) return true;
+            } catch (IOException | com.google.gson.JsonParseException unavailable) {
+                // No task has been submitted; readiness may be retried within this startup budget.
+            }
+            long pause = Math.min(100, deadline.remainingMillis());
+            if (pause > 0) Thread.sleep(pause);
+        }
+        return false;
     }
 
     private void refreshCacheWithRetry(int retryCount, String cacheVersion) {

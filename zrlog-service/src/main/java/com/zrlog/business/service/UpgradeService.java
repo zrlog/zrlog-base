@@ -167,6 +167,16 @@ public class UpgradeService {
         if (Objects.isNull(version) || !Objects.equals(checkVersionResponse.getUpgrade(), true)) {
             return new UpgradeProcessResponse(true, backendString(backend, "upgrade.result.noChange"));
         }
+        return doUpgradeVersion(version, progressListener, backend);
+    }
+
+    /** Execute the exact version already checked and claimed by the caller. */
+    public UpgradeProcessResponse doUpgradeVersion(Version version, UpgradeProgressListener progressListener,
+                                                   Map<String, Object> backend) {
+        if (Objects.isNull(version) || !ZrLogUtil.greatThenCurrentVersion(version.getBuildId(),
+                version.getBuildDate(), version.getVersion())) {
+            return new UpgradeProcessResponse(true, backendString(backend, "upgrade.result.noChange"));
+        }
         if (isOnlineUpgradeDisabled()) {
             return buildManualUpgradeResponse(version, backend);
         }

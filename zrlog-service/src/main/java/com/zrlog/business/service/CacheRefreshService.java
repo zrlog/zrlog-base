@@ -6,6 +6,8 @@ import com.hibegin.common.util.StringUtils;
 import com.hibegin.http.server.api.HttpRequest;
 import com.zrlog.business.plugin.PluginCorePlugin;
 import com.zrlog.business.plugin.StaticSitePlugin;
+import com.zrlog.business.plugin.StaticGenerationBudget;
+import com.zrlog.util.ExecutionDeadline;
 import com.zrlog.business.plugin.type.StaticSiteType;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
@@ -83,6 +85,54 @@ public class CacheRefreshService {
                                                 List<StaticSiteType> staticSiteTypeList) {
         BaseDataInitVO initVO = cacheService.refreshInitData();
         refreshPluginCacheData(initVO.getVersion() + "", request, staticSiteTypeList);
+    }
+
+    /**
+     * Scheduled work stays in its invoking request. The fence is checked between effects and waits;
+     * unlike the interactive refresh this entry does not create detached executor tasks or retry forever.
+     */
+    public void updateCacheWithinBudget(HttpRequest request, List<StaticSiteType> types,
+                                      String executionId, int actorId,
+                                      java.util.function.LongSupplier remainingMillis, Runnable fence) throws Exception {
+        if (executionId == null || !executionId.matches("[a-zA-Z0-9_.-]{1,128}") || actorId < 1)
+            throw new IllegalArgumentException("Invalid cache refresh identity");
+        StaticGenerationBudget budget = new StaticGenerationBudget(
+                ExecutionDeadline.afterMillis(Math.max(0, remainingMillis.getAsLong())), fence, executionId, actorId);
+        budget.check();
+        BaseDataInitVO data = cacheService.refreshInitData();
+        PluginCorePlugin plugins = pluginCore.get();
+        if (plugins != null) {
+            budget.check();
+            if (!plugins.isStarted() && !plugins.startWithinBudget(budget.remainingMillis()))
+                throw new IllegalStateException("Plugin core is unavailable");
+            budget.check();
+            if (!plugins.refreshCacheWithinBudget(data.getVersion() + "", executionId, actorId, budget.remainingMillis())) {
+                throw new IllegalStateException("Plugin cache refresh failed");
+            }
+        }
+        budget.check();
+        if (isStaticSiteDisabled()) return;
+        for (StaticSitePlugin site : staticSites.get()) {
+            if (!types.contains(site.getType())) continue;
+            budget.check();
+            if (!site.startWithinBudget(budget)) throw new IllegalStateException("Static page generation failed");
+            budget.check();
+            String version = site.getSiteVersionWithinBudget(budget);
+            if (plugins != null && !plugins.refreshCacheWithinBudget(version, executionId, actorId, budget.remainingMillis())) {
+                throw new IllegalStateException("Static page delivery failed");
+            }
+            while (true) {
+                budget.check();
+                long remaining = budget.remainingMillis();
+                if (site.isSynchronizedWithinBudget(request.getScheme(), remaining)) {
+                    budget.check();
+                    websites.get().updateByKV(site.getDbCacheKey(), version);
+                    break;
+                }
+                Thread.sleep(Math.min(250, remaining));
+            }
+        }
+        budget.check();
     }
 
     private void notifyPluginUpdateCache(String cacheVersion, HttpRequest request) {

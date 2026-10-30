@@ -28,12 +28,20 @@ public final class StaticSiteRenderer {
     }
 
     RenderedPage render(String uri, String host, StaticSitePlugin plugin) throws Exception {
+        return render(uri, host, plugin, null);
+    }
+
+    RenderedPage render(String uri, String host, StaticSitePlugin plugin, StaticGenerationBudget budget) throws Exception {
+        if (budget != null) budget.check();
         responseConfig.setEnableGzip(false);
         HttpRequest request = HttpRequestBuilder.buildRequest(HttpMethod.GET, uri, host,
                 BaseStaticSitePlugin.STATIC_USER_AGENT, requestConfig, applicationContext);
+        if (budget != null) request.getAttr().put(StaticGenerationBudget.REQUEST_ATTRIBUTE, budget);
         int acceptedStatus = uri.equals(plugin.notFindFile()) ? 404 : 200;
-        try (BodySaveResponse response = new BodySaveResponse(request, responseConfig, true, acceptedStatus, plugin)) {
+        try (BodySaveResponse response = new BodySaveResponse(request, responseConfig, true, acceptedStatus, plugin, budget)) {
             new HttpRequestHandlerRunnable(request, response).run();
+            response.checkGenerationCompleted();
+            if (budget != null) budget.check();
             return new RenderedPage(request.getUri(), response.getCacheFile());
         }
     }

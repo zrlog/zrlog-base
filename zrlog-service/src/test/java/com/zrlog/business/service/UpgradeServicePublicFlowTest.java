@@ -128,6 +128,16 @@ public class UpgradeServicePublicFlowTest {
     }
 
     @Test
+    public void shouldUseTheClaimedVersionForManualInstructionsWithoutFetchingAgain() {
+        Version selected = futureVersion("99.1.0");
+        selected.setZipDownloadUrl("https://example.invalid/reviewed-version.zip");
+        UpgradeProcessResponse response = new TestableUpgradeService(false, false, true, false)
+                .doUpgradeVersion(selected, UpgradeProgressListener.NONE, backend());
+        assertTrue(response.getFinish());
+        assertEquals("[download upgrade file](https://example.invalid/reviewed-version.zip)", response.getMessage());
+    }
+
+    @Test
     public void shouldReturnDockerManualUpgradeResponseWithoutDownloading() {
         FakeUpdateVersionInfoPlugin preCheckPlugin = new FakeUpdateVersionInfoPlugin(futureVersion("99.0.0"), null);
         TestableUpgradeService service = new TestableUpgradeService(true, false, false, true);

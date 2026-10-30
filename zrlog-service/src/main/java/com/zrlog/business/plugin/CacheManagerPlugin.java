@@ -25,6 +25,7 @@ public class CacheManagerPlugin implements IPlugin {
     private final WebsiteKvService settings;
     private ScheduledExecutorService scheduledThreadPoolExecutor;
     private boolean started = false;
+    private boolean externallyScheduled;
 
     @Inject
     public CacheManagerPlugin(CacheService cacheService, WebsiteKvService settings) {
@@ -34,11 +35,12 @@ public class CacheManagerPlugin implements IPlugin {
 
     @Override
     public boolean autoStart() {
-        return !EnvKit.isFaaSMode();
+        return !externallyScheduled && !EnvKit.isFaaSMode();
     }
 
     @Override
     public boolean start() {
+        if (externallyScheduled) return true;
         if (started) {
             return true;
         }
@@ -50,6 +52,12 @@ public class CacheManagerPlugin implements IPlugin {
         }, 0, getInitDataMaxCacheTimeout(), TimeUnit.SECONDS);
         this.started = true;
         return true;
+    }
+
+    /** The host's durable scheduler takes ownership while other deployments retain the legacy timer. */
+    public synchronized void setExternallyScheduled(boolean value) {
+        if (value) stop();
+        externallyScheduled = value;
     }
 
     private int getInitDataMaxCacheTimeout() {

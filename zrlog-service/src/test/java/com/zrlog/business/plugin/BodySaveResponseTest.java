@@ -135,6 +135,30 @@ public class BodySaveResponseTest {
         }
     }
 
+    @Test
+    public void rememberedWriteFailureCannotBeReportedAsCompleted() throws Exception {
+        File cacheFile = tempFile("article.html");
+        StaticGenerationBudget budget = new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(5000), () -> {});
+        try (BodySaveResponse response = new BodySaveResponse(request("/article.html"), new ResponseConfig(), true,
+                200, new TestStaticSitePlugin(cacheFile), budget)) {
+            response.wrapperBaseResponseHeader(200);
+            response.send("first".getBytes(StandardCharsets.UTF_8), true, false);
+            response.close();
+            assertThrows(RuntimeException.class, () -> response.send("second".getBytes(StandardCharsets.UTF_8), true, true));
+            assertThrows(RuntimeException.class, response::checkGenerationCompleted);
+        }
+        assertEquals("first", Files.readString(cacheFile.toPath()));
+    }
+
+    @Test
+    public void expiredBudgetDoesNotDeleteExistingFile() throws Exception {
+        File cacheFile = tempFile("article.html");
+        StaticGenerationBudget budget = new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(0), () -> {});
+        assertThrows(IllegalStateException.class, () -> new BodySaveResponse(request("/article.html"), new ResponseConfig(),
+                true, 200, new TestStaticSitePlugin(cacheFile), budget));
+        assertEquals("stale", Files.readString(cacheFile.toPath()));
+    }
+
     private static class TestStaticSitePlugin implements StaticSitePlugin {
         private final com.zrlog.common.vo.PublicWebSiteInfo site = new com.zrlog.common.vo.PublicWebSiteInfo();
         private final File cacheFile;

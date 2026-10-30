@@ -1,6 +1,7 @@
 package com.zrlog.business.plugin;
 
 import org.junit.Test;
+import com.zrlog.util.ExecutionDeadline;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -8,11 +9,55 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.*;
 
 public class PluginGhostWatcherTest {
+
+    @Test(timeout = 3000)
+    public void closeReleasesAWatcherBlockedOnSocketRead() throws Exception {
+        try (ServerSocket server = new ServerSocket(0)) {
+            server.setSoTimeout(1000);
+            PluginGhostWatcher watcher = new PluginGhostWatcher("127.0.0.1", server.getLocalPort(), 0);
+            FutureTask<Boolean> result = new FutureTask<>(watcher::doWatch);
+            Thread thread = new Thread(result);
+            thread.start();
+            try (Socket peer = server.accept()) {
+                watcher.close();
+                assertTrue(result.get(1, TimeUnit.SECONDS));
+                peer.setSoTimeout(1000);
+                assertEquals(-1, peer.getInputStream().read());
+            } finally { watcher.close(); thread.join(1000); }
+        }
+    }
+
+    @Test(timeout = 4000)
+    public void startupDeadlineEndsAnIdleWatcherButConfirmationRemovesTheDeadline() throws Exception {
+        for (boolean confirmed : new boolean[]{false, true}) {
+            try (ServerSocket server = new ServerSocket(0)) {
+                server.setSoTimeout(1000);
+                AtomicReference<ExecutionDeadline> deadline = new AtomicReference<>(ExecutionDeadline.afterMillis(300));
+                PluginGhostWatcher watcher = new PluginGhostWatcher("127.0.0.1", server.getLocalPort(), 0);
+                FutureTask<Boolean> result = new FutureTask<>(() -> watcher.doWatch(deadline::get));
+                Thread thread = new Thread(result);
+                thread.start();
+                try (Socket peer = server.accept()) {
+                    if (confirmed) {
+                        deadline.set(null);
+                        assertThrows(TimeoutException.class, () -> result.get(500, TimeUnit.MILLISECONDS));
+                        watcher.close();
+                    }
+                    assertTrue(result.get(1, TimeUnit.SECONDS));
+                    peer.setSoTimeout(1000);
+                    assertEquals(-1, peer.getInputStream().read());
+                } finally { watcher.close(); thread.join(1000); }
+            }
+        }
+    }
 
     @Test
     public void shouldDrainWatcherStreamWithFixedSizeReads() throws Exception {

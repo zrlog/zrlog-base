@@ -28,6 +28,7 @@ import com.zrlog.model.WebSite;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.util.BlogBuildInfoUtil;
+import com.zrlog.util.ExecutionDeadline;
 import com.zrlog.web.WebSiteInfoProvider;
 import org.apache.commons.dbutils.QueryRunner;
 import org.apache.commons.dbutils.ResultSetHandler;
@@ -50,6 +51,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
@@ -447,6 +449,87 @@ public class ServiceUtilityFallbackTest {
         }
     }
 
+    @Test(timeout = 5000)
+    public void waitingForCoreDownloadExpiresWithoutCancellingTheOwner() throws Exception {
+        byte[] jar = pluginCoreJar();
+        java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        AtomicInteger requests = new AtomicInteger();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/plugin/core/plugin-core.jar", exchange -> {
+            requests.incrementAndGet();
+            try {
+                exchange.sendResponseHeaders(200, 0);
+                exchange.getResponseBody().write(jar, 0, 2);
+                exchange.getResponseBody().flush();
+                entered.countDown();
+                release.await();
+                exchange.getResponseBody().write(jar, 2, jar.length - 2);
+            } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+            finally { exchange.close(); }
+        });
+        server.start();
+        String previous = setBlogBuildInfoString("resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
+        File folder = temporaryFolder.newFolder("download-owner");
+        java.util.concurrent.CompletableFuture<File> owner = null;
+        try {
+            owner = java.util.concurrent.CompletableFuture.supplyAsync(() -> PluginCoreUtils.tryDownloadPluginCoreFile(
+                    folder.toString(), ExecutionDeadline.afterMillis(4000)));
+            assertTrue(entered.await(1, java.util.concurrent.TimeUnit.SECONDS));
+            RuntimeException failure = assertThrows(RuntimeException.class, () -> PluginCoreUtils.tryDownloadPluginCoreFile(
+                    folder.toString(), ExecutionDeadline.afterMillis(150)));
+            assertTrue(failure.getCause() instanceof java.net.http.HttpTimeoutException);
+            assertFalse(owner.isDone());
+            assertEquals(1, requests.get());
+            release.countDown();
+            assertArrayEquals(jar, Files.readAllBytes(owner.get(2, java.util.concurrent.TimeUnit.SECONDS).toPath()));
+            assertNoPluginCoreDownloadParts(folder);
+        } finally {
+            release.countDown();
+            try {
+                if (owner != null) owner.get(2, java.util.concurrent.TimeUnit.SECONDS);
+            } finally {
+                setBlogBuildInfoString("resourceDownloadUrl", previous);
+                server.stop(0);
+            }
+        }
+    }
+
+    @Test(timeout = 5000)
+    public void nativeChecksumAndArtifactShareOneDownloadDeadline() throws Exception {
+        String fileName = "plugin-core-Linux-x86_64.bin";
+        byte[] artifact = nativeElf();
+        byte[] checksum = (md5(artifact) + "  " + fileName + "\n").getBytes(StandardCharsets.UTF_8);
+        AtomicInteger requests = new AtomicInteger();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/plugin/core/", exchange -> {
+            requests.incrementAndGet();
+            try {
+                exchange.sendResponseHeaders(200, 0);
+                exchange.getResponseBody().flush();
+                Thread.sleep(600);
+                exchange.getResponseBody().write(exchange.getRequestURI().getPath().endsWith(".md5") ? checksum : artifact);
+            } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+            catch (IOException disconnected) { /* The shared deadline closes the artifact transfer. */ }
+            finally { exchange.close(); }
+        });
+        server.start();
+        String previous = setBlogBuildInfoString("resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
+        File folder = temporaryFolder.newFolder("native-download-budget");
+        try {
+            RuntimeException failure = assertThrows(RuntimeException.class, () -> PluginCoreUtils.tryDownloadPluginCoreFile(
+                    folder.toString(), true, "Linux-x86_64", ExecutionDeadline.afterMillis(1000)));
+            assertTrue(failure.getCause() instanceof java.net.http.HttpTimeoutException);
+            assertEquals(2, requests.get());
+            assertFalse(new File(folder, fileName).exists());
+            assertFalse(new File(folder, fileName + ".md5").exists());
+            assertNoPluginCoreDownloadParts(folder);
+        } finally {
+            setBlogBuildInfoString("resourceDownloadUrl", previous);
+            server.stop(0);
+        }
+    }
+
     @Test
     public void shouldWrapPluginCoreDownloadFailure() throws Exception {
         int unusedPort;
@@ -669,6 +752,24 @@ public class ServiceUtilityFallbackTest {
         assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
         assertArrayEquals(body, Files.readAllBytes(result.toPath()));
         assertTrue(pluginCore.canExecute());
+    }
+
+    @Test
+    public void shouldPreserveExistingNativePluginCoreExecutablePermissions() throws Exception {
+        Path pluginsFolder = temporaryFolder.newFolder("executable-core").toPath();
+        org.junit.Assume.assumeTrue(Files.getFileStore(pluginsFolder).supportsFileAttributeView("posix"));
+        Path pluginCore = pluginsFolder.resolve("plugin-core-Linux-x86_64.bin");
+        byte[] body = nativeElf();
+        Files.write(pluginCore, body);
+        var permissions = PosixFilePermissions.fromString("r-x------");
+        Files.setPosixFilePermissions(pluginCore, permissions);
+
+        File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.toString(),
+                true, "Linux-x86_64");
+
+        assertEquals(pluginCore.toFile().getCanonicalFile(), result.getCanonicalFile());
+        assertArrayEquals(body, Files.readAllBytes(pluginCore));
+        assertEquals(permissions, Files.getPosixFilePermissions(pluginCore));
     }
 
     @Test

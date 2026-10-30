@@ -4,6 +4,8 @@ import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.NetworkProxy;
 import org.graalvm.nativeimage.ImageInfo;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
@@ -19,6 +21,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,6 +34,140 @@ import java.util.stream.Stream;
 import static org.junit.Assert.*;
 
 public class PluginCoreProcessImplTest {
+    private Field proxyPolicy;
+    private Object previousProxyPolicy;
+
+    @Before
+    public void isolateLaunchPolicyFromRunnerProxyEnvironment() throws Exception {
+        proxyPolicy = NetworkProxy.class.getDeclaredField("effective");
+        proxyPolicy.setAccessible(true);
+        previousProxyPolicy = proxyPolicy.get(null);
+        proxyPolicy.set(null, proxySettings(null, null));
+    }
+
+    @After
+    public void restoreLaunchPolicy() throws Exception {
+        proxyPolicy.set(null, previousProxyPolicy);
+    }
+
+    private static NetworkProxy.Settings proxySettings(String url, String noProxy) throws Exception {
+        // These process-argument fixtures specify their policy; environment precedence has its own tests.
+        var resolve = NetworkProxy.class.getDeclaredMethod("resolve", Map.class, Properties.class);
+        resolve.setAccessible(true);
+        var values = new Properties();
+        if (url != null) values.setProperty(NetworkProxy.URL_KEY, url);
+        if (noProxy != null) values.setProperty(NetworkProxy.NO_PROXY_KEY, noProxy);
+        return (NetworkProxy.Settings) resolve.invoke(null, Map.of(), values);
+    }
+
+    @Test(timeout = 4000)
+    public void expiredInitialLaunchStopsItsChildWithoutRestarting() throws Exception {
+        try (BoundedLaunchFixture fixture = new BoundedLaunchFixture(false)) {
+            int port = fixture.start(400);
+            assertTrue(port > 0);
+            assertTrue(fixture.spawned.await(1, TimeUnit.SECONDS));
+            fixture.thread.get().join(1500);
+            assertFalse(fixture.thread.get().isAlive());
+            assertFalse(fixture.child.isAlive());
+            assertEquals(1, fixture.launches.get());
+            assertFalse(fixture.runtime.confirmStarted(port, com.zrlog.util.ExecutionDeadline.afterMillis(100)));
+        }
+    }
+
+    @Test(timeout = 4000)
+    public void confirmedCoreSurvivesStartupDeadlineAndRejectsLateStartupCancellation() throws Exception {
+        try (BoundedLaunchFixture fixture = new BoundedLaunchFixture(false)) {
+            int port = fixture.start(500);
+            assertTrue(fixture.spawned.await(1, TimeUnit.SECONDS));
+            assertTrue(fixture.runtime.confirmStarted(port, com.zrlog.util.ExecutionDeadline.afterMillis(300)));
+            new java.util.concurrent.CountDownLatch(1).await(650, TimeUnit.MILLISECONDS);
+            fixture.runtime.cancelStartup(port, com.zrlog.util.ExecutionDeadline.afterMillis(100));
+            assertTrue(fixture.child.isAlive());
+            assertEquals(1, fixture.launches.get());
+            fixture.runtime.stopPluginCore();
+            fixture.thread.get().join(1000);
+            assertFalse(fixture.child.isAlive());
+            assertFalse(fixture.thread.get().isAlive());
+        }
+    }
+
+    @Test(timeout = 5000)
+    public void expiredBlockedSpawnCannotBeReplacedAndLateProcessIsStopped() throws Exception {
+        try (BoundedLaunchFixture fixture = new BoundedLaunchFixture(true)) {
+            int port = fixture.start(300);
+            assertTrue(fixture.spawned.await(1, TimeUnit.SECONDS));
+            fixture.runtime.cancelStartup(port, com.zrlog.util.ExecutionDeadline.afterMillis(100));
+            assertEquals(-1, fixture.start(100));
+            assertEquals(1, fixture.launches.get());
+            new java.util.concurrent.CountDownLatch(1).await(150, TimeUnit.MILLISECONDS);
+            fixture.releaseSpawn.countDown();
+            fixture.thread.get().join(1000);
+            assertFalse(fixture.thread.get().isAlive());
+            assertFalse(fixture.child.isAlive());
+            assertEquals(1, fixture.launches.get());
+        }
+    }
+
+    private static final class BoundedLaunchFixture implements AutoCloseable {
+        final Path root;
+        final String previousRoot;
+        final String previousArch;
+        final ControlledProcess child = new ControlledProcess(true, true);
+        final java.util.concurrent.CountDownLatch spawned = new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch releaseSpawn = new java.util.concurrent.CountDownLatch(1);
+        final AtomicInteger launches = new AtomicInteger();
+        final AtomicReference<Thread> thread = new AtomicReference<>();
+        final PluginCoreProcessImpl runtime;
+
+        BoundedLaunchFixture(boolean blockSpawn) throws Exception {
+            root = Files.createTempDirectory("zrlog-bounded-core");
+            Path core = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
+            Files.createDirectories(core.getParent());
+            Files.write(core, minimalElfExecutable());
+            previousRoot = System.getProperty("sws.root.path");
+            previousArch = setFileArch("Linux-x86_64");
+            System.setProperty("sws.root.path", root.toString());
+            ImageInfo.setInImageRuntimeCode(true);
+            runtime = new PluginCoreProcessImpl(null, "/blog", () -> 19084) {
+                @Override
+                Process startPluginCore(File file, String db, String args, String path, String version,
+                                        String token, int httpPort, int masterPort, int watcherPort) throws IOException {
+                    launches.incrementAndGet();
+                    spawned.countDown();
+                    if (blockSpawn) {
+                        try { releaseSpawn.await(); }
+                        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IOException(interrupted); }
+                    }
+                    return child;
+                }
+                @Override
+                Thread startPluginCoreHandle(AbstractPluginCoreProcessHandle handle) {
+                    Thread worker = new Thread(handle);
+                    thread.set(worker);
+                    worker.start();
+                    return worker;
+                }
+            };
+        }
+
+        int start(long budget) {
+            return runtime.pluginServerStart("unused", "-Xmx64m", root.toString(), "test", "fixture-token",
+                    com.zrlog.util.ExecutionDeadline.afterMillis(budget));
+        }
+
+        public void close() throws Exception {
+            releaseSpawn.countDown();
+            try {
+                runtime.stopPluginCore();
+                if (thread.get() != null) thread.get().join(1000);
+            } finally {
+                ImageInfo.setInImageRuntimeCode(false);
+                setFileArch(previousArch);
+                restoreProperty("sws.root.path", previousRoot);
+                delete(root);
+            }
+        }
+    }
 
     private static void restoreProperty(String key, String value) {
         if (value == null) {
@@ -232,7 +370,7 @@ public class PluginCoreProcessImplTest {
         Object previousPolicy = effective.get(null);
         try {
             System.setProperty("sws.root.path", root.toString());
-            NetworkProxy.Settings active = NetworkProxy.preview("http://proxy.example:3128", ".internal.example");
+            NetworkProxy.Settings active = proxySettings("http://proxy.example:3128", ".internal.example");
             effective.set(null, active);
             NetworkProxy.save("http://pending.example:8080", "");
             Path sqlite = root.resolve("sqlite.properties");
@@ -284,6 +422,7 @@ public class PluginCoreProcessImplTest {
             ImageInfo.setInImageRuntimeCode(true);
             PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog", () -> 19084);
 
+            process.setExternallyScheduled(true);
             Process started = process.startPluginCore(pluginCore.toFile(), "db=ok",
                     "-Xmx64m", root.resolve("static").toString(), "3.6.0", "token-123",
                     21000, 41000, 51000);
@@ -304,11 +443,42 @@ public class PluginCoreProcessImplTest {
             assertEquals("token-123", args.get(10));
             assertEquals("/blog", args.get(12));
             assertTrue(args.get(13).startsWith("-Duser.dir="));
+            assertEquals("--host-scheduler", args.get(14));
         } finally {
             ImageInfo.setInImageRuntimeCode(false);
             restoreProperty("sws.root.path", previousRootPath);
             delete(root);
         }
+    }
+
+    @Test
+    public void jvmLaunchOnlyTransfersSchedulerOwnershipWhenExplicitlyConfigured() throws Exception {
+        Path root = Files.createTempDirectory("zrlog-plugin-core-owned-scheduler");
+        Path argsFile = root.resolve("args.txt");
+        Path launcher = root.resolve("launcher");
+        Files.writeString(launcher, "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsFile + "\n", StandardCharsets.UTF_8);
+        assertTrue(launcher.toFile().setExecutable(true));
+        Path artifact = root.resolve("plugin-core.jar");
+        Files.writeString(artifact, "controlled process fixture");
+        String previousRoot = System.getProperty("sws.root.path");
+        try {
+            System.setProperty("sws.root.path", root.toString());
+            PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/sub", () -> 19084) {
+                @Override String programName(File file) { return launcher.toString(); }
+            };
+            for (boolean owned : new boolean[]{false, true}) {
+                process.setExternallyScheduled(owned);
+                Process child = process.startPluginCore(artifact.toFile(), "missing-db", "-Xmx64m", root.toString(),
+                        "4.0.0", "fixture-token", 21000, 41000, 51000);
+                assertTrue(child.waitFor(5, TimeUnit.SECONDS));
+                assertEquals(0, child.exitValue());
+                List<String> args = Files.readAllLines(argsFile);
+                assertEquals(owned, args.contains("--host-scheduler"));
+                assertTrue(args.contains("-jar"));
+                assertTrue(args.indexOf("/sub") > args.indexOf("fixture-token"));
+                if (owned) assertEquals("--host-scheduler", args.get(args.size() - 1));
+            }
+        } finally { restoreProperty("sws.root.path", previousRoot); delete(root); }
     }
 
     @Test

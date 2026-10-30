@@ -45,7 +45,7 @@ public class CommandLineUpgradeNoticeTest {
                 new TestUpdater(UpdaterTypeEnum.NATIVE_IMAGE, new File("/opt/zrlog/zrlog")), new HashSet<>());
 
         assertNotNull(notice);
-        assertTrue(notice.contains("Latest:  3.9.0"));
+        assertTrue(notice.contains("Latest:  3.9.0-SNAPSHOT\n"));
         assertTrue(notice.contains("Channel: preview"));
         assertTrue(notice.contains("\"./zrlog\" upgrade --channel=preview"));
         assertFalse(notice.contains("/opt/zrlog"));

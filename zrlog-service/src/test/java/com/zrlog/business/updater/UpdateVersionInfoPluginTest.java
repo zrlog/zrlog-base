@@ -47,19 +47,39 @@ public class UpdateVersionInfoPluginTest {
     }
 
     @Test
-    public void shouldNormalizePreviewAndReleaseVersionsForDisplay() {
+    public void shouldLabelPreviewAndReleaseWithoutChangingVersionIdentity() {
         Version preview = version("3.6.0-SNAPSHOT");
+        preview.setArtifactVersion("3.6.0-SNAPSHOT");
+        preview.setChannel("preview");
         Version release = version("3.6.0");
 
         Version normalizedPreview = UpdateVersionInfoPlugin.normalizeVersionForDisplay(preview);
         Version normalizedRelease = UpdateVersionInfoPlugin.normalizeVersionForDisplay(release);
 
-        assertEquals("3.6.0", normalizedPreview.getVersion());
+        assertEquals("3.6.0-SNAPSHOT", normalizedPreview.getVersion());
+        assertEquals(preview.getArtifactVersion(), normalizedPreview.getArtifactVersion());
+        assertEquals(preview.getBuildId(), normalizedPreview.getBuildId());
+        assertEquals(preview.getChannel(), normalizedPreview.getChannel());
         assertEquals("3.6.0-SNAPSHOT", preview.getVersion());
         assertNotNull(normalizedPreview.getType());
         assertEquals("3.6.0", normalizedRelease.getVersion());
         assertNotNull(normalizedRelease.getType());
         assertNull(UpdateVersionInfoPlugin.normalizeVersionForDisplay(null));
+    }
+
+    @Theory
+    public void storedUpgradeNoticeKeepsTheCompletePreviewVersion(DatabaseType databaseType) throws Exception {
+        try (var db = ZrLogTestDatabase.open(databaseType)) {
+            var notices = new UpgradeNoticeService(() -> true, new WebsiteKvService(() -> new WebSite(db.dataSource())));
+            Version preview = version("99.0.0-SNAPSHOT");
+            preview.setArtifactVersion(preview.getVersion());
+            preview.setBuildDate(new Date(System.currentTimeMillis() + 3600000));
+            notices.sync(preview);
+
+            assertEquals("99.0.0-SNAPSHOT", notices.getStoredUpgradeNotice().getVersion().getVersion());
+            assertEquals("99.0.0-SNAPSHOT", notices.getNotice().getVersion().getVersion());
+            assertEquals("99.0.0-SNAPSHOT", notices.getNotice().getVersion().getArtifactVersion());
+        }
     }
 
     @Test
@@ -127,13 +147,13 @@ public class UpdateVersionInfoPluginTest {
     }
 
     @Test
-    public void shouldFetchLastVersionThroughVersionTaskAndNormalizeDisplayVersion() {
+    public void shouldFetchLastVersionThroughVersionTaskWithoutRemovingSnapshot() {
         FakeVersionTimerTask task = new FakeVersionTimerTask(version("3.8.0-SNAPSHOT"));
         TestUpdateVersionInfoPlugin plugin = new TestUpdateVersionInfoPlugin(task, null);
 
         Version version = plugin.getLastVersion(true);
 
-        assertEquals("3.8.0", version.getVersion());
+        assertEquals("3.8.0-SNAPSHOT", version.getVersion());
         assertEquals(1, task.runCount.get());
     }
 

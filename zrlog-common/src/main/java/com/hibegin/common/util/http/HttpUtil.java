@@ -7,6 +7,7 @@ import com.hibegin.common.util.http.handle.HttpStringHandle;
 import com.zrlog.common.Constants;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.ThreadUtils;
+import com.zrlog.util.ExecutionDeadline;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,6 +18,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Logger;
@@ -85,6 +89,37 @@ public class HttpUtil {
         return sendRequest(request, directHttpClient());
     }
 
+    public HttpResponse<String> sendDirectRequest(HttpRequest request, ExecutionDeadline deadline, long maxBytes)
+            throws IOException, InterruptedException {
+        return BoundedHttpExchange.send(directHttpClient(), withUserAgent(request),
+                () -> HttpResponse.BodySubscribers.ofString(StandardCharsets.UTF_8), maxBytes, deadline);
+    }
+
+    public HttpResponse<String> sendRequest(HttpRequest request, ExecutionDeadline deadline, long maxBytes)
+            throws IOException, InterruptedException {
+        return BoundedHttpExchange.send(httpClient, withUserAgent(request),
+                () -> HttpResponse.BodySubscribers.ofString(StandardCharsets.UTF_8), maxBytes, deadline);
+    }
+
+    /** Downloads a complete successful response before replacing the target; failures preserve it. */
+    public void downloadToFile(HttpRequest request, Path target, ExecutionDeadline deadline, long maxBytes)
+            throws IOException, InterruptedException {
+        deadline.requireRemainingMillis();
+        Path absolute = target.toAbsolutePath();
+        Files.createDirectories(absolute.getParent());
+        Path staging = Files.createTempFile(absolute.getParent(),
+                absolute.getFileName() + "." + ProcessHandle.current().pid() + ".", ".part");
+        try {
+            HttpResponse<Path> response = BoundedHttpExchange.send(httpClient, withUserAgent(request),
+                    () -> HttpResponse.BodySubscribers.ofFile(staging), maxBytes, deadline);
+            if (response.statusCode() != 200) throw new IOException("Download returned HTTP " + response.statusCode());
+            deadline.requireRemainingMillis();
+            Files.move(staging, absolute, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            Files.deleteIfExists(staging);
+        }
+    }
+
     private synchronized HttpClient directHttpClient() {
         if (directHttpClient == null) {
             directHttpClient = HttpClient.newBuilder().executor(executorService)
@@ -94,6 +129,10 @@ public class HttpUtil {
     }
 
     private HttpResponse<String> sendRequest(HttpRequest request, HttpClient client) throws IOException, InterruptedException {
+        return client.send(withUserAgent(request), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpRequest withUserAgent(HttpRequest request) {
         HttpRequest.Builder builder = HttpRequest.newBuilder(request.uri())
                 .method(request.method(), request.bodyPublisher().orElse(HttpRequest.BodyPublishers.noBody()))
                 .expectContinue(request.expectContinue());
@@ -102,8 +141,7 @@ public class HttpUtil {
         request.headers().map().forEach((name, values) -> {
             if (!"User-Agent".equalsIgnoreCase(name)) values.forEach(value -> builder.header(name, value));
         });
-        HttpRequest adapted = builder.setHeader("User-Agent", getUserAgent()).build();
-        return client.send(adapted, HttpResponse.BodyHandlers.ofString());
+        return builder.setHeader("User-Agent", getUserAgent()).build();
     }
 
     public void closeHttpClient() {

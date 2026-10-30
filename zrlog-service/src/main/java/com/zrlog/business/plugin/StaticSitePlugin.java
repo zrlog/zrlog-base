@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -28,6 +29,67 @@ import static com.zrlog.plugin.BaseStaticSitePlugin.isStaticPluginRequest;
 public interface StaticSitePlugin extends BaseStaticSitePlugin {
 
     Logger LOGGER = LoggerUtil.getLogger(StaticSitePlugin.class);
+
+    /** Implementations must complete their owned work before returning and propagate failures. */
+    default boolean startWithinBudget(StaticGenerationBudget budget) throws Exception {
+        throw new UnsupportedOperationException("Static generation does not support an execution budget");
+    }
+
+    default void saveToCacheFolderWithinBudget(InputStream input, String uri, StaticGenerationBudget budget) throws IOException {
+        try (InputStream source = input) {
+            budget.check();
+            if (!isStaticHtmlEnabled()) return;
+            File file = getCacheFile(uri);
+            java.nio.file.Files.createDirectories(file.toPath().getParent());
+            try (OutputStream output = new FileOutputStream(file)) {
+                budget.copy(source, output);
+            }
+            budget.check();
+            getCacheFiles().add(file);
+        }
+    }
+
+    default void copyResourceWithinBudget(String name, StaticGenerationBudget budget) throws IOException {
+        budget.check();
+        InputStream source = CacheServiceImpl.class.getResourceAsStream(name);
+        if (source == null) throw new IOException("Missing static resource");
+        saveToCacheFolderWithinBudget(source, name, budget);
+    }
+
+    default void faviconWithinBudget(String value, String path, boolean cache, StaticGenerationBudget budget) throws IOException {
+        budget.check();
+        if (StringUtils.isEmpty(value)) {
+            copyResourceWithinBudget(path, budget);
+            return;
+        }
+        byte[] bytes;
+        try { bytes = Base64.getDecoder().decode(value.contains(",") ? value.substring(value.indexOf(',') + 1) : value); }
+        catch (IllegalArgumentException error) { throw new IOException("Invalid favicon data", error); }
+        File file = PathUtil.getStaticFile(path);
+        java.nio.file.Files.createDirectories(file.toPath().getParent());
+        try (OutputStream output = new FileOutputStream(file)) {
+            budget.copy(new ByteArrayInputStream(bytes), output);
+        }
+        if (cache) saveToCacheFolderWithinBudget(new ByteArrayInputStream(bytes), path, budget);
+        budget.check();
+    }
+
+    default String getSiteVersionWithinBudget(StaticGenerationBudget budget) throws IOException {
+        StringBuilder hashes = new StringBuilder();
+        for (File file : new TreeSet<>(getCacheFiles())) {
+            budget.check();
+            java.security.MessageDigest digest;
+            try { digest = java.security.MessageDigest.getInstance("MD5"); }
+            catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+            try (InputStream input = new FileInputStream(file);
+                 OutputStream output = new java.security.DigestOutputStream(OutputStream.nullOutputStream(), digest)) {
+                budget.copy(input, output);
+            }
+            hashes.append(String.format(Locale.ROOT, "%032x", new java.math.BigInteger(1, digest.digest())));
+        }
+        budget.check();
+        return Math.abs(hashes.toString().hashCode()) + "";
+    }
 
     static String getSuffix(HttpRequest request, boolean staticHtml) {
         if (isStaticPluginRequest(request) || staticHtml) {
@@ -112,6 +174,21 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
             }
         }
         return false;
+    }
+
+    /** A scheduled caller must not enter an unbounded network wait. */
+    default boolean isSynchronizedWithinBudget(String scheme, long remainingMillis) throws IOException, InterruptedException {
+        if (isDisabled()) return true;
+        if (remainingMillis < 1) return false;
+        String url = (scheme == null ? "https" : scheme) + "://" + getSiteInfo().getHost()
+                + getContextPath() + "/" + getVersionFileName() + "?_t=" + System.currentTimeMillis();
+        var deadline = com.zrlog.util.ExecutionDeadline.afterMillis(remainingMillis).capMillis(10000);
+        var budget = new StaticGenerationBudget(deadline, () -> {});
+        String expected = getSiteVersionWithinBudget(budget);
+        var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url))
+                .timeout(Duration.ofMillis(Math.min(remainingMillis, 10000))).GET().build();
+        var response = HttpUtil.getInstance().sendRequest(request, deadline, 1024);
+        return response.statusCode() == 200 && Objects.equals(expected, response.body());
     }
 
     default File loadCacheFile(HttpRequest request) {
@@ -238,6 +315,45 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "do fetch error", e.getMessage());
         }
+    }
+
+    /** Request-lifetime generation never submits page work to the legacy executor. */
+    default void doFetchWithinBudget(StaticSiteRenderer renderer, StaticGenerationBudget budget) throws Exception {
+        while (true) {
+            budget.check();
+            String key = getHandleStatusPageMap().entrySet().stream()
+                    .filter(entry -> entry.getValue() == HandleState.NEW || entry.getValue() == HandleState.RE_FETCH)
+                    .map(Map.Entry::getKey).sorted().findFirst().orElse(null);
+            if (key == null) break;
+            getHandleStatusPageMap().put(key, HandleState.HANDING);
+            try {
+                StaticSiteRenderer.RenderedPage page = renderer.render(key, getSiteInfo().getHost(), this, budget);
+                budget.check();
+                if (page.file == null || !page.file.isFile()) throw new IOException("Static page generation produced no file");
+                getCacheFiles().add(page.file);
+                if (!page.uri.startsWith(Constants.ADMIN_URI_BASE_PATH + "/") && !Objects.equals(key, notFindFile())) {
+                    Lock parse = getParseLock();
+                    if (!parse.tryLock(budget.remainingMillis(), TimeUnit.MILLISECONDS))
+                        throw new IllegalStateException("Static page parsing time budget exhausted");
+                    try {
+                        budget.check();
+                        StaticSiteHtmlLinks.parseInto(page.file, getSiteInfo().getHost(), getHandleStatusPageMap());
+                    } finally { parse.unlock(); }
+                }
+                budget.check();
+                getHandleStatusPageMap().put(key, HandleState.HANDLED);
+            } catch (Exception error) {
+                getHandleStatusPageMap().put(key, HandleState.RE_FETCH);
+                throw error;
+            }
+        }
+        if (getHandleStatusPageMap().values().stream().anyMatch(state -> state != HandleState.HANDLED))
+            throw new IllegalStateException("Static page generation is incomplete");
+        String version = getSiteVersionWithinBudget(budget);
+        budget.check();
+        java.nio.file.Files.createDirectories(getCacheFile(getVersionFileName()).toPath().getParent());
+        java.nio.file.Files.writeString(getCacheFile(getVersionFileName()).toPath(), version);
+        budget.check();
     }
 
     StaticSiteType getType();

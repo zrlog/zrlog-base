@@ -39,6 +39,7 @@ public class UpdateVersionInfoPlugin implements IPlugin {
     private final CommandLineUpgradeNotice commandLineNotice;
     private ScheduledExecutorService scheduledExecutorService;
     private UpdateVersionTimerTask updateVersionTimerTask;
+    private boolean externallyScheduled;
 
     public UpdateVersionInfoPlugin(
             UpgradeNoticeService notices,
@@ -96,7 +97,7 @@ public class UpdateVersionInfoPlugin implements IPlugin {
 
     @Override
     public boolean autoStart() {
-        return !EnvKit.isFaaSMode();
+        return !externallyScheduled && !EnvKit.isFaaSMode();
     }
 
     private void initExecutorService() {
@@ -114,6 +115,7 @@ public class UpdateVersionInfoPlugin implements IPlugin {
 
     @Override
     public boolean start() {
+        if (externallyScheduled) return true;
         if (isStarted()) {
             return true;
         }
@@ -132,6 +134,14 @@ public class UpdateVersionInfoPlugin implements IPlugin {
         return true;
     }
 
+    /** Keep on-demand version checks available when scheduling belongs to the host. */
+    public synchronized void setExternallyScheduled(boolean value) {
+        if (value) stop();
+        externallyScheduled = value;
+    }
+
+    public boolean isExternallyScheduled() { return externallyScheduled; }
+
     @Override
     public boolean isStarted() {
         return Objects.nonNull(scheduledExecutorService);
@@ -143,6 +153,7 @@ public class UpdateVersionInfoPlugin implements IPlugin {
             scheduledExecutorService.shutdown();
             scheduledExecutorService = null;
         }
+        updateVersionTimerTask = null;
         return true;
     }
 

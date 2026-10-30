@@ -8,6 +8,7 @@ import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.util.PluginCoreUtils;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.ThreadUtils;
+import com.zrlog.util.ExecutionDeadline;
 import com.zrlog.util.ZrLogUtil;
 
 import java.io.File;
@@ -18,6 +19,7 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.IntSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -41,7 +43,7 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
     private static final String NATIVE_MAX_HEAP_SIZE_KEY = "pluginCoreNativeMaxHeapSize";
     private final AtomicBoolean stopped = new AtomicBoolean(false);
     private final AtomicBoolean shutdownHookRegistered = new AtomicBoolean(false);
-    private final Object processLifecycleLock = new Object();
+    private final ReentrantLock processLifecycleLock = new ReentrantLock();
     private final Runnable onStopRunnable;
     //插件服务存放的物理路径
     private final File pluginsFolder;
@@ -52,6 +54,7 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
     private File errorLogFile;
     private int lastPluginMasterPort = -1;
     private boolean unzipped = false;
+    private volatile boolean externallyScheduled;
 
 
     public PluginCoreProcessImpl(Runnable onStopRunnable, String contextPath, IntSupplier hostPort) {
@@ -63,6 +66,11 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
         } else {
             this.pluginsFolder = PathUtil.getConfFile("/plugins/");
         }
+    }
+
+    @Override
+    public void setExternallyScheduled(boolean externallyScheduled) {
+        this.externallyScheduled = externallyScheduled;
     }
 
     static List<String> jvmLaunchArguments(File pluginCoreFile, String dbProperties, String pluginJvmArgs) {
@@ -177,7 +185,7 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
         return "java";
     }
 
-    private void prepareUnzipPlugins() {
+    private void prepareUnzipPlugins(ExecutionDeadline deadline) throws IOException, InterruptedException {
         if (unzipped) {
             return;
         }
@@ -187,11 +195,13 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
         try {
             String zipFile = ZrLogUtil.getFaaSRoot() + "/conf/plugins.zip";
             if (new File(zipFile).exists()) {
-                ZipUtil.unZip(zipFile, PathUtil.getConfPath());
+                if (deadline == null) ZipUtil.unZip(zipFile, PathUtil.getConfPath());
+                else PluginCoreUtils.unpackPlugins(new File(zipFile).toPath(), new File(PathUtil.getConfPath()).toPath(), deadline);
             }
+            unzipped = true;
         } catch (IOException e) {
+            if (deadline != null) throw e;
             LOGGER.warning("Can't unzip " + ZrLogUtil.getFaaSRoot());
-        } finally {
             unzipped = true;
         }
     }
@@ -210,10 +220,7 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
             LOGGER.warning("Missing plugin-core file " + pluginCoreFile.getName());
             return null;
         }
-        if (Objects.isNull(infoLogFile) || Objects.isNull(errorLogFile)) {
-            infoLogFile = getLogFile(false);
-            errorLogFile = getLogFile(true);
-        }
+        prepareProcessLogs();
         List<String> args = new ArrayList<>();
         if (EnvKit.isNativeImage()) {
             args.add("-XX:MaxHeapSize=" + nativeMaxHeapSize());
@@ -246,6 +253,7 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
         }
         //参数位置顺序需要固定
         args.add("-Duser.dir=" + getPluginWorkerPath(pluginsFolder));
+        if (externallyScheduled) args.add("--host-scheduler");
         //args end
         List<String> cmd = new ArrayList<>();
         cmd.add(programName(pluginCoreFile));
@@ -268,14 +276,22 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
 
     @Override
     public int pluginServerStart(final String dbProperties, final String pluginJvmArgs, final String runtimePath, final String runTimeVersion, String token) {
-        prepareUnzipPlugins();
+        return pluginServerStart(dbProperties, pluginJvmArgs, runtimePath, runTimeVersion, token, null);
+    }
+
+    @Override
+    public int pluginServerStart(final String dbProperties, final String pluginJvmArgs, final String runtimePath,
+                                  final String runTimeVersion, String token, final ExecutionDeadline deadline) {
+        if (deadline != null && (deadline.remainingMillis() == 0 || Thread.currentThread().isInterrupted())) return -1;
         //简单处理，为了能在一个服务器上面启动多个ZrLog程序，使用Random端口的方式，（感兴趣可以算算概率）
         final int randomServerPort = new Random().nextInt(10000) + 20000;
         final int randomWatcherListenPort = randomServerPort + 30000;
+        AbstractPluginCoreProcessHandle handle = null;
         try {
-            final AbstractPluginCoreProcessHandle handle;
-            synchronized (processLifecycleLock) {
-                if (Objects.nonNull(pluginCoreProcessHandle) && !pluginCoreProcessHandle.close()) {
+            if (!lockWithin(deadline)) return -1;
+            try {
+                if (Objects.nonNull(pluginCoreProcessHandle) && !(deadline == null
+                        ? pluginCoreProcessHandle.close() : pluginCoreProcessHandle.close(deadline))) {
                     throw new IllegalStateException("Previous plugin-core process is still alive");
                 }
                 stopped.set(false);
@@ -288,13 +304,18 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                     private long launchAttemptCount;
                     private long processGeneration;
                     private boolean watcherConnected;
-                    private boolean closed;
-                    private Thread runnerThread;
+                    private volatile boolean closed;
+                    private volatile Thread runnerThread;
+                    private volatile PluginGhostWatcher watcher;
+                    private volatile ExecutionDeadline startupDeadline = deadline;
 
                     public void run() {
                         Thread.currentThread().setName("plugin-core-thread");
-                        synchronized (processLifecycleLock) {
+                        processLifecycleLock.lock();
+                        try {
                             runnerThread = Thread.currentThread();
+                        } finally {
+                            processLifecycleLock.unlock();
                         }
 
                         try {
@@ -322,28 +343,36 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                             }
                         } finally {
                             close();
-                            synchronized (processLifecycleLock) {
+                            processLifecycleLock.lock();
+                            try {
                                 if (runnerThread == Thread.currentThread()) {
                                     runnerThread = null;
                                 }
+                            } finally {
+                                processLifecycleLock.unlock();
                             }
                         }
                     }
 
                     private boolean shouldSupervise() {
-                        synchronized (processLifecycleLock) {
+                        processLifecycleLock.lock();
+                        try {
                             return shouldSuperviseLocked();
+                        } finally {
+                            processLifecycleLock.unlock();
                         }
                     }
 
                     private boolean shouldSuperviseLocked() {
-                        return !closed && !stopped.get() && !Thread.currentThread().isInterrupted();
+                        return !closed && !stopped.get() && !Thread.currentThread().isInterrupted()
+                                && (startupDeadline == null || startupDeadline.remainingMillis() > 0);
                     }
 
                     private boolean stopPreviousProcessBeforeLaunch() throws InterruptedException {
                         while (shouldSupervise()) {
                             Process previousProcess;
-                            synchronized (processLifecycleLock) {
+                            processLifecycleLock.lock();
+                            try {
                                 if (!shouldSuperviseLocked()) {
                                     return false;
                                 }
@@ -351,30 +380,36 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                                 if (Objects.isNull(previousProcess)) {
                                     return true;
                                 }
-                                if (!previousProcess.isAlive() || stopAndAwaitProcess(previousProcess)) {
+                                if (!previousProcess.isAlive() || (startupDeadline == null
+                                        ? stopAndAwaitProcess(previousProcess) : stopAndAwaitProcess(previousProcess, startupDeadline))) {
                                     process = null;
                                     return true;
                                 }
+                            } finally {
+                                processLifecycleLock.unlock();
                             }
                             LOGGER.warning("Unable to stop plugin-core pid=" + processId(previousProcess)
                                     + "; retry stop in " + PROCESS_STOP_RETRY_MILLIS
                                     + " ms before starting a replacement");
-                            pauseBeforePluginCoreStopRetry(PROCESS_STOP_RETRY_MILLIS);
+                            pauseBeforePluginCoreStopRetry(waitWithin(PROCESS_STOP_RETRY_MILLIS, startupDeadline));
                         }
                         return false;
                     }
 
                     private boolean pauseBeforeNextLaunch() throws InterruptedException {
                         long delayMillis;
-                        synchronized (processLifecycleLock) {
+                        processLifecycleLock.lock();
+                        try {
                             if (!shouldSuperviseLocked()) {
                                 return false;
                             }
                             delayMillis = launchDelayMillis;
                             launchDelayMillis = 0L;
+                        } finally {
+                            processLifecycleLock.unlock();
                         }
                         if (delayMillis > 0L) {
-                            pauseBeforePluginCoreRestart(delayMillis);
+                            pauseBeforePluginCoreRestart(waitWithin(delayMillis, startupDeadline));
                         }
                         return shouldSupervise();
                     }
@@ -383,19 +418,28 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                         int nextMasterPort = -1;
                         long currentAttempt = -1L;
                         try {
-                            synchronized (processLifecycleLock) {
+                            processLifecycleLock.lock();
+                            try {
                                 if (!shouldSuperviseLocked()) {
                                     return false;
                                 }
                                 currentAttempt = ++launchAttemptCount;
                                 nextMasterPort = nextPluginMasterPort(lastPluginMasterPort);
                                 lastPluginMasterPort = nextMasterPort;
+                            } finally {
+                                processLifecycleLock.unlock();
                             }
-                            File coreFile = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.toString());
-                            synchronized (processLifecycleLock) {
+                            ExecutionDeadline launchDeadline = startupDeadline;
+                            prepareUnzipPlugins(launchDeadline);
+                            File coreFile = launchDeadline == null
+                                    ? PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.toString())
+                                    : PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.toString(), launchDeadline);
+                            processLifecycleLock.lock();
+                            try {
                                 if (!shouldSuperviseLocked()) {
                                     return false;
                                 }
+                                prepareProcessLogs();
                                 Process startedProcess = startPluginCore(coreFile, dbProperties, pluginJvmArgs,
                                         runtimePath, runTimeVersion, token, randomServerPort, nextMasterPort,
                                         randomWatcherListenPort);
@@ -406,6 +450,8 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                                 processStartedAtNanos = monotonicTimeNanos();
                                 watcherConnected = false;
                                 processGeneration++;
+                            } finally {
+                                processLifecycleLock.unlock();
                             }
                             LOGGER.info("Started plugin-core pid=" + processId(process)
                                     + ", generation=" + processGeneration
@@ -415,12 +461,15 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                                     + ", watcherPort=" + randomWatcherListenPort);
                             return true;
                         } catch (Exception e) {
-                            synchronized (processLifecycleLock) {
+                            processLifecycleLock.lock();
+                            try {
                                 if (!shouldSuperviseLocked()) {
                                     return false;
                                 }
                                 restartBackoffMillis = nextRestartBackoffMillis(restartBackoffMillis, 0L);
                                 launchDelayMillis = restartBackoffMillis;
+                            } finally {
+                                processLifecycleLock.unlock();
                             }
                             LOGGER.log(Level.WARNING, "Unable to start plugin-core launchAttempt=" + currentAttempt
                                     + ", masterPort=" + nextMasterPort
@@ -436,12 +485,22 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                             infoPluginConsole.printAsync();
                             errorPluginConsole.printAsync();
                             while (shouldRun()) {
-                                boolean connected = newPluginGhostWatcher("127.0.0.1", randomWatcherListenPort).doWatch();
+                                PluginGhostWatcher currentWatcher = newPluginGhostWatcher("127.0.0.1", randomWatcherListenPort);
+                                watcher = currentWatcher;
+                                if (!shouldRun()) {
+                                    currentWatcher.close();
+                                    break;
+                                }
+                                boolean connected;
+                                try { connected = startupDeadline == null ? currentWatcher.doWatch()
+                                        : currentWatcher.doWatch(() -> startupDeadline); }
+                                finally { currentWatcher.close(); watcher = null; }
                                 if (connected) {
                                     watcherConnected = true;
                                 }
                                 // Avoid a tight loop while the child is still starting.
-                                pauseAfterPluginGhostWatcher();
+                                if (startupDeadline == null) pauseAfterPluginGhostWatcher();
+                                else Thread.sleep(waitWithin(1000, startupDeadline));
                                 if (connected || !shouldRetryWatcherConnection()) {
                                     break;
                                 }
@@ -461,16 +520,21 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                     }
 
                     private boolean shouldRun() {
-                        synchronized (processLifecycleLock) {
+                        processLifecycleLock.lock();
+                        try {
                             return shouldSuperviseLocked() && Objects.nonNull(process);
+                        } finally {
+                            processLifecycleLock.unlock();
                         }
                     }
 
                     private boolean shouldRetryWatcherConnection() {
-                        synchronized (processLifecycleLock) {
-                            return !closed && !stopped.get() && !Thread.currentThread().isInterrupted()
-                                    && Objects.nonNull(process) && process.isAlive()
+                        processLifecycleLock.lock();
+                        try {
+                            return shouldSuperviseLocked() && Objects.nonNull(process) && process.isAlive()
                                     && processRuntimeMillis() < PLUGIN_CORE_READY_TIMEOUT_MILLIS;
+                        } finally {
+                            processLifecycleLock.unlock();
                         }
                     }
 
@@ -479,7 +543,8 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                         long delayMillis;
                         boolean connected;
                         Process unavailableProcess;
-                        synchronized (processLifecycleLock) {
+                        processLifecycleLock.lock();
+                        try {
                             if (!shouldSuperviseLocked()) {
                                 return;
                             }
@@ -490,6 +555,8 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                                     restartBackoffMillis, connected ? observedRuntimeMillis : 0L);
                             launchDelayMillis = restartBackoffMillis;
                             delayMillis = launchDelayMillis;
+                        } finally {
+                            processLifecycleLock.unlock();
                         }
                         String message = "plugin-core unavailable: " + reason
                                 + ", pid=" + processId(unavailableProcess)
@@ -509,36 +576,105 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                         return TimeUnit.NANOSECONDS.toMillis(Math.max(0L, elapsedNanos));
                     }
 
+                    @Override
+                    boolean confirmStarted(int port) {
+                        if (port != randomServerPort || closed || stopped.get()
+                                || process == null || !process.isAlive()
+                                || (startupDeadline != null && startupDeadline.remainingMillis() == 0)) return false;
+                        startupDeadline = null;
+                        return true;
+                    }
+
+                    @Override
+                    boolean isPendingAt(int port) {
+                        return port == randomServerPort && startupDeadline != null;
+                    }
+
+                    @Override
+                    void cancelStartup() {
+                        closed = true;
+                        PluginGhostWatcher currentWatcher = watcher;
+                        if (currentWatcher != null) currentWatcher.close();
+                        Thread thread = runnerThread;
+                        if (thread != null && thread != Thread.currentThread()) thread.interrupt();
+                    }
+
                     public boolean close() {
-                        Thread threadToInterrupt;
-                        boolean processStopped;
-                        synchronized (processLifecycleLock) {
-                            closed = true;
-                            threadToInterrupt = runnerThread;
-                            processStopped = stopAndAwaitProcess(process);
-                            if (processStopped) {
-                                process = null;
-                            }
+                        return close(startupDeadline);
+                    }
+
+                    @Override
+                    boolean close(ExecutionDeadline cleanupDeadline) {
+                        cancelStartup();
+                        if (!lockWithin(cleanupDeadline)) return false;
+                        try {
+                            boolean processStopped = (cleanupDeadline == null ? stopAndAwaitProcess(process) : stopAndAwaitProcess(process, cleanupDeadline));
+                            if (processStopped) process = null;
+                            return processStopped;
+                        } finally {
+                            processLifecycleLock.unlock();
                         }
-                        if (threadToInterrupt != null && threadToInterrupt != Thread.currentThread()) {
-                            threadToInterrupt.interrupt();
-                        }
-                        if (!processStopped) {
-                            LOGGER.warning("Unable to stop plugin-core process; retaining its process handle");
-                        }
-                        return processStopped;
                     }
                 };
                 pluginCoreProcessHandle = handle;
+            } finally {
+                processLifecycleLock.unlock();
             }
             registerShutdownHook();
             startPluginCoreHandle(handle);
             return randomServerPort;
         } catch (Exception e) {
+            if (handle != null) handle.close(deadline);
             LOGGER.log(Level.WARNING, "start plugin exception ", e);
             return -1;
         }
 
+    }
+
+    @Override
+    public boolean confirmStarted(int port, ExecutionDeadline deadline) {
+        if (deadline != null && (deadline.remainingMillis() == 0 || Thread.currentThread().isInterrupted())) return false;
+        if (!lockWithin(deadline)) return false;
+        try {
+            return pluginCoreProcessHandle != null && pluginCoreProcessHandle.confirmStarted(port);
+        } finally { processLifecycleLock.unlock(); }
+    }
+
+    @Override
+    public void cancelStartup(int port, ExecutionDeadline deadline) {
+        if (!lockWithin(deadline)) return;
+        try {
+            AbstractPluginCoreProcessHandle handle = pluginCoreProcessHandle;
+            if (handle != null && handle.isPendingAt(port)) {
+                handle.cancelStartup();
+                if (handle.close(deadline)) pluginCoreProcessHandle = null;
+            }
+        } finally { processLifecycleLock.unlock(); }
+    }
+
+    private boolean lockWithin(ExecutionDeadline deadline) {
+        if (deadline == null) {
+            processLifecycleLock.lock();
+            return true;
+        }
+        if (Thread.currentThread().isInterrupted()) return processLifecycleLock.tryLock();
+        try {
+            return processLifecycleLock.tryLock(deadline.remainingMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private static long waitWithin(long maximum, ExecutionDeadline deadline) {
+        return deadline == null ? maximum : Math.min(maximum, deadline.remainingMillis());
+    }
+
+    private void prepareProcessLogs() {
+        if (infoLogFile == null || errorLogFile == null) {
+            infoLogFile = getLogFile(false);
+            errorLogFile = getLogFile(true);
+        }
     }
 
     int nextPluginMasterPort(int previousPort) {
@@ -573,23 +709,27 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
     }
 
     boolean stopAndAwaitProcess(Process process) {
+        return stopAndAwaitProcess(process, null);
+    }
+
+    boolean stopAndAwaitProcess(Process process, ExecutionDeadline deadline) {
         if (Objects.isNull(process) || !process.isAlive()) {
             return true;
         }
         process.destroy();
-        if (awaitProcessExit(process) || !process.isAlive()) {
+        if (awaitProcessExit(process, deadline) || !process.isAlive()) {
             return true;
         }
         process.destroyForcibly();
         if (Thread.currentThread().isInterrupted()) {
             return !process.isAlive();
         }
-        return awaitProcessExit(process) || !process.isAlive();
+        return awaitProcessExit(process, deadline) || !process.isAlive();
     }
 
-    private boolean awaitProcessExit(Process process) {
+    private boolean awaitProcessExit(Process process, ExecutionDeadline deadline) {
         try {
-            return process.waitFor(PROCESS_STOP_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+            return process.waitFor(waitWithin(PROCESS_STOP_TIMEOUT_MILLIS, deadline), TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
@@ -619,12 +759,15 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
     @Override
     public void stopPluginCore() {
         boolean shouldNotifyStop;
-        synchronized (processLifecycleLock) {
+        processLifecycleLock.lock();
+        try {
             shouldNotifyStop = stopped.compareAndSet(false, true);
             AbstractPluginCoreProcessHandle handle = pluginCoreProcessHandle;
             if (Objects.nonNull(handle) && handle.close()) {
                 pluginCoreProcessHandle = null;
             }
+        } finally {
+            processLifecycleLock.unlock();
         }
         if (shouldNotifyStop && Objects.nonNull(onStopRunnable)) {
             onStopRunnable.run();

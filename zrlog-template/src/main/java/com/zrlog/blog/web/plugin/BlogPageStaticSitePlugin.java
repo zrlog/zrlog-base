@@ -6,6 +6,7 @@ import com.hibegin.common.util.*;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.plugin.StaticSitePlugin;
 import com.zrlog.business.plugin.StaticSiteRenderer;
+import com.zrlog.business.plugin.StaticGenerationBudget;
 import com.zrlog.business.plugin.type.StaticSiteType;
 import com.zrlog.business.service.TemplateInfoHelper;
 import com.zrlog.business.template.util.BlogResourceUtils;
@@ -189,14 +190,78 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
 
     @Override
     public boolean start() {
-        cacheFiles.clear();
         lock.lock();
         try {
+            cacheFiles.clear();
             doGenerator();
         } finally {
             lock.unlock();
         }
         return true;
+    }
+
+    @Override
+    public boolean startWithinBudget(StaticGenerationBudget budget) throws Exception {
+        budget.check();
+        if (!lock.tryLock(budget.remainingMillis(), TimeUnit.MILLISECONDS))
+            throw new IllegalStateException("Static generation is busy");
+        try {
+            budget.check();
+            if (isDisabled()) return true;
+            cacheFiles.clear();
+            PublicWebSiteInfo webSite = site.get();
+            FaviconBase64DTO icon = faviconSource.get();
+            faviconWithinBudget(icon.getFavicon_ico_base64(), favicon,
+                    ResultValueConvertUtils.toBoolean(icon.getGenerator_html_status()), budget);
+            String robots = webSite.getRobotRuleContent();
+            if (!StringUtils.isEmpty(robots)) {
+                budget.check();
+                File file = PathUtil.getStaticFile("robots.txt");
+                java.nio.file.Files.createDirectories(file.toPath().getParent());
+                java.nio.file.Files.writeString(file.toPath(), robots);
+                saveToCacheFolderWithinBudget(new FileInputStream(file), "/robots.txt", budget);
+            }
+            for (String asset : BlogResourceUtils.getInstance().searchResources("assets/"))
+                copyResourceWithinBudget("/" + asset, budget);
+            File iconFile = PathUtil.getStaticFile(favicon);
+            if (iconFile.exists()) saveToCacheFolderWithinBudget(new FileInputStream(iconFile), favicon, budget);
+            else copyResourceWithinBudget(favicon, budget);
+            copyTemplateWithinBudget(webSite.getTemplate(), budget);
+            budget.check();
+            handleStatusPageMap.clear();
+            handleStatusPageMap.put(contextPath + "/", HandleState.NEW);
+            handleStatusPageMap.put(notFindFile(), HandleState.NEW);
+            saveToCacheFolderWithinBudget(new ByteArrayInputStream(("/* " + notFindFile() + " 404")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8)), "/_redirects", budget);
+            doFetchWithinBudget(renderer, budget);
+            return true;
+        } finally { lock.unlock(); }
+    }
+
+    private void copyTemplateWithinBudget(String templatePath, StaticGenerationBudget budget) throws Exception {
+        budget.check();
+        TemplateVO template = TemplateInfoHelper.loadTemplateVO(templatePath);
+        if (template == null) throw new IllegalStateException("Static template is unavailable");
+        for (String resource : template.getStaticResources()) {
+            budget.check();
+            if (template.isClasspathTemplate()) {
+                for (String name : BlogResourceUtils.getInstance().searchResources(templatePath.substring(1) + "/" + resource))
+                    if (!name.endsWith(".styl")) copyResourceWithinBudget("/" + name, budget);
+            } else {
+                java.nio.file.Path root = PathUtil.getStaticFile(template.getTemplate() + "/" + resource).toPath();
+                if (!java.nio.file.Files.exists(root)) continue;
+                try (var files = java.nio.file.Files.walk(root)) {
+                    var iterator = files.iterator();
+                    while (iterator.hasNext()) {
+                        budget.check();
+                        java.nio.file.Path file = iterator.next();
+                        if (java.nio.file.Files.isRegularFile(file))
+                            saveToCacheFolderWithinBudget(new FileInputStream(file.toFile()),
+                                    file.toString().substring(PathUtil.getStaticPath().length()), budget);
+                    }
+                }
+            }
+        }
     }
 
     @Override

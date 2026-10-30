@@ -3,17 +3,16 @@ package com.zrlog.business.util;
 import com.hibegin.common.util.EnvKit;
 import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.http.HttpUtil;
-import com.hibegin.common.util.http.handle.HttpHandle;
-import com.hibegin.common.util.http.handle.HttpStringHandle;
 import com.zrlog.util.BlogBuildInfoUtil;
+import com.zrlog.util.ExecutionDeadline;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
-import java.net.URISyntaxException;
+import java.net.URI;
+import java.net.http.HttpTimeoutException;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
@@ -24,7 +23,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.OptionalLong;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.jar.JarFile;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
@@ -33,6 +33,8 @@ import java.util.zip.ZipInputStream;
 public class PluginCoreUtils {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(PluginCoreUtils.class);
+    private static final ReentrantLock DOWNLOAD_LOCK = new ReentrantLock();
+    private static final long MAX_CORE_BYTES = 256L * 1024 * 1024;
     private static final int ELF_MAGIC = 0x7f454c46;
     private static final int MACH_O_MAGIC = 0xfeedface;
     private static final int MACH_O_CIGAM = 0xcefaedfe;
@@ -44,6 +46,46 @@ public class PluginCoreUtils {
     private static final int PE_MACHINE_ARM64 = 0xaa64;
     private static final int MACH_O_CPU_X86_64 = 0x01000007;
     private static final int MACH_O_CPU_ARM64 = 0x0100000c;
+
+    /** Unpacks the FaaS bundle cooperatively; each entry is published only after it is complete. */
+    public static void unpackPlugins(Path archive, Path target, ExecutionDeadline deadline)
+            throws IOException, InterruptedException {
+        Path root = target.toAbsolutePath().normalize();
+        deadline.requireRemainingMillis();
+        Files.createDirectories(root);
+        try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(archive))) {
+            ZipEntry entry;
+            byte[] buffer = new byte[64 * 1024];
+            while ((entry = zip.getNextEntry()) != null) {
+                deadline.requireRemainingMillis();
+                Path destination = root.resolve(entry.getName()).normalize();
+                if (!destination.startsWith(root)) throw new IOException("Plugin archive entry escapes its directory");
+                for (Path ancestor = destination; ancestor != null && ancestor.startsWith(root); ancestor = ancestor.getParent()) {
+                    if (Files.isSymbolicLink(ancestor)) throw new IOException("Plugin archive entry crosses a symbolic link");
+                }
+                if (entry.isDirectory()) {
+                    Files.createDirectories(destination);
+                } else {
+                    Files.createDirectories(destination.getParent());
+                    Path temporary = Files.createTempFile(destination.getParent(), "plugin-unpack-", ".part");
+                    try {
+                        try (java.io.OutputStream output = Files.newOutputStream(temporary)) {
+                            int read;
+                            while ((read = zip.read(buffer)) != -1) {
+                                deadline.requireRemainingMillis();
+                                output.write(buffer, 0, read);
+                            }
+                        }
+                        deadline.requireRemainingMillis();
+                        Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                    } finally {
+                        Files.deleteIfExists(temporary);
+                    }
+                }
+                zip.closeEntry();
+            }
+        }
+    }
 
     private static File getPluginFileName(String pluginsFolder) {
         return getPluginFileName(pluginsFolder, EnvKit.isNativeImage(), BlogBuildInfoUtil.getFileArch());
@@ -64,17 +106,43 @@ public class PluginCoreUtils {
         return tryDownloadPluginCoreFile(pluginsFolder, EnvKit.isNativeImage(), BlogBuildInfoUtil.getFileArch());
     }
 
-    static synchronized File tryDownloadPluginCoreFile(String pluginsFolder, boolean nativeImage, String fileArch) {
+    public static File tryDownloadPluginCoreFile(String pluginsFolder, ExecutionDeadline deadline) {
+        return tryDownloadPluginCoreFile(pluginsFolder, EnvKit.isNativeImage(), BlogBuildInfoUtil.getFileArch(), deadline);
+    }
+
+    static File tryDownloadPluginCoreFile(String pluginsFolder, boolean nativeImage, String fileArch) {
+        return tryDownloadPluginCoreFile(pluginsFolder, nativeImage, fileArch, ExecutionDeadline.afterMillis(600000));
+    }
+
+    static File tryDownloadPluginCoreFile(String pluginsFolder, boolean nativeImage, String fileArch,
+                                          ExecutionDeadline deadline) {
+        boolean locked = false;
+        try {
+            locked = DOWNLOAD_LOCK.tryLock(deadline.requireRemainingMillis(), TimeUnit.MILLISECONDS);
+            if (!locked) throw new HttpTimeoutException("Plugin-core download lock budget exhausted");
+            return downloadPluginCoreFile(pluginsFolder, nativeImage, fileArch, deadline);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("download plugin core interrupted", interrupted);
+        } catch (IOException failure) {
+            throw new IllegalStateException("download plugin core error, " + failure.getMessage(), failure);
+        } finally {
+            if (locked) DOWNLOAD_LOCK.unlock();
+        }
+    }
+
+    private static File downloadPluginCoreFile(String pluginsFolder, boolean nativeImage, String fileArch,
+                                                ExecutionDeadline deadline) throws IOException, InterruptedException {
+        deadline.requireRemainingMillis();
         File pluginCoreFile = getPluginFileName(pluginsFolder, nativeImage, fileArch);
         Path pluginCorePath = pluginCoreFile.toPath();
         Path downloadPath = null;
-        boolean usablePluginCore = false;
         try {
             Path pluginsPath = pluginCorePath.getParent();
             Files.createDirectories(pluginsPath);
             deleteStaleDownloadFiles(pluginsPath, pluginCoreFile.getName());
-            if (isUsablePluginCore(pluginCoreFile, nativeImage)) {
-                usablePluginCore = true;
+            if (isUsablePluginCore(pluginCoreFile, nativeImage, deadline)) {
+                makeExecutable(pluginCoreFile);
                 return pluginCoreFile;
             }
             String downloadPrefix = pluginCoreFile.getName() + "." + ProcessHandle.current().pid() + ".";
@@ -90,46 +158,45 @@ public class PluginCoreUtils {
             map.put("Cache-Control", "no-cache");
             String expectedNativeMd5 = nativeImage
                     ? downloadNativeMd5(artifactUrl + ".md5?_t=" + cacheBuster,
-                    pluginCoreFile.getName(), map) : null;
-            PluginCoreDownloadHandle downloadHandle = new PluginCoreDownloadHandle(downloadPath);
-            HttpUtil.getInstance().sendGetRequest(withoutCacheDownloadUrl, new HashMap<>(), downloadHandle, map);
-            downloadHandle.requireComplete();
+                    pluginCoreFile.getName(), map, deadline) : null;
+            HttpRequest.Builder download = HttpRequest.newBuilder(URI.create(withoutCacheDownloadUrl)).GET();
+            map.forEach(download::header);
+            HttpUtil.getInstance().downloadToFile(download.build(), downloadPath, deadline, MAX_CORE_BYTES);
             validateDownloadedPluginCore(downloadPath, nativeImage, pluginCoreFile.getName(),
-                    expectedNativeMd5);
+                    expectedNativeMd5, deadline);
+            deadline.requireRemainingMillis();
             if (nativeImage) {
                 publishNativeMd5(pluginCorePath, expectedNativeMd5);
             }
             publishDownloadedPluginCore(downloadPath, pluginCorePath);
             downloadPath = null;
-            usablePluginCore = true;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("download plugin core error, " + e.getMessage(), e);
-        } catch (IOException | URISyntaxException e) {
-            throw new RuntimeException("download plugin core error, " + e.getMessage(), e);
+            makeExecutable(pluginCoreFile);
         } finally {
             deleteDownloadFile(downloadPath);
-            if (usablePluginCore) {
-                if (pluginCoreFile.getName().endsWith(".bin")) {
-                    CmdUtil.sendCmd("chmod", "a+x", pluginCoreFile.toString());
-                }
-            }
         }
         return pluginCoreFile;
     }
 
-    private static boolean isUsablePluginCore(File pluginCoreFile, boolean nativeImage) {
+    private static void makeExecutable(File file) throws IOException {
+        if (file.getName().endsWith(".bin") && !file.canExecute() && !file.setExecutable(true, false)) {
+            throw new IOException("Unable to make plugin-core executable");
+        }
+    }
+
+    private static boolean isUsablePluginCore(File pluginCoreFile, boolean nativeImage, ExecutionDeadline deadline) throws IOException, InterruptedException {
         if (!pluginCoreFile.isFile() || pluginCoreFile.length() <= 0) {
             return false;
         }
         try {
             if (nativeImage) {
-                validateNativeExecutable(pluginCoreFile.toPath(), pluginCoreFile.getName());
-                validateLocalNativeMd5IfPresent(pluginCoreFile.toPath());
+                validateNativeExecutable(pluginCoreFile.toPath(), pluginCoreFile.getName(), deadline);
+                validateLocalNativeMd5IfPresent(pluginCoreFile.toPath(), deadline);
             } else {
-                validateJar(pluginCoreFile.toPath());
+                validateJar(pluginCoreFile.toPath(), deadline);
             }
             return true;
+        } catch (HttpTimeoutException expired) {
+            throw expired;
         } catch (IOException | SecurityException e) {
             LOGGER.warning(pluginCoreFile.getName() + " is invalid and will be downloaded again: "
                     + e.getMessage());
@@ -139,28 +206,28 @@ public class PluginCoreUtils {
 
     private static void validateDownloadedPluginCore(Path downloadPath, boolean nativeImage,
                                                      String targetFileName,
-                                                     String expectedNativeMd5) throws IOException {
+                                                     String expectedNativeMd5, ExecutionDeadline deadline) throws IOException, InterruptedException {
         if (!Files.isRegularFile(downloadPath) || Files.size(downloadPath) <= 0) {
             throw new IOException("downloaded plugin core is empty");
         }
         if (nativeImage) {
-            validateNativeExecutable(downloadPath, targetFileName);
-            requireMd5(downloadPath, expectedNativeMd5);
+            validateNativeExecutable(downloadPath, targetFileName, deadline);
+            requireMd5(downloadPath, expectedNativeMd5, deadline);
         } else {
-            validateJar(downloadPath);
+            validateJar(downloadPath, deadline);
         }
     }
 
     private static String downloadNativeMd5(String checksumUrl, String fileName,
-                                            Map<String, String> headers)
-            throws IOException, InterruptedException, URISyntaxException {
-        HttpStringHandle checksumHandle = new HttpStringHandle();
-        HttpUtil.getInstance().sendGetRequest(checksumUrl, new HashMap<>(), checksumHandle, headers);
-        if (checksumHandle.getStatusCode() != 200) {
-            throw new IOException("plugin core checksum download returned HTTP "
-                    + checksumHandle.getStatusCode());
+                                            Map<String, String> headers, ExecutionDeadline deadline)
+            throws IOException, InterruptedException {
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(checksumUrl)).GET();
+        headers.forEach(request::header);
+        var response = HttpUtil.getInstance().sendRequest(request.build(), deadline, 4096);
+        if (response.statusCode() != 200) {
+            throw new IOException("plugin core checksum download returned HTTP " + response.statusCode());
         }
-        return parseNativeMd5(checksumHandle.getT(), fileName);
+        return parseNativeMd5(response.body(), fileName);
     }
 
     private static String parseNativeMd5(String checksumText, String fileName) throws IOException {
@@ -182,7 +249,7 @@ public class PluginCoreUtils {
         return checksum;
     }
 
-    private static void validateLocalNativeMd5IfPresent(Path nativePath) throws IOException {
+    private static void validateLocalNativeMd5IfPresent(Path nativePath, ExecutionDeadline deadline) throws IOException, InterruptedException {
         Path checksumPath = nativeMd5Path(nativePath);
         if (!Files.exists(checksumPath)) {
             return;
@@ -192,16 +259,16 @@ public class PluginCoreUtils {
         }
         String expectedMd5 = parseNativeMd5(Files.readString(checksumPath),
                 nativePath.getFileName().toString());
-        requireMd5(nativePath, expectedMd5);
+        requireMd5(nativePath, expectedMd5, deadline);
     }
 
-    private static void requireMd5(Path path, String expectedMd5) throws IOException {
-        if (expectedMd5 == null || !expectedMd5.equals(md5(path))) {
+    private static void requireMd5(Path path, String expectedMd5, ExecutionDeadline deadline) throws IOException, InterruptedException {
+        if (expectedMd5 == null || !expectedMd5.equals(md5(path, deadline))) {
             throw new IOException("plugin core checksum mismatch");
         }
     }
 
-    private static String md5(Path path) throws IOException {
+    private static String md5(Path path, ExecutionDeadline deadline) throws IOException, InterruptedException {
         final MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("MD5");
@@ -212,6 +279,7 @@ public class PluginCoreUtils {
         try (InputStream inputStream = Files.newInputStream(path)) {
             int read;
             while ((read = inputStream.read(buffer)) != -1) {
+                deadline.requireRemainingMillis();
                 digest.update(buffer, 0, read);
             }
         }
@@ -239,7 +307,7 @@ public class PluginCoreUtils {
         }
     }
 
-    private static void validateNativeExecutable(Path path, String targetFileName) throws IOException {
+    private static void validateNativeExecutable(Path path, String targetFileName, ExecutionDeadline deadline) throws IOException, InterruptedException {
         try (RandomAccessFile file = new RandomAccessFile(path.toFile(), "r")) {
             long fileSize = file.length();
             if (fileSize < 4) {
@@ -253,19 +321,19 @@ public class PluginCoreUtils {
                     && targetFileName.endsWith(".bin");
             int magic = buffer(file, 0, 4, ByteOrder.BIG_ENDIAN).getInt();
             if (windowsExecutable && (magic >>> 16) == 0x4d5a) {
-                validatePortableExecutable(file, fileSize, targetFileName);
+                validatePortableExecutable(file, fileSize, targetFileName, deadline);
             } else if (linuxExecutable && magic == ELF_MAGIC) {
-                validateElf(file, fileSize, targetFileName);
+                validateElf(file, fileSize, targetFileName, deadline);
             } else if (macExecutable && (magic == MACH_O_MAGIC || magic == MACH_O_CIGAM
                     || magic == MACH_O_64_MAGIC || magic == MACH_O_64_CIGAM)) {
-                validateMachO(file, fileSize, magic, targetFileName);
+                validateMachO(file, fileSize, magic, targetFileName, deadline);
             } else {
                 throw new IOException("native plugin core format does not match its target platform");
             }
         }
     }
 
-    private static void validateElf(RandomAccessFile file, long fileSize, String targetFileName) throws IOException {
+    private static void validateElf(RandomAccessFile file, long fileSize, String targetFileName, ExecutionDeadline deadline) throws IOException, InterruptedException {
         ByteBuffer identity = buffer(file, 0, 16, ByteOrder.BIG_ENDIAN);
         int fileClass = Byte.toUnsignedInt(identity.get(4));
         int dataEncoding = Byte.toUnsignedInt(identity.get(5));
@@ -292,6 +360,7 @@ public class PluginCoreUtils {
         requireRange(programHeaderOffset, (long) programEntrySize * programEntryCount,
                 fileSize, "ELF program table");
         for (int index = 0; index < programEntryCount; index++) {
+            deadline.requireRemainingMillis();
             long entryOffset = programHeaderOffset + (long) index * programEntrySize;
             ByteBuffer entry = buffer(file, entryOffset, minimumProgramEntrySize, order);
             long segmentOffset = is64Bit ? positiveLong(entry.getLong(8), "ELF segment offset")
@@ -303,7 +372,7 @@ public class PluginCoreUtils {
     }
 
     private static void validatePortableExecutable(RandomAccessFile file, long fileSize,
-                                                   String targetFileName) throws IOException {
+                                                   String targetFileName, ExecutionDeadline deadline) throws IOException, InterruptedException {
         if (fileSize < 64) {
             throw new IOException("native plugin core has an incomplete DOS header");
         }
@@ -334,6 +403,7 @@ public class PluginCoreUtils {
         long sectionTableOffset = optionalHeaderOffset + optionalHeaderSize;
         requireRange(sectionTableOffset, (long) sectionCount * 40, fileSize, "PE section table");
         for (int index = 0; index < sectionCount; index++) {
+            deadline.requireRemainingMillis();
             ByteBuffer section = buffer(file, sectionTableOffset + (long) index * 40,
                     40, ByteOrder.LITTLE_ENDIAN);
             long rawSize = Integer.toUnsignedLong(section.getInt(16));
@@ -345,7 +415,7 @@ public class PluginCoreUtils {
     }
 
     private static void validateMachO(RandomAccessFile file, long fileSize, int magic,
-                                      String targetFileName) throws IOException {
+                                      String targetFileName, ExecutionDeadline deadline) throws IOException, InterruptedException {
         boolean is64Bit = magic == MACH_O_64_MAGIC || magic == MACH_O_64_CIGAM;
         ByteOrder order = magic == MACH_O_MAGIC || magic == MACH_O_64_MAGIC
                 ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN;
@@ -363,6 +433,7 @@ public class PluginCoreUtils {
         long commandsEnd = headerSize + commandsSize;
         int segmentCount = 0;
         for (long index = 0; index < commandCount; index++) {
+            deadline.requireRemainingMillis();
             requireRange(commandOffset, 8, commandsEnd, "Mach-O load command");
             ByteBuffer commandHeader = buffer(file, commandOffset, 8, order);
             long command = Integer.toUnsignedLong(commandHeader.getInt(0));
@@ -431,7 +502,7 @@ public class PluginCoreUtils {
         return ByteBuffer.wrap(bytes).order(order);
     }
 
-    private static void validateJar(Path jarPath) throws IOException {
+    private static void validateJar(Path jarPath, ExecutionDeadline deadline) throws IOException, InterruptedException {
         try (JarFile ignored = new JarFile(jarPath.toFile())) {
             // Opening the archive validates its central directory before every entry is read below.
         }
@@ -441,9 +512,11 @@ public class PluginCoreUtils {
              ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
             ZipEntry entry;
             while ((entry = zipInputStream.getNextEntry()) != null) {
+                deadline.requireRemainingMillis();
                 if (!entry.isDirectory()) {
                     fileEntries++;
                     while (zipInputStream.read(buffer) != -1) {
+                        deadline.requireRemainingMillis();
                         // Reading through the entry validates its declared size, stream and CRC.
                     }
                 }
@@ -505,52 +578,4 @@ public class PluginCoreUtils {
         }
     }
 
-    private static class PluginCoreDownloadHandle extends HttpHandle<File> {
-
-        private final Path downloadPath;
-        private int statusCode;
-        private IOException failure;
-
-        private PluginCoreDownloadHandle(Path downloadPath) {
-            this.downloadPath = downloadPath;
-        }
-
-        @Override
-        public int getStatusCode() {
-            return statusCode;
-        }
-
-        @Override
-        public boolean handle(HttpRequest request, HttpResponse<InputStream> response) {
-            statusCode = response.statusCode();
-            try (InputStream inputStream = response.body()) {
-                if (statusCode != 200) {
-                    return false;
-                }
-                long copied = Files.copy(inputStream, downloadPath, StandardCopyOption.REPLACE_EXISTING);
-                OptionalLong contentLength = response.headers().firstValueAsLong("Content-Length");
-                if (contentLength.isPresent() && copied != contentLength.getAsLong()) {
-                    failure = new IOException("incomplete plugin core download: expected "
-                            + contentLength.getAsLong() + " bytes but received " + copied);
-                    return false;
-                }
-                setT(downloadPath.toFile());
-            } catch (IOException e) {
-                failure = e;
-            }
-            return false;
-        }
-
-        private void requireComplete() throws IOException {
-            if (statusCode != 200) {
-                throw new IOException("plugin core download returned HTTP " + statusCode);
-            }
-            if (failure != null) {
-                throw failure;
-            }
-            if (getT() == null) {
-                throw new IOException("plugin core download did not produce a file");
-            }
-        }
-    }
 }

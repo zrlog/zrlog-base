@@ -20,6 +20,8 @@ public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseabl
     private final int additionalAcceptedStatusCode;
     private OutputStream outputStream;
     private int statusCode;
+    private final StaticGenerationBudget budget;
+    private RuntimeException generationFailure;
 
     public BodySaveResponse(HttpRequest request, ResponseConfig responseConfig, boolean requiredStatusCodeSuccess,
                             StaticSitePlugin staticSitePlugin) {
@@ -28,7 +30,14 @@ public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseabl
 
     BodySaveResponse(HttpRequest request, ResponseConfig responseConfig, boolean requiredStatusCodeSuccess,
                      int additionalAcceptedStatusCode, StaticSitePlugin staticSitePlugin) {
+        this(request, responseConfig, requiredStatusCodeSuccess, additionalAcceptedStatusCode, staticSitePlugin, null);
+    }
+
+    BodySaveResponse(HttpRequest request, ResponseConfig responseConfig, boolean requiredStatusCodeSuccess,
+                     int additionalAcceptedStatusCode, StaticSitePlugin staticSitePlugin, StaticGenerationBudget budget) {
         super(request, responseConfig);
+        this.budget = budget;
+        if (budget != null) budget.check();
         this.additionalAcceptedStatusCode = additionalAcceptedStatusCode;
         this.cacheFile = buildCacheFile(staticSitePlugin);
         if (Objects.nonNull(cacheFile)) {
@@ -70,6 +79,21 @@ public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseabl
 
     @Override
     protected void send(byte[] bytes, boolean body, boolean close) {
+        if (budget == null) {
+            sendBody(bytes, body, close);
+            return;
+        }
+        try {
+            if (generationFailure != null) throw generationFailure;
+            budget.remainingMillis();
+            sendBody(bytes, body, close);
+        } catch (RuntimeException error) {
+            generationFailure = error;
+            throw error;
+        }
+    }
+
+    private void sendBody(byte[] bytes, boolean body, boolean close) {
         if (Objects.isNull(cacheFile)) {
             return;
         }
@@ -82,7 +106,16 @@ public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseabl
         if (statusCode != 200 && statusCode != additionalAcceptedStatusCode && requiredStatusCodeSuccess) {
             return;
         }
-        initLock.lock();
+        if (budget == null) initLock.lock();
+        else {
+            try {
+                if (!initLock.tryLock(budget.remainingMillis(), java.util.concurrent.TimeUnit.MILLISECONDS))
+                    throw new IllegalStateException("Static response initialization time budget exhausted");
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Static response initialization interrupted", interrupted);
+            }
+        }
         try {
             if (Objects.isNull(this.outputStream)) {
                 try {
@@ -106,6 +139,10 @@ public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseabl
             return null;
         }
         return cacheFile;
+    }
+
+    void checkGenerationCompleted() {
+        if (generationFailure != null) throw generationFailure;
     }
 
     @Override

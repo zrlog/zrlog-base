@@ -78,6 +78,20 @@ public class UpdateVersionInfoPluginTest {
     }
 
     @Theory
+    public void hostSchedulingDisablesLegacyTimerAndKeepsOnDemandChecks(DatabaseType databaseType) throws Exception {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
+            db.update("insert into website(name, value) values(?, ?)", WebsiteKvService.AUTO_UPGRADE_VERSION_KEY, "60");
+            var plugin = new TestUpdateVersionInfoPlugin(new FakeVersionTimerTask(version("3.7.0")), db.dataSource());
+            plugin.setExternallyScheduled(true);
+            assertFalse(plugin.autoStart());
+            assertTrue(plugin.start());
+            assertFalse(plugin.isStarted());
+            assertNotNull(plugin.getLastVersion(true));
+            assertFalse(plugin.isStarted());
+        }
+    }
+
+    @Theory
     public void shouldStartWithoutSchedulingWhenAutoUpgradeIsDisabled(DatabaseType databaseType) throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",

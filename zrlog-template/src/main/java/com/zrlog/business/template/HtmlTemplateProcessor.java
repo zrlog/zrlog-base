@@ -7,6 +7,7 @@ import com.hibegin.common.util.http.handle.CloseResponseHandle;
 import com.hibegin.http.HttpMethod;
 import com.hibegin.http.server.api.HttpRequest;
 import com.zrlog.business.plugin.PluginCorePlugin;
+import com.zrlog.business.plugin.StaticGenerationBudget;
 import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.plugin.BaseStaticSitePlugin;
 import com.zrlog.util.StaticFileCacheUtils;
@@ -47,10 +48,13 @@ public class HtmlTemplateProcessor {
 
     private final String staticResourceBaseUrl;
     private final PluginCorePlugin pluginCore;
+    private final StaticGenerationBudget budget;
 
     public HtmlTemplateProcessor(HttpRequest request, AdminTokenVO adminTokenVO, String staticResourceBaseUrl,
                                  PluginCorePlugin pluginCore) {
         this.pluginCore = pluginCore;
+        Object execution = request.getAttr() == null ? null : request.getAttr().get(StaticGenerationBudget.REQUEST_ATTRIBUTE);
+        this.budget = execution instanceof StaticGenerationBudget ? (StaticGenerationBudget) execution : null;
         this.baseUrl = request.getContextPath() + "/";
         this.request = request;
         this.adminTokenVO = adminTokenVO;
@@ -61,6 +65,24 @@ public class HtmlTemplateProcessor {
     private void handlePluginTag(Document document, Map<String, String> replaceMap) {
         Elements plugins = document.select("plugin[name]");
         if (plugins.isEmpty()) {
+            return;
+        }
+        if (budget != null) {
+            for (Element tag : plugins) {
+                budget.check();
+                if (tag.attr("name").isEmpty()) continue;
+                tag.attr("data-plugin-id", pluginId.incrementAndGet() + "");
+                String uri = "/" + tag.attr("name") + "/" + tag.attr("view").replaceFirst("/", "");
+                if (!tag.attr("param").isEmpty()) uri += "?" + tag.attr("param");
+                try {
+                    String content = pluginCore.renderViewWithinBudget(uri, request, budget);
+                    budget.check();
+                    replaceMap.put(tag.outerHtml(), content);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Plugin view rendering interrupted", interrupted);
+                } catch (java.io.IOException error) { throw new IllegalStateException("Plugin view rendering failed", error); }
+            }
             return;
         }
         List<CompletableFuture<Void>> futures = new ArrayList<>();
@@ -81,6 +103,7 @@ public class HtmlTemplateProcessor {
     }
 
     public String transform(String htmlStr) {
+        if (budget != null) budget.check();
         Document document = Jsoup.parse(htmlStr, "", Parser.htmlParser());
         Map<String, String> replaceMap = new ConcurrentHashMap<>();
         for (Element tag : document.getAllElements()) {
@@ -93,6 +116,7 @@ public class HtmlTemplateProcessor {
             html = html.replace(entry.getKey(), entry.getValue());
         }
         String versionInfo = SecurityUtils.md5(html);
+        if (budget != null) budget.check();
         if (BaseStaticSitePlugin.isStaticPluginRequest(request)) {
             return html + "<!--" + versionInfo + "-->";
         }

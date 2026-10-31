@@ -99,7 +99,10 @@ public class DbUpgradeService {
             int fileVersion = f.getKey();
             if (fileVersion > dbVersion) {
                 List<String> executableSql;
-                if (usesSqliteDialect()) {
+                if (f.getValue().stripLeading().startsWith("-- dialect: mysql") && !usesMysqlDialect()) {
+                    // Keep the version step on every backend, without executing MySQL-only DDL.
+                    executableSql = Collections.emptyList();
+                } else if (usesSqliteDialect()) {
                     executableSql = SqlConvertUtils.doMySQLToSqliteBySqlText(f.getValue());
                 } else {
                     executableSql = SqlConvertUtils.extractExecutableSql(f.getValue());
@@ -163,6 +166,15 @@ public class DbUpgradeService {
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "", e);
         }
+    }
+
+    private boolean usesMysqlDialect() {
+        if (dataSource.isWebApi()) {
+            return false;
+        }
+        String jdbcUrl = dataSource.getDataSourceProperties().getProperty("jdbcUrl", "");
+        return jdbcUrl.regionMatches(true, 0, "jdbc:mysql:", 0, "jdbc:mysql:".length())
+                || jdbcUrl.regionMatches(true, 0, "jdbc:mariadb:", 0, "jdbc:mariadb:".length());
     }
 
     private boolean usesSqliteDialect() {

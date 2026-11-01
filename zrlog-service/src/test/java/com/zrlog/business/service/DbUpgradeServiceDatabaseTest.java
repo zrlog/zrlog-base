@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.*;
@@ -78,6 +79,67 @@ public class DbUpgradeServiceDatabaseTest {
             upgradeService(db.dataSource(), -1).tryDoUpgrade();
 
             assertNull(db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+        }
+    }
+
+    @Test
+    public void mysqlCharsetMigrationPreservesUnicodeValuesOnOtherBackends() throws Exception {
+        String previous = System.getProperty("sws.conf.path");
+        File folder = writeUpgradeSql("tables-unicode-conf", bundledUpgradeSql(30).replace("\n", "\r\n"), 30);
+        try {
+            System.setProperty("sws.conf.path", folder.getAbsolutePath());
+            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
+                String value = "桂林🛶、大理🌿，𠮷，字面转义 \\ud83d\\udef6";
+                db.putWebsite("existing-unicode", value);
+                db.putWebsite("existing-null", null);
+                db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "29");
+                db.update("insert into tag(text) values(?)", "旅行🛶𠮷");
+                upgradeService(db.dataSource(), 29).tryDoUpgrade();
+                assertEquals("30", db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+                assertEquals(value, db.scalar("select value from website where name=?", "existing-unicode"));
+                assertNull(db.scalar("select value from website where name=?", "existing-null"));
+                assertEquals(1L, ((Number) db.scalar("select count(*) from website where name=?", "existing-null")).longValue());
+                assertEquals("旅行🛶𠮷", db.scalar("select text from tag"));
+                db.putWebsite("new-unicode", value);
+                assertEquals(value, db.scalar("select value from website where name=?", "new-unicode"));
+                db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "29");
+                upgradeService(asWebApi(db.dataSource()), 29).tryDoUpgrade();
+                assertEquals("30", db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+                assertEquals(value, db.scalar("select value from website where name=?", "new-unicode"));
+            }
+        } finally {
+            restoreProperty("sws.conf.path", previous);
+        }
+    }
+
+    @Test
+    public void shouldExecuteMysqlOnlyMigrationForMysqlAndMariaDbSources() throws Exception {
+        String previous = System.getProperty("sws.conf.path");
+        File folder = writeUpgradeSql("mysql-dialect-conf", "-- dialect: mysql\r\n"
+                + "insert into website(name,value) values('mysql-migration','applied');", 30);
+        try {
+            System.setProperty("sws.conf.path", folder.getAbsolutePath());
+            for (String jdbcUrl : List.of("jdbc:mysql://localhost/site", "JDBC:MARIADB://localhost/site")) {
+                try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
+                    Properties properties = db.properties();
+                    properties.setProperty("jdbcUrl", jdbcUrl);
+                    DataSourceWrapper source = (DataSourceWrapper) Proxy.newProxyInstance(
+                            DataSourceWrapper.class.getClassLoader(), new Class[]{DataSourceWrapper.class},
+                            (proxy, method, args) -> {
+                                if ("getDataSourceProperties".equals(method.getName())) return properties;
+                                try {
+                                    return method.invoke(db.dataSource(), args);
+                                } catch (InvocationTargetException e) {
+                                    throw e.getCause();
+                                }
+                            });
+                    upgradeService(source, 29).tryDoUpgrade();
+                    assertEquals("applied", db.scalar("select value from website where name='mysql-migration'"));
+                    assertEquals("30", db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+                }
+            }
+        } finally {
+            restoreProperty("sws.conf.path", previous);
         }
     }
 
@@ -479,7 +541,7 @@ public class DbUpgradeServiceDatabaseTest {
                 db.update("drop table if exists user_access_token");
                 db.update("insert into user(userId,userName,role,authVersion) values(?,?,?,?)", 1, "existing", "author", 7);
                 upgradeService(db.dataSource(), 28).tryDoUpgrade();
-                assertEquals("29", db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+                assertEquals(String.valueOf(UpgradeVersionHandler.SQL_VERSION), db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
                 assertEquals(7, ((Number) db.scalar("select authVersion from user where userId=1")).intValue());
                 db.update("insert into user_access_token(id,userId,name,tokenHash,scope,resource,authVersion,createdAt,expiresAt) values(?,?,?,?,?,?,?,?,?)",
                         "token-id", 1, "Assistant", "hash", "articles:read", "https://example.com/mcp", 7, 1L, 100L);

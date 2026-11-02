@@ -18,8 +18,6 @@ import java.util.*;
  */
 public class ZrLogUtil {
 
-    //private static final Logger LOGGER = LoggerUtil.getLogger(ZrLogUtil.class);
-
     public static final String DB_PROPERTIES_KEY_IN_ENV = "DB_PROPERTIES";
 
     private ZrLogUtil() {

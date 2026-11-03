@@ -8,6 +8,8 @@ import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.exception.DatabaseInitializationException;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.data.service.DistributedLock;
+import com.zrlog.data.di.DaggerDataComponent;
 import com.zrlog.web.WebSetupContext;
 import com.zrlog.web.WebSetupLoader;
 import org.junit.Rule;
@@ -70,24 +72,24 @@ public class SchemaMigrationStopTest {
                 try {
                     Future<?> startup = workers.submit(() -> config.start(borrowedSource(db, closed)));
                     assertTrue(executing.await(5, TimeUnit.SECONDS));
-                    Object owner = db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY);
+                    Object owner = db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY);
                     assertNotNull(owner);
                     Future<?> stop = workers.submit(config::stop);
                     assertTrue(config.stopping.await(2, TimeUnit.SECONDS));
                     assertThrows(TimeoutException.class, () -> stop.get(100, TimeUnit.MILLISECONDS));
                     assertFalse(closed.get());
-                    assertEquals(owner, db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+                    assertEquals(owner, db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
                     finishStatement.countDown();
                     stop.get(3, TimeUnit.SECONDS);
                     ExecutionException failure = assertThrows(ExecutionException.class, () -> startup.get(3, TimeUnit.SECONDS));
                     assertTrue(failure.getCause() instanceof DatabaseInitializationException);
                     assertTrue(closed.get());
-                    assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+                    assertNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
                     assertEquals("30", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
                     assertNull(db.scalar("SELECT value FROM website WHERE name='base_data_init_cache_v3'"));
                     new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
                     assertEquals("31", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
-                    assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+                    assertNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
                 } finally {
                     finishStatement.countDown();
                     workers.shutdownNow();
@@ -101,12 +103,13 @@ public class SchemaMigrationStopTest {
         public void stoppingAWaitingInstanceLeavesOtherInstancesLockIntact() throws Exception {
             System.setProperty("sws.root.path", temporary.getRoot().getAbsolutePath());
             try (ZrLogTestDatabase db = ZrLogTestDatabase.openWebApi("/schema/v30-install-e8d8c9d.sql");
-                 SchemaUpgradeLock owner = SchemaUpgradeLock.acquire(db.dataSource())) {
+                 DistributedLock owner = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).lockManager()
+                        .acquire(DistributedLock.SCHEMA_UPGRADE_KEY, 30, TimeUnit.SECONDS, () -> false)) {
                 db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "30");
-                Object token = db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY);
+                Object token = db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY);
                 CountDownLatch waiting = new CountDownLatch(1);
                 db.afterWebApiQuery((sql, params) -> {
-                    if (params.length == 1 && SchemaUpgradeLock.KEY.equals(params[0])) waiting.countDown();
+                    if (params.length == 1 && DistributedLock.SCHEMA_UPGRADE_KEY.equals(params[0])) waiting.countDown();
                 });
                 StopConfig config = new StopConfig();
                 AtomicBoolean closed = new AtomicBoolean();
@@ -117,7 +120,7 @@ public class SchemaMigrationStopTest {
                     workers.submit(config::stop).get(3, TimeUnit.SECONDS);
                     assertThrows(ExecutionException.class, () -> startup.get(3, TimeUnit.SECONDS));
                     assertTrue(closed.get());
-                    assertEquals(token, db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+                    assertEquals(token, db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
                     assertEquals("30", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
                 } finally {
                     workers.shutdownNow();
@@ -151,11 +154,11 @@ public class SchemaMigrationStopTest {
                 StopConfig config = new StopConfig();
                 try {
                     assertThrows(DatabaseInitializationException.class, () -> config.start(borrowedSource(db, closed)));
-                    assertNotNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+                    assertNotNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
                     assertFalse(closed.get());
                     config.stop();
                     assertTrue(closed.get());
-                    assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+                    assertNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
                     assertEquals("31", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
                 } finally { config.stop(); }
             }

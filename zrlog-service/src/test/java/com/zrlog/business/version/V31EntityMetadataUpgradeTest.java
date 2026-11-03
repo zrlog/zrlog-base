@@ -5,6 +5,8 @@ import com.zrlog.business.service.DbUpgradeService;
 import com.zrlog.common.CacheService;
 import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.data.service.DistributedLock;
+import com.zrlog.data.di.DaggerDataComponent;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -97,7 +99,7 @@ public class V31EntityMetadataUpgradeTest {
             assertEquals(0L, ((Number) db.scalar("SELECT count(createdAt) FROM log")).longValue());
             assertEquals(Timestamp.valueOf("2010-01-01 00:00:00").getTime(), time(db.scalar("SELECT commTime FROM comment")));
             assertEquals(Timestamp.valueOf("2020-01-01 00:00:00").getTime(), time(db.scalar("SELECT td FROM comment")));
-            assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+            assertNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
             // A second cold start with a stale cached version must not replay conversion.
             new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
             new V31EntityMetadataUpgrade(db.dataSource()).run();
@@ -114,7 +116,7 @@ public class V31EntityMetadataUpgradeTest {
             assertThrows(IllegalStateException.class, () -> new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade());
             assertEquals("30", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
             assertEquals(Long.MAX_VALUE, ((Number) db.scalar("SELECT createdAt FROM user_passkey_challenge")).longValue());
-            assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+            assertNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
         }
     }
 
@@ -125,18 +127,19 @@ public class V31EntityMetadataUpgradeTest {
             ExecutorService executor = Executors.newSingleThreadExecutor();
             try {
                 Future<?> coldStart;
-                try (SchemaUpgradeLock lock = SchemaUpgradeLock.acquire(db.dataSource())) {
-                    Object owner = db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY);
+                try (DistributedLock lock = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).lockManager()
+                        .acquire(DistributedLock.SCHEMA_UPGRADE_KEY, 30, TimeUnit.SECONDS, () -> false)) {
+                    Object owner = db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY);
                     coldStart = executor.submit(() -> new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade());
                     assertThrows(TimeoutException.class, () -> coldStart.get(200, TimeUnit.MILLISECONDS));
                     assertEquals("30", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
-                    assertEquals(owner, db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+                    assertEquals(owner, db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
                     new V31EntityMetadataUpgrade(db.dataSource()).run();
                     db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "31");
                 }
                 coldStart.get(5, TimeUnit.SECONDS);
                 assertEquals("31", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
-                assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+                assertNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
             } finally {
                 executor.shutdownNow();
                 assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
@@ -149,10 +152,10 @@ public class V31EntityMetadataUpgradeTest {
         try (ZrLogTestDatabase db = open()) {
             new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
             // A completed migration's final DELETE may have lost its response or never reached D1.
-            db.putWebsite(SchemaUpgradeLock.KEY, "previous-owner");
+            db.putWebsite(DistributedLock.SCHEMA_UPGRADE_KEY, "previous-owner");
             new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
             assertEquals("31", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
-            assertEquals("previous-owner", db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+            assertEquals("previous-owner", db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
         }
     }
 
@@ -190,7 +193,7 @@ public class V31EntityMetadataUpgradeTest {
             new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
             assertEquals("31", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
             assertTrue("Empty migration made " + requests.get() + " remote calls", requests.get() <= 100);
-            assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+            assertNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
         }
     }
 
@@ -215,7 +218,7 @@ public class V31EntityMetadataUpgradeTest {
                 assertEquals("31", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
                 assertEquals(original, time(db.scalar("SELECT createdAt FROM user_passkey_challenge")));
                 assertEquals(original + 300000, ((Number) db.scalar("SELECT expiresAt FROM user_passkey_challenge")).longValue());
-                assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+                assertNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
             }
         }
     }
@@ -228,7 +231,7 @@ public class V31EntityMetadataUpgradeTest {
             assertThrows(IllegalStateException.class, () -> new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade());
             assertEquals("30", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
             assertEquals(-1, ((Number) db.scalar("SELECT version FROM log WHERE title='invalid-version'")).intValue());
-            assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+            assertNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
         }
     }
 }

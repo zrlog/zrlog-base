@@ -53,11 +53,8 @@ public class UserPreferenceStore {
     }
 
     public String raw(int userId) throws SQLException {
-        Object value =
-                userProvider
-                        .get()
-                        .queryFirstObj("select preferences from user where userId=?", userId);
-        return value == null ? null : value.toString();
+        User user = userProvider.get().loadById((long) userId);
+        return user == null ? null : user.getPreferences();
     }
 
     public JsonObject parseStored(String raw) {

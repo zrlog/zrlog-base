@@ -1,6 +1,7 @@
 package com.zrlog.data.service;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import com.zrlog.data.repository.UserRepository;
 import com.zrlog.test.support.ZrLogTestDatabase;
@@ -16,6 +17,8 @@ public class UserPreferenceStoreTest {
                 user.execute("insert into user(userId,userName) values(2,'two')");
                 UserPreferenceStore store =
                         new UserPreferenceStore(() -> new UserRepository(ignored.dataSource()));
+                assertNull(store.raw(999));
+                assertNull(store.raw(1));
                 assertEquals(1440, store.sessionTimeoutMinutes(1, 1440));
                 store.mutate(
                         1,

@@ -4,6 +4,9 @@ import static org.junit.Assert.*;
 
 import com.hibegin.common.dao.entity.EntityRepository;
 import com.hibegin.common.dao.entity.OptimisticLockException;
+import com.zrlog.common.cache.dto.LinkDTO;
+import com.zrlog.common.cache.dto.LogNavDTO;
+import com.zrlog.common.cache.dto.TagDTO;
 import com.zrlog.model.Comment;
 import com.zrlog.model.Log;
 import com.zrlog.test.support.ZrLogTestDatabase;
@@ -36,6 +39,73 @@ public class EntityRepositoryDatabaseTest {
         return backend.equals("WEB_API")
                 ? ZrLogTestDatabase.openWebApi()
                 : ZrLogTestDatabase.open(ZrLogTestDatabase.DatabaseType.valueOf(backend));
+    }
+
+    @Test
+    public void publicListsPreserveOrderingNavigationFiltersAndNullableFields() throws Exception {
+        try (ZrLogTestDatabase db = open()) {
+            db.update(
+                    "INSERT INTO link(linkId,linkName,sort,url,alt,icon) VALUES(?,?,?,?,?,?)",
+                    1,
+                    "Later",
+                    20,
+                    "/later",
+                    "Later link",
+                    "later-icon");
+            db.update("INSERT INTO link(linkId,linkName,sort) VALUES(?,?,?)", 2, "Earlier", 10);
+            List<LinkDTO> links = new LinkRepository(db.dataSource()).findAll();
+            assertEquals(2, links.size());
+            assertEquals(Long.valueOf(2), links.get(0).getId());
+            assertEquals("Earlier", links.get(0).getLinkName());
+            assertEquals(Long.valueOf(10), links.get(0).getSort());
+            assertNull(links.get(0).getUrl());
+            assertNull(links.get(0).getAlt());
+            assertNull(links.get(0).getIcon());
+            assertEquals("/later", links.get(1).getUrl());
+            assertEquals("Later link", links.get(1).getAlt());
+            assertEquals("later-icon", links.get(1).getIcon());
+
+            db.update(
+                    "INSERT INTO lognav(navId,navName,url,sort,icon) VALUES(?,?,?,?,?)",
+                    1,
+                    "Later",
+                    "/later",
+                    20,
+                    "nav-icon");
+            db.update(
+                    "INSERT INTO lognav(navId,navName,url,sort) VALUES(?,?,?,?)",
+                    2,
+                    "Earlier",
+                    "/earlier",
+                    10);
+            db.update(
+                    "INSERT INTO lognav(navId,navName,url,sort) VALUES(?,?,?,?)",
+                    3,
+                    null,
+                    "/hidden",
+                    0);
+            db.update(
+                    "INSERT INTO lognav(navId,navName,url,sort) VALUES(?,?,?,?)",
+                    4,
+                    "Hidden",
+                    null,
+                    0);
+            List<LogNavDTO> navs = new LogNavRepository(db.dataSource()).findAll();
+            assertEquals(2, navs.size());
+            assertEquals(Long.valueOf(2), navs.get(0).getId());
+            assertEquals("Earlier", navs.get(0).getNavName());
+            assertEquals("/earlier", navs.get(0).getUrl());
+            assertEquals(Long.valueOf(10), navs.get(0).getSort());
+            assertNull(navs.get(0).getIcon());
+            assertEquals("nav-icon", navs.get(1).getIcon());
+
+            db.update("INSERT INTO tag(tagId,text,count) VALUES(?,?,?)", 1, "java", 3);
+            List<TagDTO> tags = new TagRepository(db.dataSource()).findAll();
+            assertEquals(1, tags.size());
+            assertEquals(Long.valueOf(1), tags.get(0).getId());
+            assertEquals("java", tags.get(0).getText());
+            assertEquals(Long.valueOf(3), tags.get(0).getCount());
+        }
     }
 
     @Test

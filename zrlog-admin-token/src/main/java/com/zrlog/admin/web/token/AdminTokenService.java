@@ -17,6 +17,7 @@ import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.data.repository.UserRepository;
 import com.zrlog.data.security.AccountAccess;
 import com.zrlog.data.service.UserPreferenceStore;
+import com.zrlog.model.User;
 import com.zrlog.util.CrossUtils;
 import com.zrlog.util.ParseUtil;
 import jakarta.inject.Inject;
@@ -150,12 +151,8 @@ public class AdminTokenService implements TokenService {
             if (!account.isEnabled()) return null;
             String sk = userSecretKeyCacheMap.get(userId);
             if (Objects.isNull(sk)) {
-                sk =
-                        (String)
-                                users.get()
-                                        .queryFirstObj(
-                                                "SELECT secretKey FROM user WHERE userId=?",
-                                                userId);
+                User user = users.get().loadById((long) userId);
+                sk = user == null ? null : user.getSecretKey();
                 if (Objects.isNull(sk)) {
                     return null;
                 }

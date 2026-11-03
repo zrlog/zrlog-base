@@ -20,6 +20,11 @@
             <groupId>com.hibegin</groupId>
             <artifactId>zrlog-data</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.hibegin</groupId>
+            <artifactId>zrlog-test-support</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

@@ -26,7 +26,15 @@ public class TagRepository extends BaseRepository<Tag, Long> {
     }
 
     public List<TagDTO> findAll() throws SQLException {
-        return queryList("select tagId as id,text,count from tag", TagDTO.class);
+        List<TagDTO> result = new ArrayList<>();
+        for (Tag row : select("")) {
+            TagDTO item = new TagDTO();
+            item.setId(row.getId());
+            item.setText(row.getText());
+            item.setCount(row.getCount() == null ? null : row.getCount().longValue());
+            result.add(item);
+        }
+        return result;
     }
 
     private Set<String> strToSet(String str) {
@@ -76,7 +84,7 @@ public class TagRepository extends BaseRepository<Tag, Long> {
     }
 
     public List<TagDTO> refreshTag() throws SQLException {
-        execute("delete from " + tableName);
+        deleteWhere("1=1");
         // Preserve the first spelling and merge case variants before the unique-index insert.
         Map<String, Integer> countMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         List<com.zrlog.data.dto.ArticleBasicDTO> logs =
@@ -185,7 +193,7 @@ public class TagRepository extends BaseRepository<Tag, Long> {
                                 new java.sql.Timestamp(System.currentTimeMillis()).toString(),
                                 t.getId());
                     } else {
-                        execute("DELETE FROM tag WHERE tagId=? AND count<=1", t.getId());
+                        deleteWhere("tagId=? AND count<=1", t.getId());
                     }
                 }
             } catch (SQLException e) {

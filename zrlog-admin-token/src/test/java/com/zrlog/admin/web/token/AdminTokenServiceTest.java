@@ -7,6 +7,9 @@ import com.hibegin.http.server.api.HttpResponse;
 import com.hibegin.http.server.web.cookie.Cookie;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.vo.AdminFullTokenVO;
+import com.zrlog.data.repository.UserRepository;
+import com.zrlog.data.service.UserPreferenceStore;
+import com.zrlog.test.support.ZrLogTestDatabase;
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
@@ -18,8 +21,6 @@ import org.junit.Test;
 
 public class AdminTokenServiceTest {
 
-    // TODO: Cover the DAO-backed secret lookup path with an isolated DataSource fixture.
-    // The current unit tests intentionally avoid bootstrapping the shared DAO/global config stack.
     private final Map<Integer, Long> personalTimeouts = new HashMap<>();
     // Keep encrypted fixtures deterministic, including the wrong-key padding failure.
     private boolean installed = true;
@@ -140,6 +141,57 @@ public class AdminTokenServiceTest {
     @After
     public void tearDown() {
         AdminTokenThreadLocal.remove();
+    }
+
+    @Test
+    public void shouldLoadUncachedTokenSecretsAndRejectRevokedOrDisabledAccounts()
+            throws Exception {
+        for (String backend : List.of("H2", "SQLITE", "WEB_API")) {
+            try (ZrLogTestDatabase db =
+                    backend.equals("WEB_API")
+                            ? ZrLogTestDatabase.openWebApi()
+                            : ZrLogTestDatabase.open(
+                                    ZrLogTestDatabase.DatabaseType.valueOf(backend))) {
+                db.update(
+                        "INSERT INTO user(userId,userName,role,enabled,authVersion,secretKey) VALUES(?,?,?,?,?,?)",
+                        7,
+                        "owner",
+                        "owner",
+                        true,
+                        0,
+                        "secret-key");
+                AdminTokenService service =
+                        new AdminTokenService(
+                                30,
+                                () -> true,
+                                () -> false,
+                                () -> new UserRepository(db.dataSource()),
+                                () ->
+                                        new UserPreferenceStore(
+                                                () -> new UserRepository(db.dataSource()))) {
+                            @Override
+                            protected long currentTimeMillis() {
+                                return now;
+                            }
+                        };
+                Cookie cookie = createAdminCookie(service, "secret-key");
+                HttpRequest request =
+                        request("/admin", header(cookie.getValue()), null, new HashMap<>());
+
+                AdminFullTokenVO parsed = service.getAdminTokenVO(request);
+                assertNotNull(parsed);
+                assertEquals(7, parsed.getUserId());
+                assertEquals("secret-key", parsed.getSecretKey());
+                assertEquals("session-id", parsed.getSessionId());
+
+                db.update("UPDATE user SET enabled=? WHERE userId=?", false, 7);
+                assertNull(service.getAdminTokenVO(request));
+                db.update("UPDATE user SET enabled=?,authVersion=? WHERE userId=?", true, 1, 7);
+                assertNull(service.getAdminTokenVO(request));
+                db.update("DELETE FROM user WHERE userId=?", 7);
+                assertNull(service.getAdminTokenVO(request));
+            }
+        }
     }
 
     @Test

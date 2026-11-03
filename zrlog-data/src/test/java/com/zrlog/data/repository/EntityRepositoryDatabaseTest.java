@@ -199,7 +199,9 @@ public class EntityRepositoryDatabaseTest {
             repository.update(row);
             assertNull(row.getCreatedAt());
             assertEquals(Integer.valueOf(7), row.getAuthVersion());
-            repository.updatePassword(1, "new-password");
+            var passwordUpdate = repository.loadById(1L);
+            passwordUpdate.setPassword("new-password");
+            repository.update(passwordUpdate);
             row.setEmail("stale@example.com");
             assertThrows(OptimisticLockException.class, () -> repository.update(row));
             var saved = repository.loadById(1L);

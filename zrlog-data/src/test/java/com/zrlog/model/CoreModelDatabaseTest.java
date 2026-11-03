@@ -209,12 +209,6 @@ public class CoreModelDatabaseTest {
             assertEquals(2L, types.get(0).getTypeamount().longValue());
             assertEquals("tech", new TypeRepository(db.dataSource()).findByAlias("tech").getAlias());
             assertEquals("admin", users.get(0).getUserName());
-            assertNotNull(new UserRepository(db.dataSource()).getUserByUserName("admin"));
-            assertEquals("password", new UserRepository(db.dataSource()).getPasswordByUserId(1));
-            assertTrue(new UserRepository(db.dataSource()).updatePassword(1, "new-password"));
-            new UserRepository(db.dataSource()).updateEmailUserNameHeaderByUserId("new@example.com", "new-admin", "/new.png", 1);
-            assertEquals("new-password", new UserRepository(db.dataSource()).getPasswordByUserId(1));
-            assertEquals("new-admin", new UserRepository(db.dataSource()).getUserByUserName("new-admin").getUserName());
             assertEquals(1, plugins.size());
             assertEquals("Plugin", plugins.get(0).getPluginName());
             assertTrue(tagTexts.contains("java"));

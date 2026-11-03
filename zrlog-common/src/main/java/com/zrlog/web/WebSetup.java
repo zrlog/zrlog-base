@@ -21,6 +21,10 @@ public interface WebSetup {
     default void onDatabaseReady(DataSourceWrapper dataSource) throws Exception {
     }
 
+    /** Stop module-owned work and release its database locks before the datasource closes. */
+    default void stop() {
+    }
+
     default Plugins getPlugins() {
         return new Plugins();
     }

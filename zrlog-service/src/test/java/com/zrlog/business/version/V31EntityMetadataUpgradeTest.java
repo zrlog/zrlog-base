@@ -11,7 +11,13 @@ import org.junit.runners.Parameterized;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
 
@@ -99,13 +105,37 @@ public class V31EntityMetadataUpgradeTest {
     public void serializesColdStartsWithoutExpiringAnActiveMigrationLock() throws Exception {
         try (ZrLogTestDatabase db = open()) {
             db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "30");
-            try (SchemaUpgradeLock lock = SchemaUpgradeLock.acquire(db.dataSource())) {
-                assertThrows(IllegalStateException.class, () -> new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade());
-                assertEquals("30", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
-                assertNotNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            try {
+                Future<?> coldStart;
+                try (SchemaUpgradeLock lock = SchemaUpgradeLock.acquire(db.dataSource())) {
+                    Object owner = db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY);
+                    coldStart = executor.submit(() -> new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade());
+                    assertThrows(TimeoutException.class, () -> coldStart.get(200, TimeUnit.MILLISECONDS));
+                    assertEquals("30", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+                    assertEquals(owner, db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+                    new V31EntityMetadataUpgrade(db.dataSource()).run();
+                    db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "31");
+                }
+                coldStart.get(5, TimeUnit.SECONDS);
+                assertEquals("31", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+                assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+            } finally {
+                executor.shutdownNow();
+                assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
             }
+        }
+    }
+
+    @Test
+    public void staleStartupVersionDoesNotAcquireLockForAnAlreadyCompletedUpgrade() throws Exception {
+        try (ZrLogTestDatabase db = open()) {
+            new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
+            // A completed migration's final DELETE may have lost its response or never reached D1.
+            db.putWebsite(SchemaUpgradeLock.KEY, "previous-owner");
             new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
             assertEquals("31", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+            assertEquals("previous-owner", db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
         }
     }
 
@@ -130,6 +160,58 @@ public class V31EntityMetadataUpgradeTest {
                 assertEquals(time, time(db.scalar("SELECT createdAt FROM user_passkey_challenge")));
                 assertEquals(1L, ((Number) db.scalar("SELECT count(*) FROM user_passkey_challenge")).longValue());
             }
+        }
+    }
+
+    @Test
+    public void migratesEmptyHistoricalDatabaseWithinWebApiRequestBudget() throws Exception {
+        org.junit.Assume.assumeTrue(backend.equals("WEB_API"));
+        try (ZrLogTestDatabase db = open()) {
+            AtomicInteger requests = new AtomicInteger();
+            db.beforeWebApiUpdate((sql, params) -> requests.incrementAndGet());
+            db.afterWebApiQuery((sql, params) -> requests.incrementAndGet());
+            new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
+            assertEquals("31", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+            assertTrue("Empty migration made " + requests.get() + " remote calls", requests.get() <= 100);
+            assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+        }
+    }
+
+    @Test
+    public void reconcilesCommittedDdlAfterLostWebApiResponses() throws Exception {
+        org.junit.Assume.assumeTrue(backend.equals("WEB_API"));
+        for (String boundary : new String[]{"ADD COLUMN `createdAt_v31`", "RENAME COLUMN `createdAt`",
+                "RENAME COLUMN `createdAt_v31`", "DROP COLUMN `createdAt_epoch_v31`"}) {
+            try (ZrLogTestDatabase db = open()) {
+                long original = Timestamp.valueOf("2024-05-06 07:08:09.987").getTime();
+                db.update("INSERT INTO user_passkey_challenge(requestId,ceremony,requestJson,createdAt,expiresAt) VALUES(?,?,?,?,?)",
+                        "lost-response", "authentication", "{}", original, original + 300000);
+                AtomicBoolean failed = new AtomicBoolean();
+                db.beforeWebApiUpdate((sql, params) -> {
+                    if (sql.contains("`user_passkey_challenge`") && sql.contains(boundary) && failed.compareAndSet(false, true)) {
+                        db.update(sql, params);
+                        throw new SQLException("Committed DDL but lost its response");
+                    }
+                });
+                new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
+                assertTrue(failed.get());
+                assertEquals("31", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+                assertEquals(original, time(db.scalar("SELECT createdAt FROM user_passkey_challenge")));
+                assertEquals(original + 300000, ((Number) db.scalar("SELECT expiresAt FROM user_passkey_challenge")).longValue());
+                assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+            }
+        }
+    }
+
+    @Test
+    public void rejectsNegativeExistingVersionsWithoutAdvancingSchema() throws Exception {
+        try (ZrLogTestDatabase db = open()) {
+            db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "30");
+            db.update("INSERT INTO log(title,version) VALUES(?,?)", "invalid-version", -1);
+            assertThrows(IllegalStateException.class, () -> new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade());
+            assertEquals("30", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+            assertEquals(-1, ((Number) db.scalar("SELECT version FROM log WHERE title='invalid-version'")).intValue());
+            assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
         }
     }
 }

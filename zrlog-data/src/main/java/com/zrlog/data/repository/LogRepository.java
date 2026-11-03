@@ -4,13 +4,11 @@ import com.zrlog.model.Log;
 
 
 import com.hibegin.common.dao.DataSourceWrapper;
-import com.hibegin.common.dao.ResultBeanUtils;
 import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.hibegin.common.dao.dto.OrderBy;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequest;
 import com.hibegin.common.dao.dto.PageRequestImpl;
-import com.hibegin.common.util.BeanUtil;
 import com.hibegin.common.util.StringUtils;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
@@ -74,18 +72,12 @@ public class LogRepository extends BaseRepository<Log, Long> implements Serializ
         if (idOrAlias instanceof Number || ParseUtil.isNumeric(String.valueOf(idOrAlias))) {
             String sql =
                     "select l.*,last_update_date as lastUpdateDate,u.userName,u.header as header,(select count(commentId) from " + CommentRepository.TABLE_NAME + " where logId=l.logId) commentSize ,t.alias as typeAlias,t.typeName as typeName  from " + tableName + " l inner join user u,type t where t.typeId=l.typeId and u.userId=l.userId and rubbish=? and privacy=? and l.logId=?";
-            Map<String, Object> log = queryFirstWithParams(sql, false, false, idOrAlias);
-            if (log != null) {
-                detail = ResultBeanUtils.convert(log, ArticleDetailDTO.class);
-            }
+            detail = queryOne(sql, ArticleDetailDTO.class, false, false, idOrAlias);
         }
         if (Objects.isNull(detail)) {
             String sql =
                     "select l.*,last_update_date as lastUpdateDate,u.userName,u.header as header,(select count(commentId) from " + CommentRepository.TABLE_NAME + " where logId=l.logId) commentSize ,t.alias as typeAlias,t.typeName as typeName  from " + tableName + " l inner join user u,type t where t.typeId=l.typeId and u.userId=l.userId and rubbish=? and privacy=? and l.alias=?";
-            Map<String, Object> log = queryFirstWithParams(sql, false, false, String.valueOf(idOrAlias));
-            if (Objects.nonNull(log)) {
-                detail = ResultBeanUtils.convert(log, ArticleDetailDTO.class);
-            }
+            detail = queryOne(sql, ArticleDetailDTO.class, false, false, String.valueOf(idOrAlias));
         }
         if (Objects.isNull(detail)) {
             return null;
@@ -152,31 +144,31 @@ public class LogRepository extends BaseRepository<Log, Long> implements Serializ
         if (idOrAlias instanceof Number || ParseUtil.isNumeric(String.valueOf(idOrAlias))) {
             String sql =
                     "select l.*,last_update_date as lastUpdateDate,u.userName,u.header as header,(select count(commentId) from " + CommentRepository.TABLE_NAME + " where logId=l.logId) commentSize ,t.alias as typeAlias,t.typeName as typeName  from " + tableName + " l inner join user u,type t where t.typeId=l.typeId and u.userId=l.userId and l.logId=?";
-            Map<String, Object> log = queryFirstWithParams(sql, idOrAlias);
+            ArticleBasicDTO log = queryOne(sql, ArticleBasicDTO.class, idOrAlias);
             if (log != null) {
-                return ResultBeanUtils.convert(log, ArticleBasicDTO.class);
+                return log;
             }
         }
         String sql =
                 "select l.*,last_update_date as lastUpdateDate,u.userName,u.header as header,(select count(commentId) from " + CommentRepository.TABLE_NAME + " where logId=l.logId) commentSize ,t.alias as typeAlias,t.typeName as typeName  from " + tableName + " l inner join user u,type t where t.typeId=l.typeId and u.userId=l.userId and l.alias=?";
-        Map<String, Object> log = queryFirstWithParams(sql, String.valueOf(idOrAlias));
+        ArticleBasicDTO log = queryOne(sql, ArticleBasicDTO.class, String.valueOf(idOrAlias));
         if (Objects.isNull(log)) {
             return null;
         }
-        return ResultBeanUtils.convert(log, ArticleBasicDTO.class);
+        return log;
     }
 
     private ArticleDetailDTO.LastLogDTO findLastLog(int id) throws SQLException {
         String lastLogSql =
                 "select l.alias as alias,l.title as title from " + tableName + " l where rubbish=? and " + "privacy" + "=? and l.logId<? order by logId desc limit 1";
-        return BeanUtil.convert(queryFirstWithParams(lastLogSql, false, false, id), ArticleDetailDTO.LastLogDTO.class);
+        return queryOne(lastLogSql, ArticleDetailDTO.LastLogDTO.class, false, false, id);
 
     }
 
     private ArticleDetailDTO.NextLogDTO findNextLog(int id) throws SQLException {
         String nextLogSql =
                 "select l.alias as alias,l.title as title from " + tableName + " l where rubbish=? and " + "privacy" + "=? and l.logId>? limit 1";
-        return BeanUtil.convert(queryFirstWithParams(nextLogSql, false, false, id), ArticleDetailDTO.NextLogDTO.class);
+        return queryOne(nextLogSql, ArticleDetailDTO.NextLogDTO.class, false, false, id);
     }
 
     public long findMaxId() throws SQLException {
@@ -283,11 +275,11 @@ public class LogRepository extends BaseRepository<Log, Long> implements Serializ
     }
 
     public Map<String, Long> getArchives() throws SQLException {
-        List<Map<String, Object>> lo =
-                queryListWithParams("select releaseTime from " + tableName + "  where rubbish=? and privacy=? " + "order by " + "releaseTime desc", false, false);
+        List<ArticleBasicDTO> lo =
+                queryList("select releaseTime from " + tableName + "  where rubbish=? and privacy=? " + "order by " + "releaseTime desc", ArticleBasicDTO.class, false, false);
         Map<String, Long> archives = new LinkedHashMap<>();
-        for (Map<String, Object> entry : lo) {
-            Object value = entry.get("releaseTime");
+        for (ArticleBasicDTO entry : lo) {
+            Object value = entry.getReleaseTime();
             if (value != null) {
                 String key = ResultValueConvertUtils.formatDate(value, "yyyy_MM");
                 if (archives.containsKey(key)) {
@@ -301,10 +293,10 @@ public class LogRepository extends BaseRepository<Log, Long> implements Serializ
     }
 
     public Map<String, Long> getAdminArticleData() throws SQLException {
-        List<Map<String, Object>> lo = queryListWithParams("select releaseTime from " + tableName + " order by releaseTime desc");
+        List<ArticleBasicDTO> lo = queryList("select releaseTime from " + tableName + " order by releaseTime desc", ArticleBasicDTO.class);
         Map<String, Long> archives = new LinkedHashMap<>();
-        for (Map<String, Object> entry : lo) {
-            Object value = entry.get("releaseTime");
+        for (ArticleBasicDTO entry : lo) {
+            Object value = entry.getReleaseTime();
             if (Objects.isNull(value)) {
                 continue;
             }

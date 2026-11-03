@@ -71,7 +71,7 @@ public class AdminTokenService implements TokenService {
     }
 
     protected AccountAccess loadAccount(int userId) throws SQLException {
-        return AccountAccess.from(users.get().loadById(userId));
+        return AccountAccess.from(users.get().loadById((long) userId));
     }
 
     @Override

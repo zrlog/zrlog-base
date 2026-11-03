@@ -1,7 +1,6 @@
 package com.zrlog.data.cache;
 
 import com.google.gson.Gson;
-import com.hibegin.common.dao.ResultBeanUtils;
 import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.ObjectUtil;
 import com.hibegin.common.util.StringUtils;
@@ -195,7 +194,7 @@ public class CacheServiceImpl implements CacheService {
             }
         }
         try {
-            return ResultBeanUtils.convert(users.get().loadById(userId), UserBasicDTO.class);
+            return users.get().findBasicById(userId);
         } catch (SQLException e) {
             throw new DAOException(e);
         }

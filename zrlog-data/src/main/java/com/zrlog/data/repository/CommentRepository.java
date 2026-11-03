@@ -17,8 +17,6 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 
 /**
  * 对应数据里面的 comment 表，用于存放文章对应的评论信息。
@@ -61,31 +59,28 @@ public class CommentRepository extends BaseRepository<Comment, Long> {
         return ((Number) queryFirstObj(sql, new SimpleDateFormat("yyyy-MM-dd").format(new Date()))).longValue();
     }
 
-    public List<Map<String, Object>> findHaveReadIsFalse() throws SQLException {
-        String sql = "select commentId as id,userComment,header,userMail,userHome,userIp,userName,hide,logId from " + tableName + " where have_read = ?  order by commTime desc ";
-        return queryListWithParams(sql, false);
+    public List<Comment> findHaveReadIsFalse() throws SQLException {
+        return select("WHERE have_read=? ORDER BY commTime DESC", false);
     }
 
-    public List<Map<String, Object>> findAllByLogId(int logId) throws SQLException {
-        List<Map<String, Object>> comments = queryListWithParams("select * from " + tableName + " where logId=?", logId);
-        for (Map<String, Object> comment : comments) {
-            comment.put("commTime", formatCommentTime(comment.get("commTime")));
-        }
-        return comments;
+    public List<Comment> findAllByLogId(int logId) throws SQLException {
+        return select("WHERE logId=?", logId);
     }
 
     public List<VisitorCommentDTO> visitorFindAllByLogId(int logId) throws SQLException {
-        List<Map<String, Object>> comments = queryListWithParams("select * from " + tableName + " where logId=?", logId);
-        for (Map<String, Object> comment : comments) {
-            comment.put("commTime", formatCommentTime(comment.get("commTime")));
-            String email = (String) comment.get("userMail");
-            if (Objects.isNull(email)) {
-                comment.put("gravatarId", "");
-            } else {
-                comment.put("gravatarId", SecurityUtils.md5(email));
-            }
+        List<VisitorCommentDTO> result = new java.util.ArrayList<>();
+        for (Comment row : findAllByLogId(logId)) {
+            VisitorCommentDTO comment = new VisitorCommentDTO();
+            comment.setId(row.getId());
+            comment.setUserComment(row.getUserComment());
+            comment.setHeader(row.getHeader());
+            comment.setCommTime(formatCommentTime(row.getCommTime()));
+            comment.setUserHome(row.getUserHome());
+            comment.setUserName(row.getUserName());
+            comment.setGravatarId(row.getUserMail() == null ? "" : SecurityUtils.md5(row.getUserMail()));
+            result.add(comment);
         }
-        return doConvertList(comments, VisitorCommentDTO.class);
+        return result;
     }
 
     public void doRead(long id) {

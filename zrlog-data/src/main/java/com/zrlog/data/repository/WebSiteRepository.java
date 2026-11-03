@@ -86,15 +86,15 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
         return WebSiteUtils.fillDefaultInfo(ResultBeanUtils.convert(getWebSiteByNameIn(websitePublicQueryKeys), PublicWebSiteInfo.class));
     }
 
-    private Map<String, Object> fillToMap(List<Map<String, Object>> lw, List<String> names) {
+    private Map<String, Object> fillToMap(List<WebSite> lw, List<String> names) {
         Map<String, Object> webSites = new LinkedHashMap<>();
         for (String name : names) {
             Object value = null;
             Object remark = null;
-            for (Map<String, Object> map : lw) {
-                if (Objects.equals(map.get("name"), name)) {
-                    value = map.get("value");
-                    remark = map.get("remark");
+            for (WebSite row : lw) {
+                if (Objects.equals(row.getName(), name)) {
+                    value = row.getValue();
+                    remark = row.getRemark();
                     break;
                 }
             }
@@ -108,7 +108,7 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
     }
 
     public Map<String, Object> getWebSiteByNameIn(List<String> names) {
-        List<Map<String, Object>> lw;
+        List<WebSite> lw;
         StringJoiner sj = new StringJoiner(",");
         Object[] params = new String[names.size()];
         for (int i = 0; i < params.length; i++) {
@@ -116,7 +116,7 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
             params[i] = names.get(i);
         }
         try {
-            lw = queryListWithParams("select name,remark,value from " + tableName + " where name in " + "(" + sj + ")", params);
+            lw = select("WHERE name IN (" + sj + ")", params);
         } catch (SQLException e) {
             throw new DAOException(e);
         }
@@ -124,13 +124,21 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
     }
 
     public boolean updateByKV(String name, Object value) throws SQLException {
-        if (queryFirstObj("select siteId from " + tableName + " where name=?", name) != null) {
-            return execute("update " + tableName + " set value=?,updatedAt=?,version=version+1 where name=?",
-                    value, new java.sql.Timestamp(System.currentTimeMillis()).toString(), name);
+        WebSite row = findByName(name);
+        if (row != null) {
+            row.setValue(value == null ? null : value.toString());
+            update(row);
         } else {
-            String now = new java.sql.Timestamp(System.currentTimeMillis()).toString();
-            return execute("insert INTO " + tableName + " (`value`,`name`,createdAt,updatedAt,version) VALUES (?,?,?,?,0)", value, name, now, now);
+            row = new WebSite();
+            row.setName(name);
+            row.setValue(value == null ? null : value.toString());
+            insert(row);
         }
+        return true;
+    }
+
+    public WebSite findByName(String name) throws SQLException {
+        return findMatching(Collections.singletonMap("name", name), 1).stream().findFirst().orElse(null);
     }
 
     public String getStringValueByName(String name) {

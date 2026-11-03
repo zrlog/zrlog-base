@@ -39,16 +39,16 @@ public class WebsiteKvServiceDatabaseTest {
             assertTrue(service.putString("feature.beta", "beta-value"));
 
             Map<String, Object> values = service.getByNames(List.of("feature.alpha", "feature.beta", "missing"));
-            List<Map<String, Object>> prefixed = service.listByPrefix("feature.");
+            List<WebsiteKvService.Entry> prefixed = service.listByPrefix("feature.");
 
             assertEquals("two", values.get("feature.alpha"));
             assertEquals("beta-value", values.get("feature.beta"));
             assertNull(values.get("missing"));
             assertEquals(2, prefixed.size());
-            assertEquals("feature.alpha", prefixed.get(0).get("name"));
-            assertEquals("feature.beta", prefixed.get(1).get("name"));
-            assertEquals("two", prefixed.get(0).get("value"));
-            assertEquals(3L, ((Number) prefixed.get(0).get("size")).longValue());
+            assertEquals("feature.alpha", prefixed.get(0).name);
+            assertEquals("feature.beta", prefixed.get(1).name);
+            assertEquals("two", prefixed.get(0).value);
+            assertEquals(3L, ((Number) prefixed.get(0).size).longValue());
 
             assertTrue(service.removeQuietly("feature.alpha"));
             assertEquals("", service.getString("feature.alpha"));
@@ -69,7 +69,7 @@ public class WebsiteKvServiceDatabaseTest {
                         firstService
                                 .getByNames(List.of("isolated.setting"))
                                 .get("isolated.setting"));
-                assertEquals("first", firstService.listByPrefix("isolated.").get(0).get("value"));
+                assertEquals("first", firstService.listByPrefix("isolated.").get(0).value);
 
                 assertTrue(firstService.putString("isolated.setting", "updated-first"));
                 assertEquals("updated-first", firstService.getString("isolated.setting"));

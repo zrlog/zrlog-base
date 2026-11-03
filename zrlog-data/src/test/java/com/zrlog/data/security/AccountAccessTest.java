@@ -10,7 +10,7 @@ import static org.junit.Assert.assertTrue;
 
 public class AccountAccessTest {
     private AccountAccess account(String role) {
-        return AccountAccess.from(Map.of("userId", 1, "role", role, "enabled", true, "authVersion", 0));
+        return AccountAccess.fromRow(Map.of("userId", 1, "role", role, "enabled", true, "authVersion", 0));
     }
 
     @Test

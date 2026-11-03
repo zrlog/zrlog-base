@@ -23,7 +23,7 @@ public class LinkRepository extends BaseRepository<Link, Long> {
     }
 
     public List<LinkDTO> findAll() throws SQLException {
-        return doConvertList(queryListWithParams("select linkName,linkId as id,sort,url,alt,icon from " + tableName + " order by sort"), LinkDTO.class);
+        return queryList("select linkName,linkId as id,sort,url,alt,icon from " + tableName + " order by sort", LinkDTO.class);
     }
 
     public PageData<LinkDTO> find(PageRequest page) {

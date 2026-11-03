@@ -4,7 +4,6 @@ import com.zrlog.model.Tag;
 
 
 import com.hibegin.common.dao.DataSourceWrapper;
-import com.hibegin.common.dao.ResultBeanUtils;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequest;
 import com.hibegin.common.util.LoggerUtil;
@@ -32,7 +31,7 @@ public class TagRepository extends BaseRepository<Tag, Long> {
     }
 
     public List<TagDTO> findAll() throws SQLException {
-        return doConvertList(queryList("tagId as id,text,count"), TagDTO.class);
+        return queryList("select tagId as id,text,count from tag", TagDTO.class);
     }
 
     private Set<String> strToSet(String str) {
@@ -85,17 +84,17 @@ public class TagRepository extends BaseRepository<Tag, Long> {
         execute("delete from " + tableName);
         // Preserve the first spelling and merge case variants before the unique-index insert.
         Map<String, Integer> countMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        List<Map<String, Object>> logs =
+        List<com.zrlog.data.dto.ArticleBasicDTO> logs =
                 new LogRepository(dataSource)
-                        .queryListWithParams(
+                        .queryList(
                                 "select keywords from "
                                         + LogRepository.TABLE_NAME
                                         + " where rubbish=? and privacy=? ",
-                                false,
+                                com.zrlog.data.dto.ArticleBasicDTO.class, false,
                                 false);
-        for (Map<String, Object> log : logs) {
-            if (StringUtils.isNotEmpty((String) log.get("keywords")) && !((String) log.get("keywords")).trim().isEmpty()) {
-                Set<String> tagSet = strToSet(log.get("keywords") + ",");
+        for (com.zrlog.data.dto.ArticleBasicDTO log : logs) {
+            if (StringUtils.isNotEmpty((String) log.getKeywords()) && !((String) log.getKeywords()).trim().isEmpty()) {
+                Set<String> tagSet = strToSet(log.getKeywords() + ",");
                 for (String tag : tagSet) {
                     countMap.merge(tag, 1, Integer::sum);
                 }
@@ -155,7 +154,7 @@ public class TagRepository extends BaseRepository<Tag, Long> {
     private void insertTag(Set<String> now) {
         for (String add : now) {
             try {
-                Map<String, Object> t = queryFirstWithParams("select * from " + tableName + " where text=?", add);
+                Tag t = select("WHERE text=? LIMIT 1", add).stream().findFirst().orElse(null);
                 if (t == null) {
                     Tag tag = new Tag();
                     tag.setText(add);
@@ -163,7 +162,7 @@ public class TagRepository extends BaseRepository<Tag, Long> {
                     insert(tag);
                 } else {
                     execute("UPDATE tag SET count=count+1,updatedAt=?,version=version+1 WHERE tagId=?",
-                            new java.sql.Timestamp(System.currentTimeMillis()).toString(), t.get(pk));
+                            new java.sql.Timestamp(System.currentTimeMillis()).toString(), t.getId());
                 }
             } catch (SQLException e) {
                 throw new DAOException(e);
@@ -174,7 +173,7 @@ public class TagRepository extends BaseRepository<Tag, Long> {
     private void deleteTag(Set<String> old) {
         for (String del : old) {
             try {
-                TagDTO t = ResultBeanUtils.convert(queryFirstWithParams("select *,tagId as id from " + tableName + " where text=?", del), TagDTO.class);
+                Tag t = select("WHERE text=? LIMIT 1", del).stream().findFirst().orElse(null);
                 if (t != null) {
                     if (t.getCount() > 1) {
                         execute("UPDATE tag SET count=count-1,updatedAt=?,version=version+1 WHERE tagId=? AND count>1",

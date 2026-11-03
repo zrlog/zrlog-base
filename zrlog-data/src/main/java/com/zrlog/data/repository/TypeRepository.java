@@ -24,8 +24,8 @@ public class TypeRepository extends BaseRepository<Type, Long> {
     }
 
     public List<TypeDTO> findAll() throws SQLException {
-        return doConvertList(queryListWithParams("select t.typeId as id,t.alias,t.typeName,t.remark,t.arrange_plugin,(select count(logId) from " + LogRepository.TABLE_NAME +
-                " where rubbish=? and privacy=? and typeid=t.typeid) as typeamount from " + tableName + " t", false, false), TypeDTO.class);
+        return queryList("select t.typeId as id,t.alias,t.typeName,t.remark,t.arrange_plugin,(select count(logId) from " + LogRepository.TABLE_NAME +
+                " where rubbish=? and privacy=? and typeid=t.typeid) as typeamount from " + tableName + " t", TypeDTO.class, false, false);
     }
 
     public PageData<TypeDTO> find(PageRequest page) {
@@ -33,8 +33,8 @@ public class TypeRepository extends BaseRepository<Type, Long> {
                 " where typeid=t.typeid) as typeamount from " + tableName + " t", page, new Object[0], TypeDTO.class);
     }
 
-    public Map<String, Object> findByAlias(String alias) throws SQLException {
-        return queryFirstWithParams("select * from " + tableName + " where alias=?", alias);
+    public Type findByAlias(String alias) throws SQLException {
+        return findMatching(Map.of("alias", alias), 1).stream().findFirst().orElse(null);
     }
 
 }

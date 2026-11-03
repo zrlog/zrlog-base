@@ -568,5 +568,20 @@
         "name": "version"
       }
     ]
+  },
+  {
+    "name": "com.zrlog.data.security.AccountAccess$Snapshot",
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "com.zrlog.data.dto.ArticleCounts",
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "com.zrlog.data.dto.CommentCounts",
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true
   }
 ]

@@ -10,6 +10,7 @@ import com.zrlog.business.service.*;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.data.di.DataComponent;
+import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.web.WebSetup;
 import com.zrlog.web.WebSetupContext;
@@ -79,9 +80,8 @@ public final class ServiceWebSetup implements WebSetup {
     @Override
     public void beforeDatabaseReady(DataSourceWrapper dataSource) throws java.sql.SQLException {
         // Read only the historical schema marker before cache construction or Entity-backed writes.
-        Object stored = new com.hibegin.common.dao.DAO(dataSource).queryFirstObj(
-                "SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY);
-        long sqlVersion = stored == null ? -1 : Long.parseLong(stored.toString());
+        String stored = new WebSiteRepository(dataSource).findValueByName(CacheService.ZRLOG_SQL_VERSION_KEY);
+        long sqlVersion = stored == null ? -1 : Long.parseLong(stored);
         if (sqlVersion >= 0) {
             DbUpgradeService upgrade;
             synchronized (migrationMonitor) {

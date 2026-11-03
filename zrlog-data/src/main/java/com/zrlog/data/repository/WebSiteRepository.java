@@ -162,6 +162,12 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
         return findMatching(Collections.singletonMap("name", name), 1).stream().findFirst().orElse(null);
     }
 
+    /** Nullable scalar read, including before the entity metadata columns have been migrated. */
+    public String findValueByName(String name) throws SQLException {
+        Object value = queryFirstObj("SELECT value FROM " + tableName + " WHERE name=?", name);
+        return value == null ? null : value.toString();
+    }
+
     public String getStringValueByName(String name) {
         try {
             Map<String, Object> webSiteByNameIn = getWebSiteByNameIn(Collections.singletonList(name));

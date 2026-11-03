@@ -3,6 +3,7 @@ package com.zrlog.business.version;
 import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.zrlog.business.service.DbUpgradeService;
 import com.zrlog.common.CacheService;
+import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -39,6 +40,22 @@ public class V31EntityMetadataUpgradeTest {
 
     private static long time(Object value) {
         return ResultValueConvertUtils.parseDate(value).longValue();
+    }
+
+    @Test
+    public void readsSchemaMarkerWithoutEntityMetadataAndPropagatesQueryFailures() throws Exception {
+        try (ZrLogTestDatabase db = open()) {
+            db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "30");
+            db.putWebsite("null-value", null);
+            WebSiteRepository website = new WebSiteRepository(db.dataSource());
+
+            assertEquals("30", website.findValueByName(CacheService.ZRLOG_SQL_VERSION_KEY));
+            assertNull(website.findValueByName("missing-value"));
+            assertNull(website.findValueByName("null-value"));
+
+            db.update("DROP TABLE website");
+            assertThrows(SQLException.class, () -> website.findValueByName(CacheService.ZRLOG_SQL_VERSION_KEY));
+        }
     }
 
     @Test

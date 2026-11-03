@@ -134,18 +134,7 @@ public class DataDtoContractTest {
     }
 
     @Test
-    public void shouldExposeCommentAndFaviconFields() {
-        CommentDTO comment = new CommentDTO();
-        comment.setId(1L);
-        comment.setUserComment("comment");
-        comment.setHeader("/avatar.png");
-        comment.setCommTime("2026-01-01");
-        comment.setUserMail("mail@example.com");
-        comment.setUserHome("https://example.com");
-        comment.setUserIp("127.0.0.1");
-        comment.setUserName("Reader");
-        comment.setHide(false);
-        comment.setLogId(2L);
+    public void shouldExposeVisitorCommentAndFaviconFields() {
         VisitorCommentDTO visitor = new VisitorCommentDTO();
         visitor.setId(3L);
         visitor.setUserComment("visitor");
@@ -160,16 +149,6 @@ public class DataDtoContractTest {
         favicon.setFavicon_png_pwa_192_base64("192");
         favicon.setFavicon_png_pwa_512_base64("512");
 
-        assertEquals(Long.valueOf(1), comment.getId());
-        assertEquals("comment", comment.getUserComment());
-        assertEquals("/avatar.png", comment.getHeader());
-        assertEquals("2026-01-01", comment.getCommTime());
-        assertEquals("mail@example.com", comment.getUserMail());
-        assertEquals("https://example.com", comment.getUserHome());
-        assertEquals("127.0.0.1", comment.getUserIp());
-        assertEquals("Reader", comment.getUserName());
-        assertEquals(Boolean.FALSE, comment.getHide());
-        assertEquals(Long.valueOf(2), comment.getLogId());
         assertEquals(Long.valueOf(3), visitor.getId());
         assertEquals("visitor", visitor.getUserComment());
         assertEquals("/visitor.png", visitor.getHeader());

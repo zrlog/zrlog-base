@@ -1,40 +1,30 @@
 package com.zrlog.model;
 
-import com.hibegin.common.dao.BasePageableDAO;
-import com.hibegin.common.dao.DataSourceWrapper;
-import com.hibegin.common.dao.dto.PageData;
-import com.hibegin.common.dao.dto.PageRequest;
-import com.zrlog.common.cache.dto.TypeDTO;
-import jakarta.inject.Inject;
+import com.hibegin.common.dao.entity.BaseEntity;
+import com.hibegin.common.dao.entity.Column;
+import com.hibegin.common.dao.entity.Entity;
 
-import java.sql.SQLException;
-import java.util.List;
-import java.util.Map;
+@Entity(table = "type", idColumn = "typeId", generatedId = true)
+public class Type extends BaseEntity<Long> {
+    private String alias;
+    private String remark;
+    private String typeName;
+    private Integer pid;
+    @Column("arrange_plugin")
+    private String arrangePlugin;
 
-/**
- * 存放文章的分类信息，对应数据的 type 表
- */
-public class Type extends BasePageableDAO {
+    public String getAlias() { return alias; }
+    public void setAlias(String alias) { this.alias = alias; }
 
-    @Inject
-    public Type(DataSourceWrapper dataSource) {
-        super(dataSource);
-        this.pk = "typeId";
-        this.tableName = "type";
-    }
+    public String getRemark() { return remark; }
+    public void setRemark(String remark) { this.remark = remark; }
 
-    public List<TypeDTO> findAll() throws SQLException {
-        return doConvertList(queryListWithParams("select t.typeId as id,t.alias,t.typeName,t.remark,t.arrange_plugin,(select count(logId) from " + Log.TABLE_NAME +
-                " where rubbish=? and privacy=? and typeid=t.typeid) as typeamount from " + tableName + " t", false, false), TypeDTO.class);
-    }
+    public String getTypeName() { return typeName; }
+    public void setTypeName(String typeName) { this.typeName = typeName; }
 
-    public PageData<TypeDTO> find(PageRequest page) {
-        return queryPageData("select t.typeId as id,t.alias,t.typeName,t.remark,t.arrange_plugin,(select count(logId) from " + Log.TABLE_NAME +
-                " where typeid=t.typeid) as typeamount from " + tableName + " t", page, new Object[0], TypeDTO.class);
-    }
+    public Integer getPid() { return pid; }
+    public void setPid(Integer pid) { this.pid = pid; }
 
-    public Map<String, Object> findByAlias(String alias) throws SQLException {
-        return queryFirstWithParams("select * from " + tableName + " where alias=?", alias);
-    }
-
+    public String getArrangePlugin() { return arrangePlugin; }
+    public void setArrangePlugin(String arrangePlugin) { this.arrangePlugin = arrangePlugin; }
 }

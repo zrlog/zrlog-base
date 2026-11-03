@@ -14,7 +14,7 @@ import com.zrlog.common.updater.UpdateVersionHandler;
 import com.zrlog.common.updater.UpgradeProgressEvent;
 import com.zrlog.common.updater.UpgradeProgressListener;
 import com.zrlog.common.vo.Version;
-import com.zrlog.model.WebSite;
+import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.util.BlogBuildInfoUtil;
 import org.junit.Rule;
 import org.junit.Test;
@@ -319,7 +319,7 @@ public class UpgradeServicePublicFlowTest {
         private int fetchFalseCount;
 
         FakeUpdateVersionInfoPlugin(Version version, DataSourceWrapper testDataSource) {
-            super(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSite(testDataSource))), () -> "zh_CN", null, new WebsiteKvService(() -> new WebSite(testDataSource)));
+            super(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSiteRepository(testDataSource))), () -> "zh_CN", null, new WebsiteKvService(() -> new WebSiteRepository(testDataSource)));
             this.version = version;
         }
 
@@ -356,7 +356,7 @@ public class UpgradeServicePublicFlowTest {
 
         TestableUpgradeService(boolean dockerMode, boolean systemServiceMode, boolean faasMode,
                                boolean faasOnlineUpgradeSupported, boolean warMode, boolean backupReady, DataSourceWrapper testDataSource) {
-            super(() -> null, new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSite(testDataSource))), backupProtection(backupReady, testDataSource), new WebsiteKvService(() -> new WebSite(testDataSource)));
+            super(() -> null, new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSiteRepository(testDataSource))), backupProtection(backupReady, testDataSource), new WebsiteKvService(() -> new WebSiteRepository(testDataSource)));
             this.dockerMode = dockerMode;
             this.systemServiceMode = systemServiceMode;
             this.faasMode = faasMode;
@@ -365,7 +365,7 @@ public class UpgradeServicePublicFlowTest {
         }
 
         private static BackupProtectionService backupProtection(boolean ready, DataSourceWrapper testDataSource) {
-            return new BackupProtectionService(new WebsiteKvService(() -> new WebSite(testDataSource))) {
+            return new BackupProtectionService(new WebsiteKvService(() -> new WebSiteRepository(testDataSource))) {
                 @Override
                 public BackupProtectionStatus getStatus() {
                     BackupProtectionStatus status = new BackupProtectionStatus();

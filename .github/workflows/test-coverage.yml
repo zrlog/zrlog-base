@@ -16,6 +16,24 @@ jobs:
     permissions:
       contents: read
 
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: zrlog_entity_migration_test
+          MYSQL_USER: zrlog_test
+          MYSQL_PASSWORD: local-test-only
+          MYSQL_ROOT_PASSWORD: local-root-test-only
+        ports: ['3306/tcp']
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      ZRLOG_MYSQL_TEST_USER: zrlog_test
+      ZRLOG_MYSQL_TEST_PASSWORD: local-test-only
+
     steps:
       - name: Checkout source code
         uses: actions/checkout@v7
@@ -27,8 +45,14 @@ jobs:
           java-version: '21'
           cache: maven
 
+      - name: Configure the disposable MySQL connection
+        run: echo 'ZRLOG_MYSQL_TEST_URL=jdbc:mysql://127.0.0.1:${{ job.services.mysql.ports[3306] }}/zrlog_entity_migration_test?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=LOCAL' >> "$GITHUB_ENV"
+
       - name: Run tests and generate coverage
-        run: ./mvnw -q org.jacoco:jacoco-maven-plugin:0.8.15:prepare-agent test org.jacoco:jacoco-maven-plugin:0.8.15:report
+        run: ./mvnw -q -U -Duser.timezone=Asia/Shanghai org.jacoco:jacoco-maven-plugin:0.8.15:prepare-agent test org.jacoco:jacoco-maven-plugin:0.8.15:report
+
+      - name: Verify UTC historical time migration
+        run: ./mvnw -B -ntp -Duser.timezone=UTC -Dtest=V31MySqlMetadataUpgradeTest -Dsurefire.failIfNoSpecifiedTests=false test
 
       - name: Build release Javadocs
         run: ./mvnw -B -ntp -DskipTests package javadoc:jar

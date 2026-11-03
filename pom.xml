@@ -26,7 +26,7 @@
         <maven.test.skip>false</maven.test.skip>
         <sws.version>4.1.17</sws.version>
         <zrlog-updater.version>4.0.1</zrlog-updater.version>
-        <zrlog-install-web.version>4.0.1</zrlog-install-web.version>
+        <zrlog-install-web.version>4.0.2-SNAPSHOT</zrlog-install-web.version>
         <h2.version>2.5.252</h2.version>
         <sqlite-jdbc.version>3.53.4.0</sqlite-jdbc.version>
         <project.build.outputTimestamp>2026-07-04T12:50:31Z</project.build.outputTimestamp>
@@ -192,7 +192,7 @@
             <dependency>
                 <groupId>com.hibegin</groupId>
                 <artifactId>common-dao</artifactId>
-                <version>1.1.16</version>
+                <version>1.2.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

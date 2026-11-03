@@ -105,8 +105,15 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
             dataSource = DataSourceUtil.buildDataSource(dbProperties);
         }
         if (webSetupsInitialized && !databaseInitialized) {
-            for (WebSetup webSetup : webSetups) {
-                webSetup.onDatabaseReady(dataSource);
+            try {
+                for (WebSetup webSetup : webSetups) {
+                    webSetup.beforeDatabaseReady(dataSource);
+                }
+                for (WebSetup webSetup : webSetups) {
+                    webSetup.onDatabaseReady(dataSource);
+                }
+            } catch (Exception failure) {
+                throw new com.zrlog.common.exception.DatabaseInitializationException(failure);
             }
             databaseInitialized = true;
         }

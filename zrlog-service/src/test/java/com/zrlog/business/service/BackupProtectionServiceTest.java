@@ -2,7 +2,7 @@ package com.zrlog.business.service;
 
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.business.rest.response.BackupProtectionStatus;
-import com.zrlog.model.WebSite;
+import com.zrlog.data.repository.WebSiteRepository;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -68,7 +68,7 @@ public class BackupProtectionServiceTest {
     }
 
     private BackupProtectionService service(Map<String, Object> values, DataSourceWrapper testDataSource) {
-        WebsiteKvService kvService = new WebsiteKvService(() -> new WebSite(testDataSource)) {
+        WebsiteKvService kvService = new WebsiteKvService(() -> new WebSiteRepository(testDataSource)) {
             @Override
             public Map<String, Object> getByNames(List<String> keys) {
                 return values;

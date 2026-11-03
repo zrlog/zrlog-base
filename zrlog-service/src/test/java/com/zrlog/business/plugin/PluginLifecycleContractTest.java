@@ -7,7 +7,7 @@ import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
-import com.zrlog.model.WebSite;
+import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.test.support.ZrLogTestDatabase;
@@ -331,10 +331,10 @@ public class PluginLifecycleContractTest {
         long previousLastAccessTime = Constants.getLastAccessTime();
         AtomicInteger refreshCount = new AtomicInteger();
         try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
-            new WebsiteKvService(() -> new WebSite(ignored.dataSource())).putString("cache_timeout_minutes", "0.001");
+            new WebsiteKvService(() -> new WebSiteRepository(ignored.dataSource())).putString("cache_timeout_minutes", "0.001");
             CacheManagerPlugin plugin =
                     new CacheManagerPlugin(
-                            countingCacheService(refreshCount), new WebsiteKvService(() -> new WebSite(ignored.dataSource())));
+                            countingCacheService(refreshCount), new WebsiteKvService(() -> new WebSiteRepository(ignored.dataSource())));
             try {
                 Constants.setLastAccessTime(System.currentTimeMillis() - 1_000);
 

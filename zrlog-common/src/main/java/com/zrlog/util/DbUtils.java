@@ -85,6 +85,9 @@ public class DbUtils {
         try {
             return zrLogConfig.configDatabase();
         } catch (Exception e) {
+            if (e instanceof com.zrlog.common.exception.DatabaseInitializationException) {
+                throw (com.zrlog.common.exception.DatabaseInitializationException) e;
+            }
             if (timeoutInSeconds > 0 && e instanceof SQLRecoverableException) {
                 int seekSeconds = 5;
                 try {

@@ -74,9 +74,11 @@ public final class ServiceWebSetup implements WebSetup {
     }
 
     @Override
-    public void onDatabaseReady(DataSourceWrapper dataSource) {
-        CacheService cache = config.getServerConfig().getBindings().build().get(CacheService.class);
-        long sqlVersion = cache.getCurrentSqlVersion();
+    public void beforeDatabaseReady(DataSourceWrapper dataSource) throws java.sql.SQLException {
+        // Read only the historical schema marker before cache construction or Entity-backed writes.
+        Object stored = new com.hibegin.common.dao.DAO(dataSource).queryFirstObj(
+                "SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY);
+        long sqlVersion = stored == null ? -1 : Long.parseLong(stored.toString());
         if (sqlVersion >= 0) {
             config.getServerConfig().getBindings().build().get(ServiceComponent.class)
                     .databaseUpgrades().create(sqlVersion).tryDoUpgrade();

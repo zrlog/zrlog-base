@@ -11,6 +11,10 @@ public interface WebSetup {
 
     void setup();
 
+    /** Runs versioned schema preparation before any module initializes database-backed services. */
+    default void beforeDatabaseReady(DataSourceWrapper dataSource) throws Exception {
+    }
+
     /**
      * Runs after all modules have registered and the database is available, including after installation.
      */

@@ -3,6 +3,7 @@ package com.zrlog.test.support;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.InMemoryDatabase;
 import com.hibegin.common.dao.SqlConvertUtils;
+import com.hibegin.common.dao.WebApiQueryRunner;
 import org.apache.commons.dbutils.QueryRunner;
 import org.apache.commons.dbutils.ResultSetHandler;
 
@@ -32,16 +33,16 @@ public final class ZrLogTestDatabase implements AutoCloseable {
     };
     private volatile SqlHook afterWebApiQuery = (sql, params) -> {
     };
-    private ZrLogTestDatabase(DatabaseType type) throws Exception {
+    private ZrLogTestDatabase(DatabaseType type, String schemaResource) throws Exception {
         sqliteFile = type == DatabaseType.SQLITE ? Files.createTempFile("zrlog-test-", ".db") : null;
         properties = sqliteFile == null ? InMemoryDatabase.h2Properties("zrlog_test_" + UUID.randomUUID())
                 : sqliteProperties(sqliteFile);
         InMemoryDatabase opened = null;
         try {
             opened = InMemoryDatabase.open(properties, false);
-            try (InputStream input = ZrLogTestDatabase.class.getResourceAsStream("/init-table-structure.sql")) {
+            try (InputStream input = ZrLogTestDatabase.class.getResourceAsStream(schemaResource)) {
                 if (input == null) {
-                    throw new IllegalStateException("Missing init-table-structure.sql; add zrlog-install-web with test scope");
+                    throw new IllegalStateException("Missing schema resource: " + schemaResource);
                 }
                 if (sqliteFile == null) {
                     opened.loadMySQLSchema(input);
@@ -73,15 +74,43 @@ public final class ZrLogTestDatabase implements AutoCloseable {
     }
 
     public static ZrLogTestDatabase open(DatabaseType type) throws Exception {
-        return new ZrLogTestDatabase(java.util.Objects.requireNonNull(type));
+        return open(type, "/init-table-structure.sql");
+    }
+
+    /** Loads an explicitly versioned historical schema for migration tests. */
+    public static ZrLogTestDatabase open(DatabaseType type, String schemaResource) throws Exception {
+        return new ZrLogTestDatabase(java.util.Objects.requireNonNull(type), java.util.Objects.requireNonNull(schemaResource));
     }
 
     /**
      * SQLite-backed, single-statement adapter for D1-style behavior; no JDBC transactions.
      */
     public static ZrLogTestDatabase openWebApi() throws Exception {
-        ZrLogTestDatabase db = open(DatabaseType.SQLITE);
-        QueryRunner runner = new QueryRunner() {
+        return openWebApi("/init-table-structure.sql");
+    }
+
+    public static ZrLogTestDatabase openWebApi(String schemaResource) throws Exception {
+        ZrLogTestDatabase db = open(DatabaseType.SQLITE, schemaResource);
+        Properties webApi = new Properties();
+        webApi.setProperty("jdbcUrl", "jdbc:https://fixture.invalid/query");
+        QueryRunner runner = new WebApiQueryRunner(webApi, false, 1) {
+            @Override
+            public int update(String sql) throws SQLException { return update(sql, new Object[0]); }
+
+            @Override
+            public <T> T query(String sql, ResultSetHandler<T> handler) throws SQLException { return query(sql, handler, new Object[0]); }
+
+            @Override
+            public int updateEntity(String sql, Object... params) throws SQLException {
+                return update(sql, params);
+            }
+
+            @Override
+            public List<Map<String, Object>> queryEntityRows(String sql, Object... params) throws SQLException {
+                if (sql.startsWith("INSERT")) db.beforeWebApiUpdate.run(sql, params);
+                return query(sql, new org.apache.commons.dbutils.handlers.MapListHandler(), params);
+            }
+
             @Override
             public int update(String sql, Object... params) throws SQLException {
                 db.beforeWebApiUpdate.run(sql, params);

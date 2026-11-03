@@ -1,6 +1,6 @@
 package com.zrlog.data.service;
 
-import com.zrlog.model.User;
+import com.zrlog.data.repository.UserRepository;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import org.junit.Test;
 
@@ -11,10 +11,10 @@ public class UserPreferenceStoreTest {
     public void sessionPreferencesUseAccountJsonAndValidateStoredValues() throws Exception {
         for (ZrLogTestDatabase.DatabaseType database : ZrLogTestDatabase.DatabaseType.values()) {
             try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(database)) {
-                User user = new User(ignored.dataSource());
+                UserRepository user = new UserRepository(ignored.dataSource());
                 user.execute("insert into user(userId,userName) values(1,'one')");
                 user.execute("insert into user(userId,userName) values(2,'two')");
-                UserPreferenceStore store = new UserPreferenceStore(() -> new User(ignored.dataSource()));
+                UserPreferenceStore store = new UserPreferenceStore(() -> new UserRepository(ignored.dataSource()));
                 assertEquals(1440, store.sessionTimeoutMinutes(1, 1440));
                 store.mutate(1, root -> root.add("session", com.google.gson.JsonParser.parseString("{\"timeoutMinutes\":60}")));
                 assertEquals(60, store.sessionTimeoutMinutes(1, 1440));

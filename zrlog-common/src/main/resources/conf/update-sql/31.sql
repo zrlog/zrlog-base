@@ -1,0 +1,7 @@
+-- Version 31 is implemented by V31EntityMetadataUpgrade with the application's explicit data source.
+-- Add missing createdAt / updatedAt DATETIME(3) NULL and version BIGINT DEFAULT 0 to the 17 installed tables.
+-- Reuse comment.td, log_version.created_at and log.last_update_date for their mapped metadata.
+-- Preserve log.version and initialize only NULL historical revisions to zero.
+-- Convert the four declared BIGINT createdAt columns using bounded batches and the existing application time zone.
+-- Retain original integer columns until converted values are verified; recognize interrupted version-31 stages.
+-- This versioned migration never creates missing tables or changes schema during normal Entity operations.

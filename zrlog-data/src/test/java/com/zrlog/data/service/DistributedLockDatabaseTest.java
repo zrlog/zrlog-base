@@ -2,7 +2,7 @@ package com.zrlog.data.service;
 
 import com.zrlog.common.vo.LockVO;
 import com.zrlog.data.di.DaggerDataComponent;
-import com.zrlog.model.WebSite;
+import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import org.junit.Test;
@@ -31,8 +31,8 @@ public class DistributedLockDatabaseTest {
     @Test
     public void shouldStoreListAndReleaseDistributedLocksUsingWebsiteTable() throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-            DistributedLock first = new DistributedLock(() -> new WebSite(db.dataSource()), "cache");
-            DistributedLock second = new DistributedLock(() -> new WebSite(db.dataSource()), "cache");
+            DistributedLock first = new DistributedLock(() -> new WebSiteRepository(db.dataSource()), "cache");
+            DistributedLock second = new DistributedLock(() -> new WebSiteRepository(db.dataSource()), "cache");
 
             assertTrue(first.tryLock());
             assertFalse(second.tryLock());

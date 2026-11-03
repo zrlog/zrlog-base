@@ -1,98 +1,66 @@
 package com.zrlog.model;
 
-import com.hibegin.common.dao.BasePageableDAO;
-import com.hibegin.common.dao.DataSourceWrapper;
-import com.hibegin.common.dao.dto.PageData;
-import com.hibegin.common.dao.dto.PageRequest;
-import com.hibegin.common.util.SecurityUtils;
-import com.zrlog.data.dto.CommentDTO;
-import com.zrlog.data.dto.VisitorCommentDTO;
-import com.zrlog.data.exception.DAOException;
-import com.zrlog.data.util.DateValueFormatUtils;
-import jakarta.inject.Inject;
+import com.hibegin.common.dao.entity.BaseEntity;
+import com.hibegin.common.dao.entity.Column;
+import com.hibegin.common.dao.entity.Entity;
 
-import java.sql.SQLException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.sql.Timestamp;
 
-/**
- * 对应数据里面的 comment 表，用于存放文章对应的评论信息。
- */
-public class Comment extends BasePageableDAO {
+@Entity(table = "comment", idColumn = "commentId", generatedId = true, createdAtColumn = "td")
+public class Comment extends BaseEntity<Long> {
+    private Timestamp commTime;
+    private Boolean hide;
+    @Column("have_read")
+    private Boolean haveRead = false;
+    private String userComment;
+    private String userHome;
+    private String userIp;
+    private String userMail;
+    private String userName;
+    private Integer logId;
+    private String postId;
+    private String header;
+    @Column("user_agent")
+    private String userAgent;
+    @Column("reply_id")
+    private Integer replyId;
 
-    public static final String TABLE_NAME = "comment";
-    private final DataSourceWrapper dataSource;
+    public Timestamp getCommTime() { return commTime; }
+    public void setCommTime(Timestamp commTime) { this.commTime = commTime; }
 
-    @Inject
-    public Comment(DataSourceWrapper dataSource) {
-        super(dataSource);
-        this.dataSource = dataSource;
-        this.tableName = TABLE_NAME;
-        this.pk = "commentId";
-    }
+    public Boolean getHide() { return hide; }
+    public void setHide(Boolean hide) { this.hide = hide; }
 
-    private static String formatCommentTime(Object value) {
-        return DateValueFormatUtils.format(value, "yyyy-MM-dd HH:mm:ss");
-    }
+    public Boolean getHaveRead() { return haveRead; }
+    public void setHaveRead(Boolean haveRead) { this.haveRead = haveRead; }
 
-    public PageData<CommentDTO> find(PageRequest page) {
-        return find(page, null);
-    }
+    public String getUserComment() { return userComment; }
+    public void setUserComment(String userComment) { this.userComment = userComment; }
 
-    public PageData<CommentDTO> find(PageRequest page, Integer privateOwnerId) {
-        String sql = "select commentId as id,userComment,header,commTime,userMail,userHome,userIp,userName,hide,logId from " + tableName + (privateOwnerId == null ? "" : " where logId in (select logId from log where privacy=false or userId=?)") + " order by commTime desc";
-        PageData<CommentDTO> commentDTOPageData = queryPageData(sql, page, privateOwnerId == null ? new Object[0] : new Object[]{privateOwnerId}, CommentDTO.class);
-        commentDTOPageData.getRows().forEach(e -> {
-            e.setCommTime(formatCommentTime(e.getCommTime()));
-        });
-        return commentDTOPageData;
-    }
+    public String getUserHome() { return userHome; }
+    public void setUserHome(String userHome) { this.userHome = userHome; }
 
-    public Long count() throws SQLException {
-        String sql = "select count(1) from " + tableName;
-        return ((Number) queryFirstObj(sql)).longValue();
-    }
+    public String getUserIp() { return userIp; }
+    public void setUserIp(String userIp) { this.userIp = userIp; }
 
-    public Long countToDayComment() throws SQLException {
-        String sql = "select count(1) from " + tableName + " where commTime>?";
-        return ((Number) queryFirstObj(sql, new SimpleDateFormat("yyyy-MM-dd").format(new Date()))).longValue();
-    }
+    public String getUserMail() { return userMail; }
+    public void setUserMail(String userMail) { this.userMail = userMail; }
 
-    public List<Map<String, Object>> findHaveReadIsFalse() throws SQLException {
-        String sql = "select commentId as id,userComment,header,userMail,userHome,userIp,userName,hide,logId from " + tableName + " where have_read = ?  order by commTime desc ";
-        return queryListWithParams(sql, false);
-    }
+    public String getUserName() { return userName; }
+    public void setUserName(String userName) { this.userName = userName; }
 
-    public List<Map<String, Object>> findAllByLogId(int logId) throws SQLException {
-        List<Map<String, Object>> comments = queryListWithParams("select * from " + tableName + " where logId=?", logId);
-        for (Map<String, Object> comment : comments) {
-            comment.put("commTime", formatCommentTime(comment.get("commTime")));
-        }
-        return comments;
-    }
+    public Integer getLogId() { return logId; }
+    public void setLogId(Integer logId) { this.logId = logId; }
 
-    public List<VisitorCommentDTO> visitorFindAllByLogId(int logId) throws SQLException {
-        List<Map<String, Object>> comments = queryListWithParams("select * from " + tableName + " where logId=?", logId);
-        for (Map<String, Object> comment : comments) {
-            comment.put("commTime", formatCommentTime(comment.get("commTime")));
-            String email = (String) comment.get("userMail");
-            if (Objects.isNull(email)) {
-                comment.put("gravatarId", "");
-            } else {
-                comment.put("gravatarId", SecurityUtils.md5(email));
-            }
-        }
-        return doConvertList(comments, VisitorCommentDTO.class);
-    }
+    public String getPostId() { return postId; }
+    public void setPostId(String postId) { this.postId = postId; }
 
-    public void doRead(long id) {
-        try {
-            new Comment(dataSource).set("have_read", true).updateById(id);
-        } catch (SQLException e) {
-            throw new DAOException(e);
-        }
-    }
+    public String getHeader() { return header; }
+    public void setHeader(String header) { this.header = header; }
+
+    public String getUserAgent() { return userAgent; }
+    public void setUserAgent(String userAgent) { this.userAgent = userAgent; }
+
+    public Integer getReplyId() { return replyId; }
+    public void setReplyId(Integer replyId) { this.replyId = replyId; }
 }

@@ -2,7 +2,7 @@ package com.zrlog.data.util;
 
 import com.zrlog.common.vo.LockVO;
 import com.zrlog.data.service.DistributedLock;
-import com.zrlog.model.WebSite;
+import com.zrlog.data.repository.WebSiteRepository;
 import jakarta.inject.Inject;
 
 import java.util.ArrayList;
@@ -15,12 +15,12 @@ import java.util.Objects;
  */
 public class DistributedLockManager {
 
-    private final jakarta.inject.Provider<WebSite> websites;
+    private final jakarta.inject.Provider<WebSiteRepository> websites;
     private final DistributedLock.Factory locks;
 
     @Inject
     public DistributedLockManager(
-            jakarta.inject.Provider<WebSite> websites, DistributedLock.Factory locks) {
+            jakarta.inject.Provider<WebSiteRepository> websites, DistributedLock.Factory locks) {
         this.websites = Objects.requireNonNull(websites);
         this.locks = Objects.requireNonNull(locks);
     }

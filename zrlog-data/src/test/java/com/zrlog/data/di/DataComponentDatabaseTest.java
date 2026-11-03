@@ -36,8 +36,9 @@ public class DataComponentDatabaseTest {
             assertEquals("second", b.cache().getPublicWebSiteInfo().getTitle());
             assertSame(a.cache(), a.cache());
             assertNotSame(a.cache(), b.cache());
-            a.log().set("title", "uncommitted query state");
-            assertTrue(a.log().getAttrs().isEmpty());
+            com.zrlog.model.Log draft = new com.zrlog.model.Log();
+            draft.setTitle("uncommitted row");
+            assertEquals(0L, ((Number) a.log().queryFirstObj("SELECT count(*) FROM log")).longValue());
             assertNotSame(a.website(), a.website());
 
             DistributedLock firstLock = a.locks().create("same-key");

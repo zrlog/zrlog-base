@@ -1,0 +1,572 @@
+[
+  {
+    "name": "com.zrlog.model.Comment",
+    "fields": [
+      {
+        "name": "commTime"
+      },
+      {
+        "name": "hide"
+      },
+      {
+        "name": "haveRead"
+      },
+      {
+        "name": "userComment"
+      },
+      {
+        "name": "userHome"
+      },
+      {
+        "name": "userIp"
+      },
+      {
+        "name": "userMail"
+      },
+      {
+        "name": "userName"
+      },
+      {
+        "name": "logId"
+      },
+      {
+        "name": "postId"
+      },
+      {
+        "name": "header"
+      },
+      {
+        "name": "userAgent"
+      },
+      {
+        "name": "replyId"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.Link",
+    "fields": [
+      {
+        "name": "alt"
+      },
+      {
+        "name": "linkName"
+      },
+      {
+        "name": "sort"
+      },
+      {
+        "name": "status"
+      },
+      {
+        "name": "url"
+      },
+      {
+        "name": "icon"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.Log",
+    "fields": [
+      {
+        "name": "alias"
+      },
+      {
+        "name": "canComment"
+      },
+      {
+        "name": "click"
+      },
+      {
+        "name": "content"
+      },
+      {
+        "name": "plainContent"
+      },
+      {
+        "name": "markdown"
+      },
+      {
+        "name": "digest"
+      },
+      {
+        "name": "keywords"
+      },
+      {
+        "name": "thumbnail"
+      },
+      {
+        "name": "recommended"
+      },
+      {
+        "name": "sticky"
+      },
+      {
+        "name": "releaseTime"
+      },
+      {
+        "name": "title"
+      },
+      {
+        "name": "typeId"
+      },
+      {
+        "name": "userId"
+      },
+      {
+        "name": "hot"
+      },
+      {
+        "name": "rubbish"
+      },
+      {
+        "name": "privacy"
+      },
+      {
+        "name": "editorType"
+      },
+      {
+        "name": "arrangePlugin"
+      },
+      {
+        "name": "extensions"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.LogExtensionIndex",
+    "fields": [
+      {
+        "name": "logId"
+      },
+      {
+        "name": "namespace"
+      },
+      {
+        "name": "extensionPath"
+      },
+      {
+        "name": "extensionValue"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.LogNav",
+    "fields": [
+      {
+        "name": "navName"
+      },
+      {
+        "name": "sort"
+      },
+      {
+        "name": "url"
+      },
+      {
+        "name": "icon"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.LogVersion",
+    "fields": [
+      {
+        "name": "logId"
+      },
+      {
+        "name": "articleVersion"
+      },
+      {
+        "name": "fromVersion"
+      },
+      {
+        "name": "patchJson"
+      },
+      {
+        "name": "title"
+      },
+      {
+        "name": "userId"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.OAuthClient",
+    "fields": [
+      {
+        "name": "name"
+      },
+      {
+        "name": "redirectUris"
+      },
+      {
+        "name": "enabled"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.OAuthCredential",
+    "fields": [
+      {
+        "name": "kind"
+      },
+      {
+        "name": "grantId"
+      },
+      {
+        "name": "payload"
+      },
+      {
+        "name": "expiresAt"
+      },
+      {
+        "name": "used"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.OAuthGrant",
+    "fields": [
+      {
+        "name": "userId"
+      },
+      {
+        "name": "clientId"
+      },
+      {
+        "name": "scope"
+      },
+      {
+        "name": "resource"
+      },
+      {
+        "name": "authVersion"
+      },
+      {
+        "name": "revoked"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.Plugin",
+    "fields": [
+      {
+        "name": "content"
+      },
+      {
+        "name": "isSystem"
+      },
+      {
+        "name": "pTitle"
+      },
+      {
+        "name": "sort"
+      },
+      {
+        "name": "pluginName"
+      },
+      {
+        "name": "level"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.Tag",
+    "fields": [
+      {
+        "name": "count"
+      },
+      {
+        "name": "text"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.Type",
+    "fields": [
+      {
+        "name": "alias"
+      },
+      {
+        "name": "remark"
+      },
+      {
+        "name": "typeName"
+      },
+      {
+        "name": "pid"
+      },
+      {
+        "name": "arrangePlugin"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.User",
+    "fields": [
+      {
+        "name": "email"
+      },
+      {
+        "name": "password"
+      },
+      {
+        "name": "userName"
+      },
+      {
+        "name": "header"
+      },
+      {
+        "name": "secretKey"
+      },
+      {
+        "name": "mfaEnabled"
+      },
+      {
+        "name": "mfaSecret"
+      },
+      {
+        "name": "passkeyUserHandle"
+      },
+      {
+        "name": "role"
+      },
+      {
+        "name": "enabled"
+      },
+      {
+        "name": "authVersion"
+      },
+      {
+        "name": "preferences"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.UserAccessToken",
+    "fields": [
+      {
+        "name": "userId"
+      },
+      {
+        "name": "name"
+      },
+      {
+        "name": "tokenHash"
+      },
+      {
+        "name": "scope"
+      },
+      {
+        "name": "resource"
+      },
+      {
+        "name": "authVersion"
+      },
+      {
+        "name": "expiresAt"
+      },
+      {
+        "name": "revoked"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.UserPasskey",
+    "fields": [
+      {
+        "name": "userId"
+      },
+      {
+        "name": "credentialIdHash"
+      },
+      {
+        "name": "credentialId"
+      },
+      {
+        "name": "publicKeyCose"
+      },
+      {
+        "name": "signatureCount"
+      },
+      {
+        "name": "transports"
+      },
+      {
+        "name": "name"
+      },
+      {
+        "name": "aaguid"
+      },
+      {
+        "name": "backupEligible"
+      },
+      {
+        "name": "backupState"
+      },
+      {
+        "name": "origin"
+      },
+      {
+        "name": "rpId"
+      },
+      {
+        "name": "lastUsedAt"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.UserPasskeyChallenge",
+    "fields": [
+      {
+        "name": "requestId"
+      },
+      {
+        "name": "ceremony"
+      },
+      {
+        "name": "userId"
+      },
+      {
+        "name": "requestJson"
+      },
+      {
+        "name": "expiresAt"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.zrlog.model.WebSite",
+    "fields": [
+      {
+        "name": "name"
+      },
+      {
+        "name": "value"
+      },
+      {
+        "name": "remark"
+      }
+    ],
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.hibegin.common.dao.entity.BaseEntity",
+    "fields": [
+      {
+        "name": "id"
+      },
+      {
+        "name": "createdAt"
+      },
+      {
+        "name": "updatedAt"
+      },
+      {
+        "name": "version"
+      }
+    ]
+  }
+]

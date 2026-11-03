@@ -9,8 +9,9 @@ import com.hibegin.common.util.StringUtils;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.version.UpgradeVersionHandler;
 import com.zrlog.business.version.UpgradeVersionHandlerHelpers;
+import com.zrlog.business.version.V31EntityMetadataUpgrade;
+import com.zrlog.business.version.SchemaUpgradeLock;
 import com.zrlog.common.CacheService;
-import com.zrlog.model.WebSite;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
@@ -31,21 +32,19 @@ public class DbUpgradeService {
 
     private final DAO dao;
     private final DataSourceWrapper dataSource;
-    private final WebSite webSite;
     private final String dbName;
     private final long currentSqlVersion;
 
     public DbUpgradeService(DataSourceWrapper dataSource,
                             long currentSqlVersion) {
-        this(dataSource, new DAO(dataSource), new WebSite(dataSource), currentSqlVersion);
+        this(dataSource, new DAO(dataSource), currentSqlVersion);
     }
 
     @AssistedInject
-    public DbUpgradeService(DataSourceWrapper dataSource, DAO dao, WebSite webSite,
+    public DbUpgradeService(DataSourceWrapper dataSource, DAO dao,
                             @Assisted long currentSqlVersion) {
         this.dataSource = dataSource;
         this.dao = dao;
-        this.webSite = webSite;
         this.dbName = resolveDbName(dataSource.getDataSourceProperties().getProperty("jdbcUrl"));
         this.currentSqlVersion = currentSqlVersion;
     }
@@ -121,50 +120,48 @@ public class DbUpgradeService {
      * 来达到系统无需手动执行数据库脚本文件。
      */
     public void tryDoUpgrade() {
-        try {
-            if (currentSqlVersion < 0) {
-                return;
-            }
+        if (currentSqlVersion < 0) {
+            return;
+        }
+        if (getExecSqlList(currentSqlVersion).isEmpty()) {
+            return;
+        }
+        try (SchemaUpgradeLock ignored = SchemaUpgradeLock.acquire(dataSource)) {
+            // Another instance may have completed migration since this instance read the cache.
+            Object stored = dao.queryFirstObj("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY);
+            long version = stored == null ? currentSqlVersion : Long.parseLong(stored.toString());
             LOGGER.info("Db " + dbName + " connect success");
-            List<Map.Entry<Integer, List<String>>> sqlList = getExecSqlList(currentSqlVersion);
-            if (sqlList.isEmpty()) {
-                return;
-            }
-            for (Map.Entry<Integer, List<String>> entry : sqlList) {
-                //执行需要更新的sql脚本
-                try {
-                    for (String sql : entry.getValue()) {
-                        if (StringUtils.isEmpty(sql.trim())) {
-                            continue;
-                        }
-                        try {
-                            dao.execute(sql);
-                        } catch (Exception e) {
-                            if (!isAlreadyAppliedSqliteSchemaChange(sql, e)) {
-                                throw e;
-                            }
-                            LOGGER.info("Skip already applied SQLite schema migration: " + sql);
-                        }
+            for (Map.Entry<Integer, List<String>> entry : getExecSqlList(version)) {
+                for (String sql : entry.getValue()) {
+                    if (StringUtils.isEmpty(sql.trim())) {
+                        continue;
                     }
-                } catch (Exception e) {
-                    LOGGER.log(Level.SEVERE, "execution sql ", e);
-                    //有异常终止升级
-                    return;
-                }
-                //执行需要转换的数据
-                try {
-                    UpgradeVersionHandler upgradeVersionHandler = UpgradeVersionHandlerHelpers.getUpgradeVersionHandler(entry.getKey());
-                    if (Objects.nonNull(upgradeVersionHandler)) {
-                        upgradeVersionHandler.doUpgrade(dao);
+                    try {
+                        dao.execute(sql);
+                    } catch (Exception e) {
+                        if (!isAlreadyAppliedSqliteSchemaChange(sql, e)) {
+                            throw e;
+                        }
+                        LOGGER.info("Skip already applied SQLite schema migration: " + sql);
                     }
-                } catch (Exception e) {
-                    LOGGER.log(Level.SEVERE, "", e);
-                    return;
                 }
-                webSite.updateByKV(CacheService.ZRLOG_SQL_VERSION_KEY, entry.getKey() + "");
+                if (entry.getKey() == 31) {
+                    new V31EntityMetadataUpgrade(dataSource).run();
+                }
+                UpgradeVersionHandler handler = UpgradeVersionHandlerHelpers.getUpgradeVersionHandler(entry.getKey());
+                if (handler != null) {
+                    handler.doUpgrade(dao);
+                }
+                // Bootstrap SQL must work before the Entity metadata columns exist.
+                if (dao.queryFirstObj("SELECT siteId FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY) == null) {
+                    dao.execute("INSERT INTO website(name,value) VALUES(?,?)", CacheService.ZRLOG_SQL_VERSION_KEY, entry.getKey().toString());
+                } else {
+                    dao.execute("UPDATE website SET value=? WHERE name=?", entry.getKey().toString(), CacheService.ZRLOG_SQL_VERSION_KEY);
+                }
             }
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "", e);
+            LOGGER.log(Level.SEVERE, "Database migration failed; application startup stopped", e);
+            throw new IllegalStateException("Database migration failed; application startup stopped", e);
         }
     }
 

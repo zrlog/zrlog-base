@@ -7,7 +7,7 @@ import com.zrlog.data.service.BaseDataDbService;
 import com.zrlog.data.service.DistributedLock;
 import com.zrlog.data.service.UserPreferenceStore;
 import com.zrlog.data.util.DistributedLockManager;
-import com.zrlog.model.*;
+import com.zrlog.data.repository.*;
 import dagger.BindsInstance;
 import dagger.Component;
 import jakarta.inject.Named;
@@ -28,23 +28,23 @@ public interface DataComponent {
 
     DAO dao();
 
-    Log log();
+    LogRepository log();
 
-    WebSite website();
+    WebSiteRepository website();
 
-    User user();
+    UserRepository user();
 
-    Tag tag();
+    TagRepository tag();
 
-    Type type();
+    TypeRepository type();
 
-    Link link();
+    LinkRepository link();
 
-    LogNav navigation();
+    LogNavRepository navigation();
 
-    Comment comment();
+    CommentRepository comment();
 
-    Plugin plugin();
+    PluginRepository plugin();
 
     BaseDataDbService baseData();
 

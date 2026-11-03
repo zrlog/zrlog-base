@@ -36,6 +36,33 @@ public class LogRepository extends BaseRepository<Log, Long> implements Serializ
         this.dataSource = dataSource;
     }
 
+    /**
+     * Atomically records a read without changing the article's version or last_update_date.
+     * Reads are statistics, not content revisions: update(entity) would advance both fields,
+     * causing unrelated editor conflicts and invalidating scheduled publication confirmations.
+     * Increment in the database without loading an entity so concurrent reads cannot lose counts.
+     * Article edits use the normal tracked update, which writes only changed fields and leaves
+     * this independently updated counter intact.
+     *
+     * @return whether the article still exists and its counter was incremented
+     */
+    public boolean incrementClick(Long logId) throws SQLException {
+        return execute("UPDATE log SET click=click+1 WHERE logId=?", logId);
+    }
+
+    private static String getPageSort(PageRequest pageRequest) {
+        List<OrderBy> orders = pageRequest.getSorts();
+        if (orders == null || orders.isEmpty()) {
+            return "l.logId desc";
+        }
+        StringBuilder orderSort = new StringBuilder();
+        for (OrderBy orderBy : orders) {
+            orderSort.append(sortKeyMap.getOrDefault(orderBy.getSortKey(), "l.logId"));
+            orderSort.append(" ").append(orderBy.getDirection().name().toLowerCase());
+        }
+        return orderSort.toString();
+    }
+
     private ArticleDetailDTO getDetail(Object idOrAlias) throws SQLException {
         if (idOrAlias == null) {
             return null;

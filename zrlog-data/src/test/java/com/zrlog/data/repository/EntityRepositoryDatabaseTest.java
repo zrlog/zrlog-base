@@ -1,5 +1,6 @@
 package com.zrlog.data.repository;
 
+import com.hibegin.common.dao.entity.EntityRepository;
 import com.hibegin.common.dao.entity.OptimisticLockException;
 import com.zrlog.model.Comment;
 import com.zrlog.model.Log;
@@ -9,6 +10,16 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.sql.Timestamp;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
@@ -65,6 +76,94 @@ public class EntityRepositoryDatabaseTest {
             assertFalse(repository.update(saved));
             assertEquals(0, writes.get());
             assertEquals(Long.valueOf(1), saved.getVersion());
+        }
+    }
+
+    @Test
+    public void readsPreserveArticleRevisionAndDoNotConflictWithAnOpenEditor() throws Exception {
+        try (ZrLogTestDatabase db = open()) {
+            LogRepository repository = new LogRepository(db.dataSource());
+            Log article = new Log();
+            article.setId(7L);
+            article.setTitle("original");
+            article.setContent("body");
+            article.setClick(100);
+            new EntityRepository<>(Log.class, db.dataSource(),
+                    Clock.fixed(Instant.parse("2020-01-01T00:00:00Z"), ZoneOffset.UTC)).insert(article);
+            Log editor = repository.loadById(7L);
+            Log otherEditor = repository.loadById(7L);
+
+            AtomicInteger reads = new AtomicInteger();
+            AtomicInteger writes = new AtomicInteger();
+            db.afterWebApiQuery((sql, params) -> reads.incrementAndGet());
+            db.beforeWebApiUpdate((sql, params) -> writes.incrementAndGet());
+            assertTrue(repository.incrementClick(7L));
+            if (backend.equals("WEB_API")) {
+                assertEquals(0, reads.get());
+                assertEquals(1, writes.get());
+            }
+            Log afterRead = repository.loadById(7L);
+            assertEquals(Integer.valueOf(101), afterRead.getClick());
+            assertEquals(editor.getVersion(), afterRead.getVersion());
+            assertEquals(editor.getCreatedAt(), afterRead.getCreatedAt());
+            assertEquals(editor.getUpdatedAt(), afterRead.getUpdatedAt());
+
+            editor.setTitle("saved while readers visit");
+            assertTrue(repository.update(editor));
+            Log saved = repository.loadById(7L);
+            assertEquals("saved while readers visit", saved.getTitle());
+            assertEquals(Integer.valueOf(101), saved.getClick());
+            assertEquals(Long.valueOf(1), saved.getVersion());
+            assertTrue(saved.getUpdatedAt().after(afterRead.getUpdatedAt()));
+            assertFalse(repository.update(saved));
+            assertEquals(Long.valueOf(1), saved.getVersion());
+
+            otherEditor.setContent("stale edit");
+            assertThrows(OptimisticLockException.class, () -> repository.update(otherEditor));
+            assertFalse(repository.incrementClick(-1L));
+            assertNull(repository.loadById(-1L));
+        }
+    }
+
+    @Test
+    public void concurrentReadsKeepEveryIncrementWithoutCreatingContentRevisions() throws Exception {
+        try (ZrLogTestDatabase db = open()) {
+            LogRepository repository = new LogRepository(db.dataSource());
+            Log article = new Log();
+            article.setId(7L);
+            article.setTitle("original");
+            repository.insert(article);
+            Log before = repository.loadById(7L);
+            int readerCount = 4;
+            int readsPerReader = 20;
+            ExecutorService workers = Executors.newFixedThreadPool(readerCount);
+            CountDownLatch ready = new CountDownLatch(readerCount);
+            CountDownLatch start = new CountDownLatch(1);
+            try {
+                List<Future<?>> results = new ArrayList<>();
+                for (int i = 0; i < readerCount; i++) {
+                    results.add(workers.submit(() -> {
+                        LogRepository reader = new LogRepository(db.dataSource());
+                        ready.countDown();
+                        assertTrue(start.await(10, TimeUnit.SECONDS));
+                        for (int read = 0; read < readsPerReader; read++) {
+                            assertTrue(reader.incrementClick(7L));
+                        }
+                        return null;
+                    }));
+                }
+                assertTrue(ready.await(10, TimeUnit.SECONDS));
+                start.countDown();
+                for (Future<?> result : results) result.get(10, TimeUnit.SECONDS);
+            } finally {
+                start.countDown();
+                workers.shutdownNow();
+                assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+            }
+            Log after = repository.loadById(7L);
+            assertEquals(Integer.valueOf(readerCount * readsPerReader), after.getClick());
+            assertEquals(before.getVersion(), after.getVersion());
+            assertEquals(before.getUpdatedAt(), after.getUpdatedAt());
         }
     }
 

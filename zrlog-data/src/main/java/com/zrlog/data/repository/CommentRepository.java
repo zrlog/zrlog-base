@@ -47,6 +47,4 @@ public class CommentRepository extends BaseRepository<Comment, Long> {
         }
         return result;
     }
-
-
 }

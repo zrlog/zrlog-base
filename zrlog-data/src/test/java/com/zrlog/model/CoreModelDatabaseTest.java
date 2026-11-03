@@ -2,7 +2,6 @@ package com.zrlog.model;
 
 import com.zrlog.data.repository.*;
 
-import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequestImpl;
 import com.zrlog.common.cache.dto.*;

@@ -26,7 +26,6 @@ public class TypeRepository extends BaseRepository<Type, Long> {
                 " where rubbish=? and privacy=? and typeid=t.typeid) as typeamount from " + tableName + " t", TypeDTO.class, false, false);
     }
 
-
     public Type findByAlias(String alias) throws SQLException {
         return findMatching(Map.of("alias", alias), 1).stream().findFirst().orElse(null);
     }

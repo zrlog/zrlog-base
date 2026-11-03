@@ -23,5 +23,4 @@ public class LinkRepository extends BaseRepository<Link, Long> {
     public List<LinkDTO> findAll() throws SQLException {
         return queryList("select linkName,linkId as id,sort,url,alt,icon from " + tableName + " order by sort", LinkDTO.class);
     }
-
 }

@@ -50,19 +50,6 @@ public class LogRepository extends BaseRepository<Log, Long> implements Serializ
         return execute("UPDATE log SET click=click+1 WHERE logId=?", logId);
     }
 
-    private static String getPageSort(PageRequest pageRequest) {
-        List<OrderBy> orders = pageRequest.getSorts();
-        if (orders == null || orders.isEmpty()) {
-            return "l.logId desc";
-        }
-        StringBuilder orderSort = new StringBuilder();
-        for (OrderBy orderBy : orders) {
-            orderSort.append(sortKeyMap.getOrDefault(orderBy.getSortKey(), "l.logId"));
-            orderSort.append(" ").append(orderBy.getDirection().name().toLowerCase());
-        }
-        return orderSort.toString();
-    }
-
     private ArticleDetailDTO getDetail(Object idOrAlias) throws SQLException {
         if (idOrAlias == null) {
             return null;

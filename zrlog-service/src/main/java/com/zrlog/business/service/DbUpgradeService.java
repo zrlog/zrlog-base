@@ -10,8 +10,10 @@ import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.version.UpgradeVersionHandler;
 import com.zrlog.business.version.UpgradeVersionHandlerHelpers;
 import com.zrlog.business.version.V31EntityMetadataUpgrade;
-import com.zrlog.business.version.SchemaUpgradeLock;
 import com.zrlog.common.CacheService;
+import com.zrlog.data.repository.WebSiteRepository;
+import com.zrlog.data.service.DistributedLock;
+import com.zrlog.data.util.DistributedLockManager;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
@@ -19,6 +21,7 @@ import dagger.assisted.AssistedInject;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,20 +40,27 @@ public class DbUpgradeService implements AutoCloseable {
     private volatile boolean cancelled;
     private final Object migrationMonitor = new Object();
     private Thread migrationThread;
-    private SchemaUpgradeLock acquiredLock;
+    private final DistributedLockManager locks;
+    private DistributedLock acquiredLock;
 
     public DbUpgradeService(DataSourceWrapper dataSource,
                             long currentSqlVersion) {
         this(dataSource, new DAO(dataSource), currentSqlVersion);
     }
 
+    public DbUpgradeService(DataSourceWrapper dataSource, DAO dao, long currentSqlVersion) {
+        this(dataSource, dao, new DistributedLockManager(() -> new WebSiteRepository(dataSource),
+                key -> new DistributedLock(() -> new WebSiteRepository(dataSource), key)), currentSqlVersion);
+    }
+
     @AssistedInject
-    public DbUpgradeService(DataSourceWrapper dataSource, DAO dao,
+    public DbUpgradeService(DataSourceWrapper dataSource, DAO dao, DistributedLockManager locks,
                             @Assisted long currentSqlVersion) {
         this.dataSource = dataSource;
         this.dao = dao;
         this.dbName = resolveDbName(dataSource.getDataSourceProperties().getProperty("jdbcUrl"));
         this.currentSqlVersion = currentSqlVersion;
+        this.locks = locks;
     }
 
     static String resolveDbName(String jdbcUrl) {
@@ -151,7 +161,8 @@ public class DbUpgradeService implements AutoCloseable {
             if (getExecSqlList(storedSqlVersion()).isEmpty()) {
                 return;
             }
-            try (SchemaUpgradeLock lock = SchemaUpgradeLock.acquire(dataSource, () -> cancelled)) {
+            try (DistributedLock lock = locks.acquire(
+                    DistributedLock.SCHEMA_UPGRADE_KEY, 30, TimeUnit.SECONDS, () -> cancelled)) {
                 acquiredLock = lock;
                 // Another instance may have completed migration since this instance read the cache.
                 long version = storedSqlVersion();

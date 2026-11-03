@@ -88,7 +88,8 @@ public class DbUpgradeServiceDatabaseTest {
         File folder = writeUpgradeSql("tables-unicode-conf", bundledUpgradeSql(30).replace("\n", "\r\n"), 30);
         try {
             System.setProperty("sws.conf.path", folder.getAbsolutePath());
-            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
+            try (ZrLogTestDatabase db = databaseType == DatabaseType.SQLITE
+                    ? ZrLogTestDatabase.openWebApi() : ZrLogTestDatabase.open(databaseType)) {
                 String value = "桂林🛶、大理🌿，𠮷，字面转义 \\ud83d\\udef6";
                 db.putWebsite("existing-unicode", value);
                 db.putWebsite("existing-null", null);
@@ -103,11 +104,7 @@ public class DbUpgradeServiceDatabaseTest {
                 db.putWebsite("new-unicode", value);
                 assertEquals(value, db.scalar("select value from website where name=?", "new-unicode"));
                 db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "29");
-                if (databaseType == DatabaseType.SQLITE) {
-                    upgradeService(asWebApi(db.dataSource()), 29).tryDoUpgrade();
-                } else {
-                    upgradeService(db.dataSource(), 29).tryDoUpgrade();
-                }
+                upgradeService(db.dataSource(), 29).tryDoUpgrade();
                 assertEquals(String.valueOf(UpgradeVersionHandler.SQL_VERSION), db.scalar("select value from website where name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
                 assertEquals(value, db.scalar("select value from website where name=?", "new-unicode"));
             }
@@ -318,12 +315,12 @@ public class DbUpgradeServiceDatabaseTest {
         writeUpgradeSql(confFolder, bundledPasskeyReplaySqlWithoutTableCreation(), 26);
         try {
             System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
-            try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
+            try (ZrLogTestDatabase db = ZrLogTestDatabase.openWebApi()) {
                 db.update("alter table log drop column sticky");
                 dropPasskeySchema(db);
                 preparePartiallyAppliedPasskeySchemaForWebApi(db);
 
-                upgradeService(asWebApi(db.dataSource()), 23).tryDoUpgrade();
+                upgradeService(db.dataSource(), 23).tryDoUpgrade();
 
                 assertEquals(0L, ((Number) db.scalar("select count(extensions) from log")).longValue());
                 assertEquals(0L, ((Number) db.scalar("select count(1) from log_extension_index")).longValue());
@@ -568,19 +565,4 @@ public class DbUpgradeServiceDatabaseTest {
         }
     }
 
-    private DataSourceWrapper asWebApi(DataSourceWrapper delegate) {
-        return (DataSourceWrapper) Proxy.newProxyInstance(
-                DataSourceWrapper.class.getClassLoader(),
-                new Class[]{DataSourceWrapper.class},
-                (proxy, method, args) -> {
-                    if ("isWebApi".equals(method.getName())) {
-                        return true;
-                    }
-                    try {
-                        return method.invoke(delegate, args);
-                    } catch (InvocationTargetException e) {
-                        throw e.getCause();
-                    }
-                });
-    }
 }

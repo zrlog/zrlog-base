@@ -168,6 +168,15 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
         return value == null ? null : value.toString();
     }
 
+    /** Lock coordination must also work before the entity metadata columns exist. */
+    public void insertLock(String name, String owner, String remark) throws SQLException {
+        execute("INSERT INTO website(name,value,remark) VALUES(?,?,?)", name, owner, remark);
+    }
+
+    public void deleteLock(String name, String owner) throws SQLException {
+        execute("DELETE FROM website WHERE name=? AND value=?", name, owner);
+    }
+
     public String getStringValueByName(String name) {
         try {
             Map<String, Object> webSiteByNameIn = getWebSiteByNameIn(Collections.singletonList(name));

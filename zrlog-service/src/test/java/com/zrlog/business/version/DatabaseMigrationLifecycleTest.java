@@ -7,6 +7,7 @@ import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.exception.DatabaseInitializationException;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.test.support.ZrLogTestDatabase;
+import com.zrlog.data.service.DistributedLock;
 import com.zrlog.web.WebSetupContext;
 import com.zrlog.web.WebSetupLoader;
 import org.junit.Rule;
@@ -51,7 +52,7 @@ public class DatabaseMigrationLifecycleTest {
                         config.configDatabase();
                         assertSame(cache, config.getServerConfig().getBindings().build().get(CacheService.class));
                     }
-                    assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+                    assertNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
                 }
             }
         } finally {

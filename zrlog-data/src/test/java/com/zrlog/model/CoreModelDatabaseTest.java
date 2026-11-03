@@ -330,29 +330,6 @@ public class CoreModelDatabaseTest {
                             .orElseThrow()
                             .getCount()
                             .longValue());
-            assertTrue(new TagRepository(db.dataSource()).updateArticleTags(null, null));
-            assertTrue(
-                    new TagRepository(db.dataSource())
-                            .updateArticleTags("java,zrlog", "java,zrlog"));
-            assertTrue(
-                    new TagRepository(db.dataSource())
-                            .updateArticleTags("java,zrlog,db", "java,zrlog"));
-            assertEquals(3, new TagRepository(db.dataSource()).find(page()).getRows().size());
-            assertTrue(
-                    new TagRepository(db.dataSource()).updateArticleTags("zrlog", "java,zrlog,db"));
-            assertEquals(2, new TagRepository(db.dataSource()).find(page()).getRows().size());
-            assertEquals(
-                    1,
-                    new TagRepository(db.dataSource())
-                            .findAll().stream()
-                                    .filter(tag -> "java".equals(tag.getText()))
-                                    .findFirst()
-                                    .orElseThrow()
-                                    .getCount()
-                                    .intValue());
-            assertFalse(
-                    new TagRepository(db.dataSource())
-                            .findAll().stream().anyMatch(tag -> "db".equals(tag.getText())));
         }
     }
 

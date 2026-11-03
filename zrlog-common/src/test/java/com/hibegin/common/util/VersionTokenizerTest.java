@@ -13,7 +13,6 @@ public class VersionTokenizerTest {
         assertTrue(tokenizer.MoveNext());
         assertEquals(3, tokenizer.getNumber());
         assertEquals("", tokenizer.getSuffix());
-        assertTrue(tokenizer.hasValue());
 
         assertTrue(tokenizer.MoveNext());
         assertEquals(5, tokenizer.getNumber());

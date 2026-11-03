@@ -81,20 +81,6 @@ public class ZrLogUtilTest {
     }
 
     @Test
-    public void shouldConvertRequestParamsToBean() {
-        Map<String, String[]> params = new HashMap<>();
-        params.put("name", new String[] {"ZrLog"});
-        params.put("tags", new String[] {"java", "blog"});
-        params.put("ignoredEmpty", new String[0]);
-        params.put("ignoredNull", null);
-
-        RequestParamBean bean = ZrLogUtil.convertRequestParam(params, RequestParamBean.class);
-
-        assertEquals("ZrLog", bean.getName());
-        assertEquals(List.of("java", "blog"), bean.getTags());
-    }
-
-    @Test
     public void shouldPreferConfiguredBlogHostWhenPresent() throws Exception {
         assertEquals(
                 "configured.example.com",
@@ -146,10 +132,6 @@ public class ZrLogUtilTest {
 
     @Test
     public void shouldExposeSmallUtilityContracts() {
-        assertEquals(".ftl", ZrLogUtil.getViewExt("freemarker"));
-        assertEquals(".jsp", ZrLogUtil.getViewExt("beetl"));
-        assertTrue(ZrLogUtil.isInternalHostName("127.0.0.1"));
-        assertFalse(ZrLogUtil.isInternalHostName("invalid.invalid.invalid"));
         assertEquals(
                 "true".equalsIgnoreCase(System.getenv("PREVIEW_MODE")), ZrLogUtil.isPreviewMode());
         assertEquals(
@@ -165,7 +147,6 @@ public class ZrLogUtilTest {
                 "shell".equals(System.getenv("DOCKER_MODE_START_BY")),
                 ZrLogUtil.isShellDockerMode());
         assertEquals("", Constants.getArticleUri());
-        assertEquals(List.of("/"), Constants.articleRouterList());
         assertEquals(Constants.class, new Constants().getClass());
     }
 
@@ -255,27 +236,6 @@ public class ZrLogUtilTest {
                                 }
                                 return null;
                             });
-        }
-    }
-
-    public static class RequestParamBean {
-        private String name;
-        private List<String> tags;
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public List<String> getTags() {
-            return tags;
-        }
-
-        public void setTags(List<String> tags) {
-            this.tags = tags;
         }
     }
 

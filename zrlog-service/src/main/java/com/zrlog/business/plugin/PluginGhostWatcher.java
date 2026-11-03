@@ -3,7 +3,6 @@ package com.zrlog.business.plugin;
 import com.hibegin.common.util.LoggerUtil;
 import com.zrlog.util.ExecutionDeadline;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
@@ -29,13 +28,6 @@ class PluginGhostWatcher implements AutoCloseable {
         this.host = host;
         this.port = port;
         this.waitMillis = waitMillis;
-    }
-
-    static void drainUntilEof(InputStream inputStream) throws IOException {
-        byte[] buffer = new byte[READ_BUFFER_SIZE];
-        while (inputStream.read(buffer) >= 0) {
-            // The watcher protocol uses only EOF as a lifecycle signal.
-        }
     }
 
     public boolean doWatch() {

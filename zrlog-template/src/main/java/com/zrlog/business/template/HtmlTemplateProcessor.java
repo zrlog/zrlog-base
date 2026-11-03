@@ -1,7 +1,6 @@
 package com.zrlog.business.template;
 
 import com.hibegin.common.util.IOUtil;
-import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.SecurityUtils;
 import com.hibegin.common.util.http.handle.CloseResponseHandle;
 import com.hibegin.http.HttpMethod;
@@ -22,7 +21,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -31,8 +29,6 @@ import org.jsoup.select.Elements;
 
 /** 对响应的模板文件生成的 html 进行转化，主要处理静态资源文件和插件相关的逻辑 */
 public class HtmlTemplateProcessor {
-
-    private static final Logger LOGGER = LoggerUtil.getLogger(HtmlTemplateProcessor.class);
 
     private final long startTime;
     private final AtomicLong pluginId = new AtomicLong(0);

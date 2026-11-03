@@ -3,20 +3,16 @@ package com.zrlog.data.repository;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequest;
-import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.StringUtils;
 import com.zrlog.common.cache.dto.TagDTO;
-import com.zrlog.data.exception.DAOException;
 import com.zrlog.model.Tag;
 import jakarta.inject.Inject;
 import java.sql.SQLException;
 import java.util.*;
-import java.util.logging.Logger;
 
 /** 统计文章中标签出现的次数，方便展示。文章的数据发生变化后，会自动更新记录，无需额外程序控制，对应数据库的 tag 表 */
 public class TagRepository extends BaseRepository<Tag, Long> {
 
-    private static final Logger LOGGER = LoggerUtil.getLogger(TagRepository.class);
     private final DataSourceWrapper dataSource;
 
     @Inject
@@ -46,41 +42,6 @@ public class TagRepository extends BaseRepository<Tag, Long> {
             }
         }
         return tags;
-    }
-
-    public boolean updateArticleTags(String nowTagStr, String oldTagStr) {
-        String copyNewTagStr = nowTagStr;
-        String copyOldTagStr = oldTagStr;
-        if (copyNewTagStr == null && oldTagStr == null) {
-            return true;
-        }
-        if (copyNewTagStr == null) {
-            copyNewTagStr = "";
-        }
-        if (copyOldTagStr == null) {
-            copyOldTagStr = "";
-        }
-        if (copyNewTagStr.equals(copyOldTagStr)) {
-            return true;
-        }
-        String[] oldArr = copyOldTagStr.split(",");
-        String[] nowArr = copyNewTagStr.split(",");
-        Set<String> addSet = new HashSet<>();
-        Set<String> deleteSet = new HashSet<>();
-        for (String str : nowArr) {
-            addSet.add(str.trim());
-        }
-        for (String str : oldArr) {
-            if (!addSet.contains(str)) {
-                deleteSet.add(str.trim());
-            } else {
-                addSet.remove(str);
-            }
-        }
-        insertTag(addSet);
-        deleteTag(deleteSet);
-
-        return true;
     }
 
     public List<TagDTO> refreshTag() throws SQLException {
@@ -159,47 +120,6 @@ public class TagRepository extends BaseRepository<Tag, Long> {
         insertSql.append(valueJoiner);
         execute(insertSql.toString(), params.toArray());
         return all;
-    }
-
-    private void insertTag(Set<String> now) {
-        for (String add : now) {
-            try {
-                Tag t = select("WHERE text=? LIMIT 1", add).stream().findFirst().orElse(null);
-                if (t == null) {
-                    Tag tag = new Tag();
-                    tag.setText(add);
-                    tag.setCount(1);
-                    insert(tag);
-                } else {
-                    execute(
-                            "UPDATE tag SET count=count+1,updatedAt=?,version=version+1 WHERE tagId=?",
-                            new java.sql.Timestamp(System.currentTimeMillis()).toString(),
-                            t.getId());
-                }
-            } catch (SQLException e) {
-                throw new DAOException(e);
-            }
-        }
-    }
-
-    private void deleteTag(Set<String> old) {
-        for (String del : old) {
-            try {
-                Tag t = select("WHERE text=? LIMIT 1", del).stream().findFirst().orElse(null);
-                if (t != null) {
-                    if (t.getCount() > 1) {
-                        execute(
-                                "UPDATE tag SET count=count-1,updatedAt=?,version=version+1 WHERE tagId=? AND count>1",
-                                new java.sql.Timestamp(System.currentTimeMillis()).toString(),
-                                t.getId());
-                    } else {
-                        deleteWhere("tagId=? AND count<=1", t.getId());
-                    }
-                }
-            } catch (SQLException e) {
-                throw new DAOException(e);
-            }
-        }
     }
 
     public PageData<TagDTO> find(PageRequest page) {

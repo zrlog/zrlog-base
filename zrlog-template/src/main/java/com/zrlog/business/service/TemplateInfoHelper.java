@@ -45,10 +45,6 @@ public class TemplateInfoHelper {
         return Objects.nonNull(loadTemplateVO(templatePath));
     }
 
-    public static boolean isDefaultTemplateStartWith(String path) {
-        return BundledThemes.getInstance().containsResource(path);
-    }
-
     public static TemplateVO loadTemplateVO(String templateName) {
         if (Objects.isNull(templateName) || !templateName.startsWith(TEMPLATE_BASE_PATH)) {
             return null;

@@ -141,7 +141,6 @@ public class CommonDtoContractTest {
         assertBeanProperties(AdminTokenVO.class);
         assertBeanProperties(BaseTemplateVO.class);
         assertBeanProperties(I18nVO.class);
-        assertBeanProperties(IDataInitVO.class);
         assertBeanProperties(LockVO.class);
         assertBeanProperties(Outline.class);
         assertBeanProperties(PublicWebSiteInfo.class);

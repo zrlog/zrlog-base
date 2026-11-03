@@ -305,11 +305,6 @@ public class HttpUtil {
         return httpHandle;
     }
 
-    public String getTextByUrl(String url)
-            throws IOException, InterruptedException, URISyntaxException {
-        return sendGetRequest(url, new HttpStringHandle(), new HashMap<>()).getT();
-    }
-
     public String getSuccessTextByUrl(String url)
             throws IOException, InterruptedException, URISyntaxException {
         HttpStringHandle httpStringHandle =

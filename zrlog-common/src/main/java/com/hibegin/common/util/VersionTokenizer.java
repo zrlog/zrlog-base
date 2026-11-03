@@ -7,7 +7,6 @@ public class VersionTokenizer {
     private int _position;
     private int _number;
     private String _suffix;
-    private boolean _hasValue;
 
     public VersionTokenizer(String versionString) {
         if (versionString == null) throw new IllegalArgumentException("versionString is null");
@@ -24,19 +23,12 @@ public class VersionTokenizer {
         return _suffix;
     }
 
-    public boolean hasValue() {
-        return _hasValue;
-    }
-
     public boolean MoveNext() {
         _number = 0;
         _suffix = "";
-        _hasValue = false;
 
         // No more characters
         if (_position >= _length) return false;
-
-        _hasValue = true;
 
         while (_position < _length) {
             char c = _versionString.charAt(_position);

@@ -3,7 +3,6 @@ package com.zrlog.business.plugin;
 import static org.junit.Assert.*;
 
 import com.zrlog.util.ExecutionDeadline;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -11,7 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 
@@ -70,36 +68,6 @@ public class PluginGhostWatcherTest {
                 }
             }
         }
-    }
-
-    @Test
-    public void shouldDrainWatcherStreamWithFixedSizeReads() throws Exception {
-        AtomicInteger remaining = new AtomicInteger(PluginGhostWatcher.READ_BUFFER_SIZE * 5 + 123);
-        AtomicInteger largestRequestedRead = new AtomicInteger();
-        InputStream inputStream =
-                new InputStream() {
-                    @Override
-                    public int read() {
-                        return remaining.getAndUpdate(value -> Math.max(0, value - 1)) > 0 ? 0 : -1;
-                    }
-
-                    @Override
-                    public int read(byte[] buffer, int offset, int length) {
-                        largestRequestedRead.accumulateAndGet(length, Math::max);
-                        int available = remaining.get();
-                        if (available <= 0) {
-                            return -1;
-                        }
-                        int read = Math.min(available, length);
-                        remaining.addAndGet(-read);
-                        return read;
-                    }
-                };
-
-        PluginGhostWatcher.drainUntilEof(inputStream);
-
-        assertEquals(0, remaining.get());
-        assertEquals(PluginGhostWatcher.READ_BUFFER_SIZE, largestRequestedRead.get());
     }
 
     @Test

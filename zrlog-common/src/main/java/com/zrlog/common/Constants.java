@@ -2,8 +2,6 @@ package com.zrlog.common;
 
 import com.hibegin.common.util.EnvKit;
 import com.zrlog.theme.spi.BundledThemes;
-import java.util.Collections;
-import java.util.List;
 
 /** 存放全局的静态变量，有多个地方使用一个key时，存放在这里，方便代码的维护。 */
 public class Constants {
@@ -54,10 +52,6 @@ public class Constants {
 
     public static String getArticleUri() {
         return "";
-    }
-
-    public static List<String> articleRouterList() {
-        return Collections.singletonList("/");
     }
 
     public static void init() {

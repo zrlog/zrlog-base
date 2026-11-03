@@ -31,7 +31,6 @@ jobs:
           --health-timeout=5s
           --health-retries=20
     env:
-      ZRLOG_MYSQL_TEST_URL: jdbc:mysql://127.0.0.1:${{ job.services.mysql.ports[3306] }}/zrlog_entity_migration_test?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=LOCAL
       ZRLOG_MYSQL_TEST_USER: zrlog_test
       ZRLOG_MYSQL_TEST_PASSWORD: local-test-only
 
@@ -45,6 +44,9 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+
+      - name: Configure the disposable MySQL connection
+        run: echo 'ZRLOG_MYSQL_TEST_URL=jdbc:mysql://127.0.0.1:${{ job.services.mysql.ports[3306] }}/zrlog_entity_migration_test?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=LOCAL' >> "$GITHUB_ENV"
 
       - name: Run tests and generate coverage
         run: ./mvnw -q -U -Duser.timezone=Asia/Shanghai org.jacoco:jacoco-maven-plugin:0.8.15:prepare-agent test org.jacoco:jacoco-maven-plugin:0.8.15:report

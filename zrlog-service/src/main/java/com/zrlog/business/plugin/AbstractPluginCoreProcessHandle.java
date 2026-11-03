@@ -18,6 +18,5 @@ public abstract class AbstractPluginCoreProcessHandle implements Runnable {
         return false;
     }
 
-    void cancelStartup() {
-    }
+    void cancelStartup() {}
 }

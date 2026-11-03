@@ -7,7 +7,6 @@ import com.zrlog.common.Constants;
 import com.zrlog.common.exception.NotImplementException;
 import com.zrlog.common.vo.I18nVO;
 import com.zrlog.theme.spi.BundledThemes;
-
 import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,9 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * 多语言的工具类
- */
+/** 多语言的工具类 */
 public class I18nUtil {
 
     public static final ThreadLocal<I18nVO> threadLocal = new ThreadLocal<>();
@@ -35,15 +32,36 @@ public class I18nUtil {
     }
 
     private static void reloadSystemI18N() {
-        loadI18N(I18nUtil.class.getResourceAsStream("/i18n/admin_backend_en_US.properties"), "admin_backend_en_US.properties", I18N_ADMIN_BACKEND_KEY);
-        loadI18N(I18nUtil.class.getResourceAsStream("/i18n/admin_backend_zh_CN.properties"), "admin_backend_zh_CN.properties", I18N_ADMIN_BACKEND_KEY);
-        loadI18N(I18nUtil.class.getResourceAsStream("/i18n/blog_en_US.properties"), "blog_en_US.properties", I18N_BLOG_KEY);
-        loadI18N(I18nUtil.class.getResourceAsStream("/i18n/blog_zh_CN.properties"), "blog_zh_CN.properties", I18N_BLOG_KEY);
-        loadI18N(I18nUtil.class.getResourceAsStream("/i18n/backend_en_US.properties"), "backend_en_US.properties", I18N_BACKEND_KEY);
-        loadI18N(I18nUtil.class.getResourceAsStream("/i18n/backend_zh_CN.properties"), "backend_zh_CN.properties", I18N_BACKEND_KEY);
+        loadI18N(
+                I18nUtil.class.getResourceAsStream("/i18n/admin_backend_en_US.properties"),
+                "admin_backend_en_US.properties",
+                I18N_ADMIN_BACKEND_KEY);
+        loadI18N(
+                I18nUtil.class.getResourceAsStream("/i18n/admin_backend_zh_CN.properties"),
+                "admin_backend_zh_CN.properties",
+                I18N_ADMIN_BACKEND_KEY);
+        loadI18N(
+                I18nUtil.class.getResourceAsStream("/i18n/blog_en_US.properties"),
+                "blog_en_US.properties",
+                I18N_BLOG_KEY);
+        loadI18N(
+                I18nUtil.class.getResourceAsStream("/i18n/blog_zh_CN.properties"),
+                "blog_zh_CN.properties",
+                I18N_BLOG_KEY);
+        loadI18N(
+                I18nUtil.class.getResourceAsStream("/i18n/backend_en_US.properties"),
+                "backend_en_US.properties",
+                I18N_BACKEND_KEY);
+        loadI18N(
+                I18nUtil.class.getResourceAsStream("/i18n/backend_zh_CN.properties"),
+                "backend_zh_CN.properties",
+                I18N_BACKEND_KEY);
         for (String locale : java.util.List.of("en_US", "zh_CN")) {
             for (String resource : com.zrlog.updater.spi.UpdateProviders.messageResources(locale)) {
-                loadI18N(I18nUtil.class.getResourceAsStream(resource), "backend_" + locale + ".properties", I18N_BACKEND_KEY);
+                loadI18N(
+                        I18nUtil.class.getResourceAsStream(resource),
+                        "backend_" + locale + ".properties",
+                        I18N_BACKEND_KEY);
             }
         }
     }
@@ -75,7 +93,10 @@ public class I18nUtil {
                 throw new NotImplementException();
         }
         try {
-            String key = name.replace(".properties", "").replace("i18n_", "").replace(resourceName + "_", "");
+            String key =
+                    name.replace(".properties", "")
+                            .replace("i18n_", "")
+                            .replace(resourceName + "_", "");
             Map<String, Object> map = resMap.computeIfAbsent(key, k -> new ConcurrentHashMap<>());
             Properties properties = new Properties();
 
@@ -99,22 +120,36 @@ public class I18nUtil {
         }
     }
 
-    public static I18nVO addToRequestWithTemplatePath(String templatePath, HttpRequest request, String siteLanguage) {
+    public static I18nVO addToRequestWithTemplatePath(
+            String templatePath, HttpRequest request, String siteLanguage) {
         if (StringUtils.isNotEmpty(templatePath)) {
             if (BundledThemes.getInstance().contains(templatePath)) {
-                File enUSPropertiesFile = new File(templatePath + "/language/i18n_en_US.properties");
-                File zhCNPropertiesFile = new File(templatePath + "/language/i18n_zh_CN.properties");
-                loadI18N(I18nUtil.class.getResourceAsStream(enUSPropertiesFile.toString().replace("\\", "/")), enUSPropertiesFile.getName(), I18N_BLOG_KEY);
-                loadI18N(I18nUtil.class.getResourceAsStream(zhCNPropertiesFile.toString().replace("\\", "/")), zhCNPropertiesFile.getName(), I18N_BLOG_KEY);
+                File enUSPropertiesFile =
+                        new File(templatePath + "/language/i18n_en_US.properties");
+                File zhCNPropertiesFile =
+                        new File(templatePath + "/language/i18n_zh_CN.properties");
+                loadI18N(
+                        I18nUtil.class.getResourceAsStream(
+                                enUSPropertiesFile.toString().replace("\\", "/")),
+                        enUSPropertiesFile.getName(),
+                        I18N_BLOG_KEY);
+                loadI18N(
+                        I18nUtil.class.getResourceAsStream(
+                                zhCNPropertiesFile.toString().replace("\\", "/")),
+                        zhCNPropertiesFile.getName(),
+                        I18N_BLOG_KEY);
             } else {
                 File filePath = PathUtil.getStaticFile(templatePath + "/language/");
                 File[] propertiesFiles = filePath.listFiles();
                 if (propertiesFiles != null) {
                     for (File propertiesFile : propertiesFiles) {
                         try {
-                            loadI18N(new FileInputStream(propertiesFile), propertiesFile.getName(), I18N_BLOG_KEY);
+                            loadI18N(
+                                    new FileInputStream(propertiesFile),
+                                    propertiesFile.getName(),
+                                    I18N_BLOG_KEY);
                         } catch (FileNotFoundException e) {
-                            //ignore
+                            // ignore
                         }
                     }
                 }
@@ -132,15 +167,15 @@ public class I18nUtil {
             if (request.getUri().contains(Constants.ADMIN_URI_BASE_PATH + "/")
                     || request.getUri().contains("/api" + Constants.ADMIN_URI_BASE_PATH + "/")
                     || request.getUri().contains(Constants.API_PUBLIC_VERSION)
-                    || request.getUri().contains(Constants.API_PUBLIC_ADMIN_RESOURCE)
-            ) {
+                    || request.getUri().contains(Constants.API_PUBLIC_ADMIN_RESOURCE)) {
                 locale = siteLanguage;
             } else {
                 String referer = request.getHeader("referer");
-                if (StringUtils.isNotEmpty(referer) && referer.contains(Constants.ADMIN_URI_BASE_PATH + "/")) {
+                if (StringUtils.isNotEmpty(referer)
+                        && referer.contains(Constants.ADMIN_URI_BASE_PATH + "/")) {
                     locale = siteLanguage;
                 } else {
-                    //try to get locale info from HTTP header
+                    // try to get locale info from HTTP header
                     locale = getAcceptLocal(request);
                 }
             }
@@ -191,7 +226,6 @@ public class I18nUtil {
         return i18nVO.getBackend().get(getCurrentLocale());
     }
 
-
     public static Map<String, Object> getAdminBackend() {
         I18nVO i18nVO = threadLocal.get();
         if (Objects.isNull(i18nVO)) {
@@ -228,8 +262,10 @@ public class I18nUtil {
 
     public static String getAdminBackendStringFromRes(String key, String locale) {
         I18nVO request = threadLocal.get();
-        Map<String, Map<String, Object>> translations = request == null ? i18nVOCache.getAdminBackend() : request.getAdminBackend();
-        Map<String, Object> local = translations.get(Objects.requireNonNullElse(locale, DEFAULT_LANG));
+        Map<String, Map<String, Object>> translations =
+                request == null ? i18nVOCache.getAdminBackend() : request.getAdminBackend();
+        Map<String, Object> local =
+                translations.get(Objects.requireNonNullElse(locale, DEFAULT_LANG));
         return local == null ? "" : Objects.toString(local.get(key), "");
     }
 
@@ -240,7 +276,6 @@ public class I18nUtil {
         }
         return ObjectUtil.requireNonNullElse((String) local.get(key), "");
     }
-
 
     public static String getCurrentLocale() {
         return getCurrentLocale(DEFAULT_LANG);

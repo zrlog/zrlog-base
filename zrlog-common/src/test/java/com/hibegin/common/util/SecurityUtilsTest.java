@@ -1,6 +1,6 @@
 package com.hibegin.common.util;
 
-import org.junit.Test;
+import static org.junit.Assert.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -8,8 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class SecurityUtilsTest {
 
@@ -35,14 +34,17 @@ public class SecurityUtilsTest {
 
     @Test
     public void shouldReturnNullForBrokenStreamAndWrapMissingFile() {
-        InputStream brokenStream = new InputStream() {
-            @Override
-            public int read() throws IOException {
-                throw new IOException("broken");
-            }
-        };
+        InputStream brokenStream =
+                new InputStream() {
+                    @Override
+                    public int read() throws IOException {
+                        throw new IOException("broken");
+                    }
+                };
 
         assertNull(SecurityUtils.md5(brokenStream));
-        assertThrows(RuntimeException.class, () -> SecurityUtils.md5ByFile(new File("/tmp/zrlog-missing-md5-file")));
+        assertThrows(
+                RuntimeException.class,
+                () -> SecurityUtils.md5ByFile(new File("/tmp/zrlog-missing-md5-file")));
     }
 }

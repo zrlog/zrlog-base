@@ -6,7 +6,6 @@ import com.zrlog.common.exception.ArgsException;
 import com.zrlog.data.repository.UserRepository;
 import com.zrlog.model.User;
 import jakarta.inject.Inject;
-
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.Objects;
@@ -14,9 +13,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-/**
- * Account JSON persistence shared by personal settings and browser session issuance.
- */
+/** Account JSON persistence shared by personal settings and browser session issuance. */
 public class UserPreferenceStore {
 
     public static final long MIN_SESSION_MINUTES = 6;
@@ -36,13 +33,18 @@ public class UserPreferenceStore {
 
     public long sessionTimeoutMinutes(int userId, long siteDefault) throws SQLException {
         JsonElement section = read(userId).get("session");
-        if (section != null && section.isJsonObject()
-                && java.util.Set.of("timeoutMinutes").containsAll(section.getAsJsonObject().keySet())) {
+        if (section != null
+                && section.isJsonObject()
+                && java.util.Set.of("timeoutMinutes")
+                        .containsAll(section.getAsJsonObject().keySet())) {
             JsonElement value = section.getAsJsonObject().get("timeoutMinutes");
             try {
-                if (value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isNumber()) {
+                if (value != null
+                        && value.isJsonPrimitive()
+                        && value.getAsJsonPrimitive().isNumber()) {
                     long minutes = value.getAsBigDecimal().longValueExact();
-                    if (minutes >= MIN_SESSION_MINUTES && minutes <= MAX_SESSION_MINUTES) return minutes;
+                    if (minutes >= MIN_SESSION_MINUTES && minutes <= MAX_SESSION_MINUTES)
+                        return minutes;
                 }
             } catch (ArithmeticException | NumberFormatException ignored) {
             }
@@ -78,20 +80,27 @@ public class UserPreferenceStore {
             JsonObject root = parseStored(previous);
             change.accept(root);
             String updated = GSON.toJson(root);
-            if (updated.getBytes(StandardCharsets.UTF_8).length > 60000) throw new ArgsException("preferences");
+            if (updated.getBytes(StandardCharsets.UTF_8).length > 60000)
+                throw new ArgsException("preferences");
             if (updated.equals(previous)) return;
             user.setPreferences(updated);
             try {
-                userProvider.get().update(user, java.util.Collections.singletonMap("preferences", previous));
+                userProvider
+                        .get()
+                        .update(user, java.util.Collections.singletonMap("preferences", previous));
                 return;
             } catch (OptimisticLockException conflict) {
                 // Retry only a confirmed conflict; an uncertain database failure must propagate.
             }
             // A burst of writes can exhaust a small attempt count before the other writer finishes.
-            // Back off, then read and merge again; the conditional write also protects other instances.
+            // Back off, then read and merge again; the conditional write also protects other
+            // instances.
             long remaining = deadline - System.nanoTime();
             if (remaining <= 0) break;
-            long delay = TimeUnit.MILLISECONDS.toNanos(ThreadLocalRandom.current().nextLong(backoffMillis, backoffMillis * 2 + 1));
+            long delay =
+                    TimeUnit.MILLISECONDS.toNanos(
+                            ThreadLocalRandom.current()
+                                    .nextLong(backoffMillis, backoffMillis * 2 + 1));
             try {
                 TimeUnit.NANOSECONDS.sleep(Math.min(delay, remaining));
             } catch (InterruptedException e) {
@@ -102,5 +111,4 @@ public class UserPreferenceStore {
         } while (System.nanoTime() - deadline < 0);
         throw new SQLException("Concurrent account preference update; please retry");
     }
-
 }

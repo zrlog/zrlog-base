@@ -3,7 +3,6 @@ package com.zrlog.data.util;
 import com.hibegin.common.util.StringUtils;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.dto.ArticleDetailDTO;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -13,8 +12,7 @@ public class ContentProtectorUtils {
 
     private static final Map<String, String> LICENSE_NAMES = buildLicenseNames();
 
-    private ContentProtectorUtils() {
-    }
+    private ContentProtectorUtils() {}
 
     private static Map<String, String> buildLicenseNames() {
         Map<String, String> licenseNames = new HashMap<>();
@@ -28,8 +26,11 @@ public class ContentProtectorUtils {
         return Collections.unmodifiableMap(licenseNames);
     }
 
-    public static String render(PublicWebSiteInfo webSite, ArticleDetailDTO article, String articleUrl) {
-        if (Objects.isNull(webSite) || Objects.isNull(article) || !Objects.equals(webSite.getContent_protector_enabled(), true)) {
+    public static String render(
+            PublicWebSiteInfo webSite, ArticleDetailDTO article, String articleUrl) {
+        if (Objects.isNull(webSite)
+                || Objects.isNull(article)
+                || !Objects.equals(webSite.getContent_protector_enabled(), true)) {
             return "";
         }
         String template = webSite.getContent_protector_template();
@@ -44,8 +45,7 @@ public class ContentProtectorUtils {
         if (StringUtils.isEmpty(author)) {
             author = webSite.getAuthor();
         }
-        return template
-                .replace("{title}", escapeHtml(article.getTitle()))
+        return template.replace("{title}", escapeHtml(article.getTitle()))
                 .replace("{url}", escapeHtml(articleUrl))
                 .replace("{author}", escapeHtml(author))
                 .replace("{site}", escapeHtml(webSite.getTitle()))

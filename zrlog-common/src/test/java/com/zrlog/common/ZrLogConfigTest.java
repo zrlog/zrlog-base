@@ -1,5 +1,7 @@
 package com.zrlog.common;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
@@ -9,11 +11,8 @@ import com.hibegin.http.server.config.ServerConfig;
 import com.zrlog.common.vo.AdminFullTokenVO;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
-import org.junit.Test;
-
 import java.util.List;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class ZrLogConfigTest {
 
@@ -150,8 +149,7 @@ public class ZrLogConfigTest {
     private static class NoopTokenService implements TokenService {
 
         @Override
-        public void updateSessionTimeout(long sessionTimeoutInMinutes) {
-        }
+        public void updateSessionTimeout(long sessionTimeoutInMinutes) {}
 
         @Override
         public AdminFullTokenVO getAdminTokenVO(HttpRequest request) {
@@ -159,12 +157,15 @@ public class ZrLogConfigTest {
         }
 
         @Override
-        public void removeAdminToken(HttpRequest request, HttpResponse response) {
-        }
+        public void removeAdminToken(HttpRequest request, HttpResponse response) {}
 
         @Override
-        public void setAdminToken(Integer userId, String secretKey, String sessionId, String protocol,
-                                  HttpRequest request, HttpResponse response) {
-        }
+        public void setAdminToken(
+                Integer userId,
+                String secretKey,
+                String sessionId,
+                String protocol,
+                HttpRequest request,
+                HttpResponse response) {}
     }
 }

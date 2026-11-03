@@ -11,7 +11,6 @@ import com.zrlog.common.Constants;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.StaticFileCacheUtils;
 import com.zrlog.util.ZrLogUtil;
-
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -22,18 +21,28 @@ public class TemplateDownloadUtils {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(TemplateDownloadUtils.class);
 
-    public static void installByUrl(String downloadUrl) throws IOException, URISyntaxException, InterruptedException {
+    public static void installByUrl(String downloadUrl)
+            throws IOException, URISyntaxException, InterruptedException {
         if (StringUtils.isEmpty(downloadUrl)) {
             return;
         }
-        HttpFileHandle fileHandle = (HttpFileHandle) HttpUtil.getInstance().sendGetRequest(downloadUrl + "?t=" + System.currentTimeMillis(), new HttpFileHandle(PathUtil.getStaticFile(Constants.TEMPLATE_BASE_PATH).toString()), new HashMap<>());
+        HttpFileHandle fileHandle =
+                (HttpFileHandle)
+                        HttpUtil.getInstance()
+                                .sendGetRequest(
+                                        downloadUrl + "?t=" + System.currentTimeMillis(),
+                                        new HttpFileHandle(
+                                                PathUtil.getStaticFile(Constants.TEMPLATE_BASE_PATH)
+                                                        .toString()),
+                                        new HashMap<>());
         if (!fileHandle.getT().exists()) {
             return;
         }
-        String templateName = downloadUrl.substring(downloadUrl.lastIndexOf("/") + 1).replace(".zip", "");
+        String templateName =
+                downloadUrl.substring(downloadUrl.lastIndexOf("/") + 1).replace(".zip", "");
         LOGGER.info("Download template [" + templateName + "] success");
         installByZipFile(fileHandle.getT(), Constants.TEMPLATE_BASE_PATH + templateName);
-        //delete zip file
+        // delete zip file
         fileHandle.getT().delete();
     }
 
@@ -41,12 +50,13 @@ public class TemplateDownloadUtils {
         ZipUtil.unZip(zipFile.toString(), PathUtil.getStaticFile(templatePath).toString());
         StaticFileCacheUtils.getInstance().refreshCacheFileMap();
         LOGGER.info("Install template [" + new File(templatePath).getName() + "] success");
-
     }
 
     private static File getTemplateZipFile(String templatePath) {
         if (EnvKit.isFaaSMode()) {
-            File file = PathUtil.safeAppendFilePath(ZrLogUtil.getFaaSRoot() + "/static/", templatePath + ".zip");
+            File file =
+                    PathUtil.safeAppendFilePath(
+                            ZrLogUtil.getFaaSRoot() + "/static/", templatePath + ".zip");
             if (file.exists()) {
                 return file;
             }
@@ -59,7 +69,8 @@ public class TemplateDownloadUtils {
         return file.exists();
     }
 
-    public static void installByTemplateName(String templatePath, boolean forceUpdate) throws IOException, URISyntaxException, InterruptedException {
+    public static void installByTemplateName(String templatePath, boolean forceUpdate)
+            throws IOException, URISyntaxException, InterruptedException {
         if (!forceUpdate && exists(templatePath)) {
             return;
         }
@@ -69,6 +80,10 @@ public class TemplateDownloadUtils {
             return;
         }
         File file = PathUtil.getStaticFile(templatePath);
-        installByUrl(BlogBuildInfoUtil.getResourceDownloadUrl() + "/attachment/template/" + file.getName() + ".zip");
+        installByUrl(
+                BlogBuildInfoUtil.getResourceDownloadUrl()
+                        + "/attachment/template/"
+                        + file.getName()
+                        + ".zip");
     }
 }

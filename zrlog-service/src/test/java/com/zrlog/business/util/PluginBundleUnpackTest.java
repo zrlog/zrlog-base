@@ -1,10 +1,8 @@
 package com.zrlog.business.util;
 
-import com.zrlog.util.ExecutionDeadline;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import static org.junit.Assert.*;
 
+import com.zrlog.util.ExecutionDeadline;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.http.HttpTimeoutException;
@@ -15,12 +13,12 @@ import java.util.stream.Stream;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-
-import static org.junit.Assert.*;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 public class PluginBundleUnpackTest {
-    @Rule
-    public TemporaryFolder temporary = new TemporaryFolder();
+    @Rule public TemporaryFolder temporary = new TemporaryFolder();
 
     private static byte[] storedArchive(String name, byte[] data) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -67,7 +65,11 @@ public class PluginBundleUnpackTest {
         // STORED local header: 30 fixed bytes, then the UTF-8 entry name, then the payload.
         bytes[30 + "core.bin".length()] ^= 1;
         Files.write(archive, bytes);
-        assertThrows(IOException.class, () -> PluginCoreUtils.unpackPlugins(archive, target, ExecutionDeadline.afterMillis(2000)));
+        assertThrows(
+                IOException.class,
+                () ->
+                        PluginCoreUtils.unpackPlugins(
+                                archive, target, ExecutionDeadline.afterMillis(2000)));
         assertEquals("existing", Files.readString(target.resolve("core.bin")));
         assertNoParts(target);
     }
@@ -83,8 +85,11 @@ public class PluginBundleUnpackTest {
         }
         Path target = temporary.newFolder("expired-target").toPath();
         Files.writeString(target.resolve("core.bin"), "existing");
-        assertThrows(HttpTimeoutException.class,
-                () -> PluginCoreUtils.unpackPlugins(archive, target, ExecutionDeadline.afterMillis(1)));
+        assertThrows(
+                HttpTimeoutException.class,
+                () ->
+                        PluginCoreUtils.unpackPlugins(
+                                archive, target, ExecutionDeadline.afterMillis(1)));
         assertEquals("existing", Files.readString(target.resolve("core.bin")));
         assertNoParts(target);
     }
@@ -93,8 +98,12 @@ public class PluginBundleUnpackTest {
     public void bundleEntryCannotEscapeItsDestination() throws Exception {
         Path archive = temporary.newFile("escape.zip").toPath();
         Path target = temporary.newFolder("escape-target").toPath();
-        Files.write(archive, storedArchive("../outside.bin", new byte[]{1}));
-        assertThrows(IOException.class, () -> PluginCoreUtils.unpackPlugins(archive, target, ExecutionDeadline.afterMillis(2000)));
+        Files.write(archive, storedArchive("../outside.bin", new byte[] {1}));
+        assertThrows(
+                IOException.class,
+                () ->
+                        PluginCoreUtils.unpackPlugins(
+                                archive, target, ExecutionDeadline.afterMillis(2000)));
         assertFalse(Files.exists(target.getParent().resolve("outside.bin")));
         assertNoParts(target);
     }

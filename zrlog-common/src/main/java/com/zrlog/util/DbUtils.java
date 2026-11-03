@@ -8,7 +8,6 @@ import com.hibegin.common.util.StringUtils;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.common.Constants;
 import com.zrlog.common.ZrLogConfig;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -23,18 +22,24 @@ public class DbUtils {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(DbUtils.class);
 
-    /**
-     * 将 env 配置的 DB_PROPERTIES 写入到实际的文件中，便于程序读取
-     */
+    /** 将 env 配置的 DB_PROPERTIES 写入到实际的文件中，便于程序读取 */
     public static File initDbPropertiesFile(ZrLogConfig zrLogConfig) {
-        File dbFile = PathUtil.getConfFile("/" + Objects.requireNonNullElse(System.getenv("DB_PROPERTIES_FILE_NAME"), "db.properties"));
+        File dbFile =
+                PathUtil.getConfFile(
+                        "/"
+                                + Objects.requireNonNullElse(
+                                        System.getenv("DB_PROPERTIES_FILE_NAME"), "db.properties"));
         dbFile.getParentFile().mkdirs();
         try {
             if (!zrLogConfig.isInstalled()) {
                 return dbFile;
             }
             if (StringUtils.isNotEmpty(ZrLogUtil.getDbInfoByEnv())) {
-                IOUtil.writeBytesToFile(new String(ZrLogUtil.getDbInfoByEnv().getBytes()).replaceAll(" ", "\n").getBytes(), dbFile);
+                IOUtil.writeBytesToFile(
+                        new String(ZrLogUtil.getDbInfoByEnv().getBytes())
+                                .replaceAll(" ", "\n")
+                                .getBytes(),
+                        dbFile);
             }
             Properties properties = getDbProp(dbFile);
             String driverClass = properties.getProperty("driverClass");
@@ -50,7 +55,8 @@ public class DbUtils {
         return dbFile;
     }
 
-    private static void handleMySQLDbProperties(File dbFile, Properties properties) throws IOException {
+    private static void handleMySQLDbProperties(File dbFile, Properties properties)
+            throws IOException {
         String jdbcUrl = ((String) properties.get("jdbcUrl"));
         if (StringUtils.isEmpty(jdbcUrl)) {
             return;
@@ -69,7 +75,6 @@ public class DbUtils {
         }
     }
 
-
     public static Properties getDbProp(File dbPropertiesFile) {
         Properties dbProperties = new Properties();
         try (FileInputStream in = new FileInputStream(dbPropertiesFile)) {
@@ -80,8 +85,8 @@ public class DbUtils {
         return dbProperties;
     }
 
-
-    public static DataSourceWrapper configDatabaseWithRetry(int timeoutInSeconds, ZrLogConfig zrLogConfig) {
+    public static DataSourceWrapper configDatabaseWithRetry(
+            int timeoutInSeconds, ZrLogConfig zrLogConfig) {
         try {
             return zrLogConfig.configDatabase();
         } catch (Exception e) {
@@ -93,7 +98,7 @@ public class DbUtils {
                 try {
                     Thread.sleep(seekSeconds * 1000);
                 } catch (InterruptedException ex) {
-                    //ignore
+                    // ignore
                 }
                 return configDatabaseWithRetry(timeoutInSeconds - seekSeconds, zrLogConfig);
             }
@@ -104,5 +109,4 @@ public class DbUtils {
         }
         return null;
     }
-
 }

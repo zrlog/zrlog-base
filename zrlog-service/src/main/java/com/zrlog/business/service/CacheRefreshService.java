@@ -17,7 +17,6 @@ import com.zrlog.util.ExecutionDeadline;
 import com.zrlog.util.ThreadUtils;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Objects;
@@ -27,9 +26,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-/**
- * 应用内缓存刷新，协调程序缓存、插件缓存和静态发布
- */
+/** 应用内缓存刷新，协调程序缓存、插件缓存和静态发布 */
 @Singleton
 public class CacheRefreshService {
     private static final Logger LOGGER = LoggerUtil.getLogger(CacheRefreshService.class);
@@ -52,7 +49,7 @@ public class CacheRefreshService {
 
     private static int getSyncTimeout() {
         if (EnvKit.isFaaSMode()) {
-            //建议配置 FaaS 为最大超时
+            // 建议配置 FaaS 为最大超时
             return 12 * 60;
         }
         return 3600;
@@ -60,16 +57,21 @@ public class CacheRefreshService {
 
     public boolean isStaticSiteDisabled() {
         PublicWebSiteInfo site = cacheService.getPublicWebSiteInfo();
-        return site == null || !Boolean.TRUE.equals(site.getGenerator_html_status()) || StringUtils.isEmpty(site.getHost());
+        return site == null
+                || !Boolean.TRUE.equals(site.getGenerator_html_status())
+                || StringUtils.isEmpty(site.getHost());
     }
 
-    public void updateCache(boolean async, HttpRequest request, List<StaticSiteType> staticSiteTypeList) {
+    public void updateCache(
+            boolean async, HttpRequest request, List<StaticSiteType> staticSiteTypeList) {
         try {
             if (async) {
                 BaseDataInitVO initVO = cacheService.refreshInitData();
-                ThreadUtils.start(() -> {
-                    refreshPluginCacheData(initVO.getVersion() + "", request, staticSiteTypeList);
-                });
+                ThreadUtils.start(
+                        () -> {
+                            refreshPluginCacheData(
+                                    initVO.getVersion() + "", request, staticSiteTypeList);
+                        });
             } else {
                 updateCacheSynchronouslyOrThrow(request, staticSiteTypeList);
             }
@@ -79,25 +81,36 @@ public class CacheRefreshService {
     }
 
     /**
-     * Refreshes cache data synchronously for callers that need to report the actual completion result.
+     * Refreshes cache data synchronously for callers that need to report the actual completion
+     * result.
      */
-    public void updateCacheSynchronouslyOrThrow(HttpRequest request,
-                                                List<StaticSiteType> staticSiteTypeList) {
+    public void updateCacheSynchronouslyOrThrow(
+            HttpRequest request, List<StaticSiteType> staticSiteTypeList) {
         BaseDataInitVO initVO = cacheService.refreshInitData();
         refreshPluginCacheData(initVO.getVersion() + "", request, staticSiteTypeList);
     }
 
     /**
      * Scheduled work stays in its invoking request. The fence is checked between effects and waits;
-     * unlike the interactive refresh this entry does not create detached executor tasks or retry forever.
+     * unlike the interactive refresh this entry does not create detached executor tasks or retry
+     * forever.
      */
-    public void updateCacheWithinBudget(HttpRequest request, List<StaticSiteType> types,
-                                        String executionId, int actorId,
-                                        java.util.function.LongSupplier remainingMillis, Runnable fence) throws Exception {
+    public void updateCacheWithinBudget(
+            HttpRequest request,
+            List<StaticSiteType> types,
+            String executionId,
+            int actorId,
+            java.util.function.LongSupplier remainingMillis,
+            Runnable fence)
+            throws Exception {
         if (executionId == null || !executionId.matches("[a-zA-Z0-9_.-]{1,128}") || actorId < 1)
             throw new IllegalArgumentException("Invalid cache refresh identity");
-        StaticGenerationBudget budget = new StaticGenerationBudget(
-                ExecutionDeadline.afterMillis(Math.max(0, remainingMillis.getAsLong())), fence, executionId, actorId);
+        StaticGenerationBudget budget =
+                new StaticGenerationBudget(
+                        ExecutionDeadline.afterMillis(Math.max(0, remainingMillis.getAsLong())),
+                        fence,
+                        executionId,
+                        actorId);
         budget.check();
         BaseDataInitVO data = cacheService.refreshInitData();
         PluginCorePlugin plugins = pluginCore.get();
@@ -106,7 +119,8 @@ public class CacheRefreshService {
             if (!plugins.isStarted() && !plugins.startWithinBudget(budget.remainingMillis()))
                 throw new IllegalStateException("Plugin core is unavailable");
             budget.check();
-            if (!plugins.refreshCacheWithinBudget(data.getVersion() + "", executionId, actorId, budget.remainingMillis())) {
+            if (!plugins.refreshCacheWithinBudget(
+                    data.getVersion() + "", executionId, actorId, budget.remainingMillis())) {
                 throw new IllegalStateException("Plugin cache refresh failed");
             }
         }
@@ -115,10 +129,13 @@ public class CacheRefreshService {
         for (StaticSitePlugin site : staticSites.get()) {
             if (!types.contains(site.getType())) continue;
             budget.check();
-            if (!site.startWithinBudget(budget)) throw new IllegalStateException("Static page generation failed");
+            if (!site.startWithinBudget(budget))
+                throw new IllegalStateException("Static page generation failed");
             budget.check();
             String version = site.getSiteVersionWithinBudget(budget);
-            if (plugins != null && !plugins.refreshCacheWithinBudget(version, executionId, actorId, budget.remainingMillis())) {
+            if (plugins != null
+                    && !plugins.refreshCacheWithinBudget(
+                            version, executionId, actorId, budget.remainingMillis())) {
                 throw new IllegalStateException("Static page delivery failed");
             }
             while (true) {
@@ -136,19 +153,19 @@ public class CacheRefreshService {
     }
 
     private void notifyPluginUpdateCache(String cacheVersion, HttpRequest request) {
-        //启动插件
+        // 启动插件
         PluginCorePlugin pluginCorePlugin = pluginCore.get();
         if (Objects.nonNull(pluginCorePlugin) && !pluginCorePlugin.isStarted()) {
             pluginCorePlugin.start();
         }
-        //plugin cache
+        // plugin cache
         if (Objects.nonNull(pluginCorePlugin)) {
             pluginCorePlugin.refreshCache(cacheVersion, request);
         }
     }
 
     private void waitStaticSiteCacheSync(HttpRequest request, StaticSitePlugin staticSitePlugin) {
-        //启动插件
+        // 启动插件
         String version = staticSitePlugin.getSiteVersion();
         notifyPluginUpdateCache(version, request);
         for (; ; ) {
@@ -175,19 +192,33 @@ public class CacheRefreshService {
         if (siteTypes == null || siteTypes.isEmpty()) {
             return false;
         }
-        List<StaticSitePlugin> staticSitePlugins = staticSites.get().stream().filter(e -> siteTypes.contains(e.getType())).collect(Collectors.toList());
+        List<StaticSitePlugin> staticSitePlugins =
+                staticSites.get().stream()
+                        .filter(e -> siteTypes.contains(e.getType()))
+                        .collect(Collectors.toList());
         if (staticSitePlugins.isEmpty()) {
             return false;
         }
         ExecutorService executorService = ThreadUtils.newFixedThreadPool(staticSitePlugins.size());
         try {
-            CompletableFuture.allOf(staticSitePlugins.stream().map(staticSitePlugin -> {
-                return CompletableFuture.runAsync(() -> {
-                    staticSitePlugin.start();
-                    notifyPluginUpdateCache(staticSitePlugin.getSiteVersion(), request);
-                    waitStaticSiteCacheSync(request, staticSitePlugin);
-                }, executorService);
-            }).toArray(CompletableFuture[]::new)).get(getSyncTimeout(), TimeUnit.SECONDS);
+            CompletableFuture.allOf(
+                            staticSitePlugins.stream()
+                                    .map(
+                                            staticSitePlugin -> {
+                                                return CompletableFuture.runAsync(
+                                                        () -> {
+                                                            staticSitePlugin.start();
+                                                            notifyPluginUpdateCache(
+                                                                    staticSitePlugin
+                                                                            .getSiteVersion(),
+                                                                    request);
+                                                            waitStaticSiteCacheSync(
+                                                                    request, staticSitePlugin);
+                                                        },
+                                                        executorService);
+                                            })
+                                    .toArray(CompletableFuture[]::new))
+                    .get(getSyncTimeout(), TimeUnit.SECONDS);
             return true;
         } catch (ExecutionException | InterruptedException | TimeoutException e) {
             throw new RuntimeException(e);
@@ -196,7 +227,8 @@ public class CacheRefreshService {
         }
     }
 
-    private void refreshPluginCacheData(String cacheVersion, HttpRequest request, List<StaticSiteType> staticSiteTypeList) {
+    private void refreshPluginCacheData(
+            String cacheVersion, HttpRequest request, List<StaticSiteType> staticSiteTypeList) {
         notifyPluginUpdateCache(cacheVersion, request);
         if (!isStaticSiteDisabled()) {
             refreshStaticSiteCache(request, staticSiteTypeList);

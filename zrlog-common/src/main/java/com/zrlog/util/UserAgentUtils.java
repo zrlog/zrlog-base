@@ -5,16 +5,21 @@ import java.util.regex.Pattern;
 
 public class UserAgentUtils {
 
-    private static final Pattern ZRLOGCTL_PATTERN = Pattern.compile(
-            "(?:^|\\s)zrlogctl/([-!#$%&'*+.^_`|~0-9A-Za-z]+)(?=\\s|$)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern CLIENT_PRODUCT_PATTERN = Pattern.compile(
-            "^([-!#$%&'*+.^_`|~0-9A-Za-z]+)(?:/([-!#$%&'*+.^_`|~0-9A-Za-z]+))?(?=\\s|$)");
+    private static final Pattern ZRLOGCTL_PATTERN =
+            Pattern.compile(
+                    "(?:^|\\s)zrlogctl/([-!#$%&'*+.^_`|~0-9A-Za-z]+)(?=\\s|$)",
+                    Pattern.CASE_INSENSITIVE);
+    private static final Pattern CLIENT_PRODUCT_PATTERN =
+            Pattern.compile(
+                    "^([-!#$%&'*+.^_`|~0-9A-Za-z]+)(?:/([-!#$%&'*+.^_`|~0-9A-Za-z]+))?(?=\\s|$)");
     // zrlogctl/<version> <caller-name>[/<caller-version>]; comments are not caller products.
-    private static final Pattern AGENT_PRODUCT_PATTERN = Pattern.compile(
-            "^[ \\t]+([-!#$%&'*+.^_`|~0-9A-Za-z]{1,128})(?:/([-!#$%&'*+.^_`|~0-9A-Za-z]{1,128}))?(?=[ \\t]|\\z)");
-    private static final Pattern CRAWLER_PATTERN = Pattern.compile(
-            "(bot|spider|crawler|crawl|slurp|curl|wget|python-requests|python-urllib|java/|okhttp|apache-httpclient|httpclient|go-http-client|postmanruntime|headlesschrome|phantomjs|bingpreview|facebookexternalhit|googleweblight|baiduspider|bytespider|petalbot|semrushbot|ahrefsbot|mj12bot|yandexbot)",
-            Pattern.CASE_INSENSITIVE);
+    private static final Pattern AGENT_PRODUCT_PATTERN =
+            Pattern.compile(
+                    "^[ \\t]+([-!#$%&'*+.^_`|~0-9A-Za-z]{1,128})(?:/([-!#$%&'*+.^_`|~0-9A-Za-z]{1,128}))?(?=[ \\t]|\\z)");
+    private static final Pattern CRAWLER_PATTERN =
+            Pattern.compile(
+                    "(bot|spider|crawler|crawl|slurp|curl|wget|python-requests|python-urllib|java/|okhttp|apache-httpclient|httpclient|go-http-client|postmanruntime|headlesschrome|phantomjs|bingpreview|facebookexternalhit|googleweblight|baiduspider|bytespider|petalbot|semrushbot|ahrefsbot|mj12bot|yandexbot)",
+                    Pattern.CASE_INSENSITIVE);
 
     public static UserAgentInfo parse(String ua) {
         if (ua == null || ua.isEmpty()) {
@@ -117,7 +122,13 @@ public class UserAgentUtils {
             this(os, browser, browserVersion, crawler, null, null);
         }
 
-        public UserAgentInfo(String os, String browser, String browserVersion, boolean crawler, String agentName, String agentVersion) {
+        public UserAgentInfo(
+                String os,
+                String browser,
+                String browserVersion,
+                boolean crawler,
+                String agentName,
+                String agentVersion) {
             this.os = os;
             this.browser = browser;
             this.browserVersion = browserVersion;

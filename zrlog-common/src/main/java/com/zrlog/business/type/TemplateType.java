@@ -1,7 +1,6 @@
 package com.zrlog.business.type;
 
 public enum TemplateType {
-
     STANDARD("template.properties", "setting/config-form.json"),
     NODE_JS("package.json", "_config.yml");
 

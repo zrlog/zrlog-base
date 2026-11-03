@@ -1,15 +1,14 @@
 package com.zrlog.business.updater;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
+
 import com.zrlog.common.updater.UpdateChannel;
 import com.zrlog.common.updater.UpdateVersionCheckResult;
 import com.zrlog.common.vo.Version;
-import org.junit.Test;
-
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertSame;
+import org.junit.Test;
 
 public class UpdateVersionTimerTaskTest {
 
@@ -24,10 +23,12 @@ public class UpdateVersionTimerTaskTest {
     @Test
     public void shouldExposeSelectedChannelAndVersionToConsumers() {
         Version version = version("3.9.0-SNAPSHOT");
-        UpdateVersionCheckResult result = new UpdateVersionCheckResult(version, UpdateChannel.PREVIEW, true);
+        UpdateVersionCheckResult result =
+                new UpdateVersionCheckResult(version, UpdateChannel.PREVIEW, true);
         AtomicReference<Version> consumedVersion = new AtomicReference<>();
         AtomicReference<UpdateVersionCheckResult> consumedResult = new AtomicReference<>();
-        UpdateVersionTimerTask task = new FakeUpdateVersionTimerTask(result, consumedVersion, consumedResult);
+        UpdateVersionTimerTask task =
+                new FakeUpdateVersionTimerTask(result, consumedVersion, consumedResult);
 
         task.run();
 
@@ -39,17 +40,20 @@ public class UpdateVersionTimerTaskTest {
 
     @Test
     public void shouldReportFailureAndKeepPreviouslyCheckedVersion() {
-        java.util.concurrent.atomic.AtomicBoolean fail = new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicBoolean fail =
+                new java.util.concurrent.atomic.AtomicBoolean();
         Version version = version("4.0.0");
-        UpdateVersionTimerTask task = new UpdateVersionTimerTask(false, "zh_CN") {
-            @Override
-            protected UpdateVersionCheckResult fetchLastVersion(boolean preview) throws java.io.IOException {
-                if (fail.get()) {
-                    throw new java.io.IOException("metadata unavailable");
-                }
-                return new UpdateVersionCheckResult(version, UpdateChannel.RELEASE, true);
-            }
-        };
+        UpdateVersionTimerTask task =
+                new UpdateVersionTimerTask(false, "zh_CN") {
+                    @Override
+                    protected UpdateVersionCheckResult fetchLastVersion(boolean preview)
+                            throws java.io.IOException {
+                        if (fail.get()) {
+                            throw new java.io.IOException("metadata unavailable");
+                        }
+                        return new UpdateVersionCheckResult(version, UpdateChannel.RELEASE, true);
+                    }
+                };
         task.run();
         org.junit.Assert.assertFalse(task.isLastCheckFailed());
         fail.set(true);
@@ -65,8 +69,10 @@ public class UpdateVersionTimerTaskTest {
 
         private final UpdateVersionCheckResult result;
 
-        FakeUpdateVersionTimerTask(UpdateVersionCheckResult result, AtomicReference<Version> versionConsumer,
-                                   AtomicReference<UpdateVersionCheckResult> resultConsumer) {
+        FakeUpdateVersionTimerTask(
+                UpdateVersionCheckResult result,
+                AtomicReference<Version> versionConsumer,
+                AtomicReference<UpdateVersionCheckResult> resultConsumer) {
             super(false, "zh_CN", versionConsumer::set, resultConsumer::set);
             this.result = result;
         }

@@ -9,15 +9,12 @@ import com.zrlog.plugin.IPlugin;
 import com.zrlog.util.ThreadUtils;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-
 import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-/**
- * 当超过指定时间后，删除缓存数据，避免缓存到脏数据一直存在。
- */
+/** 当超过指定时间后，删除缓存数据，避免缓存到脏数据一直存在。 */
 @Singleton
 public class CacheManagerPlugin implements IPlugin {
 
@@ -44,12 +41,18 @@ public class CacheManagerPlugin implements IPlugin {
         if (started) {
             return true;
         }
-        scheduledThreadPoolExecutor = new ScheduledThreadPoolExecutor(1, ThreadUtils.getThreadFactory());
-        scheduledThreadPoolExecutor.scheduleAtFixedRate(() -> {
-            if (System.currentTimeMillis() - Constants.getLastAccessTime() > getInitDataMaxCacheTimeout()) {
-                cacheService.refreshInitData();
-            }
-        }, 0, getInitDataMaxCacheTimeout(), TimeUnit.SECONDS);
+        scheduledThreadPoolExecutor =
+                new ScheduledThreadPoolExecutor(1, ThreadUtils.getThreadFactory());
+        scheduledThreadPoolExecutor.scheduleAtFixedRate(
+                () -> {
+                    if (System.currentTimeMillis() - Constants.getLastAccessTime()
+                            > getInitDataMaxCacheTimeout()) {
+                        cacheService.refreshInitData();
+                    }
+                },
+                0,
+                getInitDataMaxCacheTimeout(),
+                TimeUnit.SECONDS);
         this.started = true;
         return true;
     }

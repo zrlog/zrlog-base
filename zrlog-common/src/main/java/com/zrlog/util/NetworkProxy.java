@@ -1,7 +1,6 @@
 package com.zrlog.util;
 
 import com.hibegin.http.server.util.PathUtil;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -12,9 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
 
-/**
- * Startup configuration, available before any WebAPI database connection.
- */
+/** Startup configuration, available before any WebAPI database connection. */
 public final class NetworkProxy {
     public static final String URL_KEY = "network.proxy.url";
     public static final String NO_PROXY_KEY = "network.proxy.noProxy";
@@ -25,8 +22,7 @@ public final class NetworkProxy {
     private static final String LOOPBACK = "localhost|127.*|[::1]|[::ffff:127.*";
     private static Settings effective;
 
-    private NetworkProxy() {
-    }
+    private NetworkProxy() {}
 
     public static synchronized Settings initialize() {
         if (effective == null) {
@@ -81,9 +77,15 @@ public final class NetworkProxy {
                 Files.setPosixFilePermissions(temporary, Files.getPosixFilePermissions(path));
             }
             try (OutputStream output = Files.newOutputStream(temporary)) {
-                file.store(output, "ZrLog outbound HTTP proxy. Restart ZrLog after changing this file.");
+                file.store(
+                        output,
+                        "ZrLog outbound HTTP proxy. Restart ZrLog after changing this file.");
             }
-            Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            Files.move(
+                    temporary,
+                    path,
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
         } finally {
             Files.deleteIfExists(temporary);
         }
@@ -108,16 +110,22 @@ public final class NetworkProxy {
             String token = item.trim();
             if (token.isEmpty()) continue;
             try {
-                if (!token.matches("[A-Za-z0-9.*_:\\[\\]-]+") || token.contains("..") || token.equals(".")) {
+                if (!token.matches("[A-Za-z0-9.*_:\\[\\]-]+")
+                        || token.contains("..")
+                        || token.equals(".")) {
                     throw new IllegalArgumentException();
                 }
                 if (token.contains(":")) {
                     if (!(token.startsWith("[") && token.endsWith("]"))) token = "[" + token + "]";
-                    if (URI.create("http://" + token + "/").getHost() == null) throw new IllegalArgumentException();
+                    if (URI.create("http://" + token + "/").getHost() == null)
+                        throw new IllegalArgumentException();
                 }
             } catch (IllegalArgumentException error) {
-                throw new IllegalArgumentException(NO_PROXY_ENV + " / " + NO_PROXY_KEY
-                        + " must contain comma-separated hosts or domain patterns, without ports or CIDR ranges");
+                throw new IllegalArgumentException(
+                        NO_PROXY_ENV
+                                + " / "
+                                + NO_PROXY_KEY
+                                + " must contain comma-separated hosts or domain patterns, without ports or CIDR ranges");
             }
             if (token.startsWith(".")) {
                 bypass.append('|').append(token.substring(1));
@@ -125,28 +133,45 @@ public final class NetworkProxy {
             }
             bypass.append('|').append(token);
         }
-        return new Settings(http, https, noProxy, source(environment, file, URL_ENV, URL_KEY),
-                source(environment, file, HTTPS_URL_ENV, URL_KEY), source(environment, file, NO_PROXY_ENV, NO_PROXY_KEY),
-                environmentKey(environment, URL_ENV), environmentKey(environment, HTTPS_URL_ENV),
-                environmentKey(environment, NO_PROXY_ENV), bypass.toString());
+        return new Settings(
+                http,
+                https,
+                noProxy,
+                source(environment, file, URL_ENV, URL_KEY),
+                source(environment, file, HTTPS_URL_ENV, URL_KEY),
+                source(environment, file, NO_PROXY_ENV, NO_PROXY_KEY),
+                environmentKey(environment, URL_ENV),
+                environmentKey(environment, HTTPS_URL_ENV),
+                environmentKey(environment, NO_PROXY_ENV),
+                bypass.toString());
     }
 
     private static Endpoint endpoint(String proxy, String variable) {
         if (proxy.isEmpty()) return new Endpoint("", "", 80);
         try {
             URI uri = URI.create(proxy);
-            if (!"http".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null
-                    || uri.getRawUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null
-                    || (uri.getRawPath() != null && !uri.getRawPath().isEmpty() && !"/".equals(uri.getRawPath()))
-                    || uri.getPort() == 0 || uri.getPort() > 65535 || uri.getPort() < -1) {
+            if (!"http".equalsIgnoreCase(uri.getScheme())
+                    || uri.getHost() == null
+                    || uri.getRawUserInfo() != null
+                    || uri.getRawQuery() != null
+                    || uri.getRawFragment() != null
+                    || (uri.getRawPath() != null
+                            && !uri.getRawPath().isEmpty()
+                            && !"/".equals(uri.getRawPath()))
+                    || uri.getPort() == 0
+                    || uri.getPort() > 65535
+                    || uri.getPort() < -1) {
                 throw new IllegalArgumentException();
             }
             int port = uri.getPort() == -1 ? 80 : uri.getPort();
             return new Endpoint("http://" + uri.getHost() + ":" + port, uri.getHost(), port);
         } catch (IllegalArgumentException exception) {
             // Never echo raw configuration: an invalid URI may contain credentials.
-            throw new IllegalArgumentException(variable + " / " + URL_KEY
-                    + " must be an HTTP proxy URL such as http://proxy.example.com:3128 (without credentials)");
+            throw new IllegalArgumentException(
+                    variable
+                            + " / "
+                            + URL_KEY
+                            + " must be an HTTP proxy URL such as http://proxy.example.com:3128 (without credentials)");
         }
     }
 
@@ -156,12 +181,14 @@ public final class NetworkProxy {
         return environment.containsKey(key) ? key : "";
     }
 
-    private static String value(Map<String, String> environment, Properties file, String env, String key) {
+    private static String value(
+            Map<String, String> environment, Properties file, String env, String key) {
         String variable = environmentKey(environment, env);
         return (variable.isEmpty() ? file.getProperty(key, "") : environment.get(variable)).trim();
     }
 
-    private static String source(Map<String, String> environment, Properties file, String env, String key) {
+    private static String source(
+            Map<String, String> environment, Properties file, String env, String key) {
         if (!environmentKey(environment, env).isEmpty()) return "environment";
         return file.containsKey(key) ? "file" : "default";
     }
@@ -196,8 +223,17 @@ public final class NetworkProxy {
         private final String noProxyVariable;
         private final String bypass;
 
-        private Settings(Endpoint http, Endpoint https, String noProxy, String source, String httpsSource, String noProxySource,
-                         String httpVariable, String httpsVariable, String noProxyVariable, String bypass) {
+        private Settings(
+                Endpoint http,
+                Endpoint https,
+                String noProxy,
+                String source,
+                String httpsSource,
+                String noProxySource,
+                String httpVariable,
+                String httpsVariable,
+                String noProxyVariable,
+                String bypass) {
             this.http = http;
             this.https = https;
             this.noProxy = noProxy;
@@ -264,7 +300,9 @@ public final class NetworkProxy {
         }
 
         public boolean samePolicy(Settings other) {
-            return http.url.equals(other.http.url) && https.url.equals(other.https.url) && bypass.equals(other.bypass)
+            return http.url.equals(other.http.url)
+                    && https.url.equals(other.https.url)
+                    && bypass.equals(other.bypass)
                     && "default".equals(source) == "default".equals(other.source)
                     && "default".equals(httpsSource) == "default".equals(other.httpsSource);
         }
@@ -279,7 +317,8 @@ public final class NetworkProxy {
                 public List<Proxy> select(URI uri) {
                     if (uri == null) throw new IllegalArgumentException("URI is required");
                     boolean secure = "https".equalsIgnoreCase(uri.getScheme());
-                    if (!(secure || "http".equalsIgnoreCase(uri.getScheme()))) return List.of(Proxy.NO_PROXY);
+                    if (!(secure || "http".equalsIgnoreCase(uri.getScheme())))
+                        return List.of(Proxy.NO_PROXY);
                     String destination = uri.getHost();
                     if (destination == null) return List.of(Proxy.NO_PROXY);
                     for (String pattern : bypass.split("\\|")) {
@@ -308,7 +347,9 @@ public final class NetworkProxy {
                 properties.put("https.proxyHost", https.host);
                 properties.put("https.proxyPort", Integer.toString(https.port));
             }
-            if (!"default".equals(source) || !"default".equals(httpsSource) || !"default".equals(noProxySource)) {
+            if (!"default".equals(source)
+                    || !"default".equals(httpsSource)
+                    || !"default".equals(noProxySource)) {
                 properties.put("http.nonProxyHosts", bypass);
             }
             return properties;

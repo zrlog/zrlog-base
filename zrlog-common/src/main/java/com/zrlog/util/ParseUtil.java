@@ -1,20 +1,17 @@
 package com.zrlog.util;
 
 import com.hibegin.common.util.StringUtils;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
 import org.jsoup.nodes.TextNode;
 
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
-/**
- * 一些常用的转化的工具方法。
- */
+/** 一些常用的转化的工具方法。 */
 public class ParseUtil {
 
     public static String getPlainSearchText(String content) {
@@ -23,7 +20,6 @@ public class ParseUtil {
         }
         return Jsoup.parse(content).body().text();
     }
-
 
     public static String autoDigest(String str, int size) {
         if (Objects.isNull(str) || str.trim().isEmpty()) {
@@ -72,7 +68,11 @@ public class ParseUtil {
             // 添加开始标签 (不计入长度)
             sb.append("<").append(element.tagName());
             for (org.jsoup.nodes.Attribute attribute : element.attributes()) {
-                sb.append(" ").append(attribute.getKey()).append("=\"").append(attribute.getValue()).append("\"");
+                sb.append(" ")
+                        .append(attribute.getKey())
+                        .append("=\"")
+                        .append(attribute.getValue())
+                        .append("\"");
             }
             sb.append(">");
 
@@ -98,9 +98,7 @@ public class ParseUtil {
         return Jsoup.parse(str).body().text();
     }
 
-    /**
-     *
-     */
+    /** */
     public static int strToInt(String str, int defaultValue) {
         if (str == null) {
             return defaultValue;
@@ -111,9 +109,7 @@ public class ParseUtil {
         return defaultValue;
     }
 
-    /**
-     * 输入一段纯文本，通过指定关键字提取相关的上下文
-     */
+    /** 输入一段纯文本，通过指定关键字提取相关的上下文 */
     public static String wrapperKeyword(String content, String keyword, long digestLength) {
         if (content == null) {
             return null;
@@ -130,18 +126,26 @@ public class ParseUtil {
                 if (strings.length > 1) {
                     for (int i = 0; i < strings.length - 1; i++) {
                         count += strings[i].length();
-                        String str = wrapperFontRed(content.substring(count, count + keyword.length()));
+                        String str =
+                                wrapperFontRed(content.substring(count, count + keyword.length()));
                         sb.append(content, count - strings[i].length(), count);
                         sb.append(str);
                         count += keyword.length();
                     }
                     // 添加最后一段数据
-                    sb.append(content.substring(count).replace(keyword.toLowerCase(), wrapperFontRed(keyword)));
+                    sb.append(
+                            content.substring(count)
+                                    .replace(keyword.toLowerCase(), wrapperFontRed(keyword)));
                     newContent = sb.toString();
                 } else if (strings.length > 0) {
                     sb.append(content, 0, strings[0].length());
-                    sb.append(lowerContent.substring(strings[0].length()).replace(keyword.toLowerCase(),
-                            wrapperFontRed(content.substring(strings[0].length()))));
+                    sb.append(
+                            lowerContent
+                                    .substring(strings[0].length())
+                                    .replace(
+                                            keyword.toLowerCase(),
+                                            wrapperFontRed(
+                                                    content.substring(strings[0].length()))));
                     newContent = sb.toString();
                 } else {
                     newContent = wrapperFontRed(content);
@@ -154,7 +158,8 @@ public class ParseUtil {
                 String[] fontArr = (newContent.substring(first)).split("</font>");
                 newContent = "";
                 for (String str : fontArr) {
-                    if (!"".equals(newContent) && newContent.length() + str.length() > digestLength) {
+                    if (!"".equals(newContent)
+                            && newContent.length() + str.length() > digestLength) {
                         if (newContent.length() < 100) {
                             newContent += str.substring(0, 100);
                         }
@@ -182,13 +187,15 @@ public class ParseUtil {
         stopWord2.add("。");
         String newContent = content;
         for (String stopWord : stopWords) {
-            if (newContent.contains(stopWord) && newContent.indexOf(stopWord) < newContent.indexOf(keyword)) {
+            if (newContent.contains(stopWord)
+                    && newContent.indexOf(stopWord) < newContent.indexOf(keyword)) {
                 newContent = newContent.substring(content.indexOf(stopWord) + 1);
                 break;
             }
         }
         for (String stopWord : stopWord2) {
-            if (newContent.contains(stopWord) && newContent.lastIndexOf(stopWord) > newContent.lastIndexOf(keyword)) {
+            if (newContent.contains(stopWord)
+                    && newContent.lastIndexOf(stopWord) > newContent.lastIndexOf(keyword)) {
                 newContent = newContent.substring(0, newContent.lastIndexOf(stopWord) + 1);
                 break;
             }
@@ -202,7 +209,6 @@ public class ParseUtil {
         }
         return str.matches("-?([1-9]\\d*|0)(\\.\\d+)?");
     }
-
 
     public static String toNamingDurationString(long milliseconds, boolean en) {
         long days = TimeUnit.MILLISECONDS.toDays(milliseconds);

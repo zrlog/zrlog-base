@@ -1,8 +1,8 @@
 package com.hibegin.common.util;
 
 public enum SystemType {
-
-    LINUX(0), WINDOWS(1);
+    LINUX(0),
+    WINDOWS(1);
     private int type;
 
     SystemType(int type) {
@@ -12,7 +12,6 @@ public enum SystemType {
     @Override
     public String toString() {
         return String.valueOf(this.getType());
-
     }
 
     public int getType() {

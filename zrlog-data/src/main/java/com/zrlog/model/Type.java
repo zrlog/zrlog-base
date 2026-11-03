@@ -10,6 +10,7 @@ public class Type extends BaseEntity<Long> {
     private String remark;
     private String typeName;
     private Integer pid;
+
     @Column("arrange_plugin")
     private String arrangePlugin;
 

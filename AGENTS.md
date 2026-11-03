@@ -17,8 +17,13 @@
 ## 构建与验证
 
 ```bash
+./mvnw -q spotless:apply
+./mvnw -q spotless:check
 ./mvnw -q test
 ./mvnw -q -DskipTests install
 ```
+
+在仓库根目录使用 JDK 21 或更高版本运行格式化命令。所有模块的 Java 源码（含测试和 Java 21 多版本源码）统一使用
+Google Java Format AOSP 四空格风格；提交前运行 `spotless:apply`。根工程的 Maven `validate` 阶段会自动检查格式。
 
 涉及公共接口或依赖变化时，在受影响的消费者中验证。保留已有工作区改动，不提交构建输出和本地配置。

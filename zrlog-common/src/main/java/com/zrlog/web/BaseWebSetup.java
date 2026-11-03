@@ -11,7 +11,6 @@ import com.zrlog.util.ZrLogBaseNativeImageUtils;
 import com.zrlog.web.inteceptor.GlobalBaseInterceptor;
 import com.zrlog.web.inteceptor.InstallStatusInterceptor;
 import com.zrlog.web.inteceptor.MyI18nInterceptor;
-
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -34,21 +33,44 @@ public class BaseWebSetup implements WebSetup {
 
     @Override
     public void setup() {
-        zrLogConfig.getServerConfig().getBindings()
-                .interceptor(MyI18nInterceptor.class, r -> new MyI18nInterceptor(() -> {
-                    var provider = zrLogConfig.getWebSetup(WebSiteInfoProvider.class);
-                    var site = provider == null ? null : provider.getPublicWebSiteInfo();
-                    return site == null ? Constants.DEFAULT_LANGUAGE : site.getLanguage();
-                }))
-                .interceptor(InstallStatusInterceptor.class, r -> new InstallStatusInterceptor(
-                        zrLogConfig::isInstalled, zrLogConfig::isMissingConfig))
-                .interceptor(GlobalBaseInterceptor.class, r -> new GlobalBaseInterceptor(!EnvKit.isDevMode()
-                        && zrLogConfig.getUpdater() != null && zrLogConfig.getUpdater().getType() == UpdaterTypeEnum.WAR));
+        zrLogConfig
+                .getServerConfig()
+                .getBindings()
+                .interceptor(
+                        MyI18nInterceptor.class,
+                        r ->
+                                new MyI18nInterceptor(
+                                        () -> {
+                                            var provider =
+                                                    zrLogConfig.getWebSetup(
+                                                            WebSiteInfoProvider.class);
+                                            var site =
+                                                    provider == null
+                                                            ? null
+                                                            : provider.getPublicWebSiteInfo();
+                                            return site == null
+                                                    ? Constants.DEFAULT_LANGUAGE
+                                                    : site.getLanguage();
+                                        }))
+                .interceptor(
+                        InstallStatusInterceptor.class,
+                        r ->
+                                new InstallStatusInterceptor(
+                                        zrLogConfig::isInstalled, zrLogConfig::isMissingConfig))
+                .interceptor(
+                        GlobalBaseInterceptor.class,
+                        r ->
+                                new GlobalBaseInterceptor(
+                                        !EnvKit.isDevMode()
+                                                && zrLogConfig.getUpdater() != null
+                                                && zrLogConfig.getUpdater().getType()
+                                                        == UpdaterTypeEnum.WAR));
         if (ThreadUtils.isEnableLoom() && Constants.debugLoggerPrintAble()) {
             LOGGER.info("Java VirtualThread(loom) enabled");
         }
-        List<Class<? extends Interceptor>> interceptors = zrLogConfig.getServerConfig().getInterceptors();
-        //all
+        List<Class<? extends Interceptor>> interceptors =
+                zrLogConfig.getServerConfig().getInterceptors();
+        // all
         interceptors.add(GlobalBaseInterceptor.class);
         interceptors.add(MyI18nInterceptor.class);
         interceptors.add(InstallStatusInterceptor.class);

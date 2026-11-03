@@ -3,15 +3,12 @@ package com.zrlog.web.inteceptor;
 import com.hibegin.http.server.api.HandleAbleInterceptor;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
-
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 
-/**
- * 全局拦截对程序状态的处理，访问非安装的页面时，统一跳转到 /install 下
- */
+/** 全局拦截对程序状态的处理，访问非安装的页面时，统一跳转到 /install 下 */
 public class InstallStatusInterceptor implements HandleAbleInterceptor {
     private final BooleanSupplier installed;
     private final BooleanSupplier missingConfig;

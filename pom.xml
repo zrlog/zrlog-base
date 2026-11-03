@@ -200,6 +200,40 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>3.11.0</version>
+                <!-- Format all base modules here; consumers keep their own build conventions. -->
+                <inherited>false</inherited>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                    <lineEndings>UNIX</lineEndings>
+                    <java>
+                        <includes>
+                            <include>zrlog-*/src/**/*.java</include>
+                        </includes>
+                        <googleJavaFormat>
+                            <version>1.33.0</version>
+                            <style>AOSP</style>
+                            <reflowLongStrings>false</reflowLongStrings>
+                        </googleJavaFormat>
+                        <importOrder/>
+                        <removeUnusedImports/>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>check-java-format</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.16.0</version>

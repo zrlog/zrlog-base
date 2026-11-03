@@ -6,7 +6,6 @@ import com.zrlog.data.repository.WebSiteRepository;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
-
 import java.sql.SQLException;
 import java.util.Date;
 import java.util.Objects;
@@ -17,8 +16,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
 
 /**
- * Non-reentrant database lock shared by JDBC and WebAPI, including before schema migration.
- * The timeout bounds waiting, not ownership: locks do not expire while protected work may still run.
+ * Non-reentrant database lock shared by JDBC and WebAPI, including before schema migration. The
+ * timeout bounds waiting, not ownership: locks do not expire while protected work may still run.
  */
 public class DistributedLock implements Lock, AutoCloseable {
     public static final String LOCK_PREFIX = "distributed_lock_";
@@ -31,14 +30,13 @@ public class DistributedLock implements Lock, AutoCloseable {
     private Thread ownerThread;
 
     @AssistedInject
-    public DistributedLock(jakarta.inject.Provider<WebSiteRepository> websites, @Assisted String lockKey) {
+    public DistributedLock(
+            jakarta.inject.Provider<WebSiteRepository> websites, @Assisted String lockKey) {
         this.websites = Objects.requireNonNull(websites);
         this.lockKey = storageKey(lockKey);
     }
 
-    /**
-     * Preserve the migration key so older and newer application versions exclude each other.
-     */
+    /** Preserve the migration key so older and newer application versions exclude each other. */
     public static String storageKey(String lockKey) {
         Objects.requireNonNull(lockKey);
         return SCHEMA_UPGRADE_KEY.equals(lockKey) ? lockKey : LOCK_PREFIX + lockKey;
@@ -48,8 +46,9 @@ public class DistributedLock implements Lock, AutoCloseable {
         String message = failure.getMessage();
         return "23505".equals(failure.getSQLState())
                 || ("23000".equals(failure.getSQLState()) && failure.getErrorCode() == 1062)
-                || (message != null && (message.contains("SQLITE_CONSTRAINT_UNIQUE")
-                || message.contains("UNIQUE constraint failed: website.name")));
+                || (message != null
+                        && (message.contains("SQLITE_CONSTRAINT_UNIQUE")
+                                || message.contains("UNIQUE constraint failed: website.name")));
     }
 
     @Override
@@ -57,10 +56,9 @@ public class DistributedLock implements Lock, AutoCloseable {
         return tryLock(time, unit, () -> false);
     }
 
-    /**
-     * Cancellation stops waiting; it never releases another caller's lock.
-     */
-    public boolean tryLock(long time, TimeUnit unit, BooleanSupplier cancelled) throws InterruptedException {
+    /** Cancellation stops waiting; it never releases another caller's lock. */
+    public boolean tryLock(long time, TimeUnit unit, BooleanSupplier cancelled)
+            throws InterruptedException {
         long waitNanos = unit.toNanos(time);
         if (waitNanos <= 0 || waitNanos > TimeUnit.MINUTES.toNanos(10)) {
             throw new IllegalArgumentException("waitTime must be positive and at most 10 minutes");
@@ -110,8 +108,13 @@ public class DistributedLock implements Lock, AutoCloseable {
         }
         String token = UUID.randomUUID().toString();
         try {
-            websites.get().insertLock(lockKey, token,
-                    "Created at " + ResultValueConvertUtils.formatDate(new Date(), "yyyy-MM-dd HH:mm:ss"));
+            websites.get()
+                    .insertLock(
+                            lockKey,
+                            token,
+                            "Created at "
+                                    + ResultValueConvertUtils.formatDate(
+                                            new Date(), "yyyy-MM-dd HH:mm:ss"));
         } catch (SQLException failure) {
             String current;
             try {

@@ -1,25 +1,24 @@
 package com.zrlog.admin.web.token;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.api.HttpResponse;
 import com.hibegin.http.server.web.cookie.Cookie;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.vo.AdminFullTokenVO;
-import org.junit.After;
-import org.junit.Test;
-
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.Assert.*;
+import org.junit.After;
+import org.junit.Test;
 
 public class AdminTokenServiceTest {
 
-    //TODO: Cover the DAO-backed secret lookup path with an isolated DataSource fixture.
+    // TODO: Cover the DAO-backed secret lookup path with an isolated DataSource fixture.
     // The current unit tests intentionally avoid bootstrapping the shared DAO/global config stack.
     private final Map<Integer, Long> personalTimeouts = new HashMap<>();
     // Keep encrypted fixtures deterministic, including the wrong-key padding failure.
@@ -28,9 +27,14 @@ public class AdminTokenServiceTest {
 
     private long now = 1_700_000_000_000L;
 
-    private static Cookie createAdminCookie(AdminTokenService service, String secretKey) throws Exception {
+    private static Cookie createAdminCookie(AdminTokenService service, String secretKey)
+            throws Exception {
         CapturedResponse capturedResponse = new CapturedResponse();
-        service.setAdminToken(7, secretKey, "session-id", "http",
+        service.setAdminToken(
+                7,
+                secretKey,
+                "session-id",
+                "http",
                 request("/admin", new HashMap<>(), null, new HashMap<>()),
                 capturedResponse.response());
         AdminTokenThreadLocal.remove();
@@ -43,7 +47,8 @@ public class AdminTokenServiceTest {
         return headers;
     }
 
-    private static void cacheSecretKey(AdminTokenService service, int userId, String secretKey) throws Exception {
+    private static void cacheSecretKey(AdminTokenService service, int userId, String secretKey)
+            throws Exception {
         secretCache(service).put(userId, secretKey);
     }
 
@@ -55,46 +60,54 @@ public class AdminTokenServiceTest {
         return cache;
     }
 
-    private static HttpRequest request(String contextPath, Map<String, String> headers,
-                                       Cookie[] cookies, Map<String, String[]> params) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                AdminTokenServiceTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    String name = method.getName();
-                    if ("getContextPath".equals(name)) {
-                        return contextPath;
-                    }
-                    if ("getHeader".equals(name)) {
-                        return headers.get((String) args[0]);
-                    }
-                    if ("getHeaderMap".equals(name)) {
-                        return headers;
-                    }
-                    if ("getCookies".equals(name)) {
-                        return cookies;
-                    }
-                    if ("getParaToStr".equals(name)) {
-                        String[] values = params.get((String) args[0]);
-                        return values == null || values.length == 0 ? null : values[0];
-                    }
-                    if ("getParamMap".equals(name)) {
-                        return params;
-                    }
-                    if ("getScheme".equals(name)) {
-                        return "http";
-                    }
-                    if ("toString".equals(name)) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
+    private static HttpRequest request(
+            String contextPath,
+            Map<String, String> headers,
+            Cookie[] cookies,
+            Map<String, String[]> params) {
+        return (HttpRequest)
+                Proxy.newProxyInstance(
+                        AdminTokenServiceTest.class.getClassLoader(),
+                        new Class[] {HttpRequest.class},
+                        (proxy, method, args) -> {
+                            String name = method.getName();
+                            if ("getContextPath".equals(name)) {
+                                return contextPath;
+                            }
+                            if ("getHeader".equals(name)) {
+                                return headers.get((String) args[0]);
+                            }
+                            if ("getHeaderMap".equals(name)) {
+                                return headers;
+                            }
+                            if ("getCookies".equals(name)) {
+                                return cookies;
+                            }
+                            if ("getParaToStr".equals(name)) {
+                                String[] values = params.get((String) args[0]);
+                                return values == null || values.length == 0 ? null : values[0];
+                            }
+                            if ("getParamMap".equals(name)) {
+                                return params;
+                            }
+                            if ("getScheme".equals(name)) {
+                                return "http";
+                            }
+                            if ("toString".equals(name)) {
+                                return "HttpRequestProxy";
+                            }
+                            return null;
+                        });
     }
 
     private AdminTokenService testService(long timeout) {
-        return new AdminTokenService(timeout, () -> installed, () -> staticHtml, () -> {
-            throw new IllegalStateException("No database in token unit tests");
-        },
+        return new AdminTokenService(
+                timeout,
+                () -> installed,
+                () -> staticHtml,
+                () -> {
+                    throw new IllegalStateException("No database in token unit tests");
+                },
                 () -> {
                     throw new IllegalStateException("Preferences are overridden by this test");
                 }) {
@@ -110,7 +123,16 @@ public class AdminTokenServiceTest {
 
             @Override
             protected com.zrlog.data.security.AccountAccess loadAccount(int userId) {
-                return com.zrlog.data.security.AccountAccess.fromRow(Map.of("userId", userId, "role", "owner", "enabled", true, "authVersion", 0));
+                return com.zrlog.data.security.AccountAccess.fromRow(
+                        Map.of(
+                                "userId",
+                                userId,
+                                "role",
+                                "owner",
+                                "enabled",
+                                true,
+                                "authVersion",
+                                0));
             }
         };
     }
@@ -127,13 +149,15 @@ public class AdminTokenServiceTest {
         CapturedResponse capturedResponse = new CapturedResponse();
         HttpRequest request = request("/admin", new HashMap<>(), null, new HashMap<>());
 
-        service.setAdminToken(7, "secret-key", "session-id", "http", request, capturedResponse.response());
+        service.setAdminToken(
+                7, "secret-key", "session-id", "http", request, capturedResponse.response());
         Cookie cookie = capturedResponse.cookies.get(0);
         cacheSecretKey(service, 7, "secret-key");
 
         Map<String, String> headers = new HashMap<>();
         headers.put(AdminTokenService.ADMIN_TOKEN_KEY_IN_REQUEST_HEADER, cookie.getValue());
-        AdminFullTokenVO token = service.getAdminTokenVO(request("/admin", headers, null, new HashMap<>()));
+        AdminFullTokenVO token =
+                service.getAdminTokenVO(request("/admin", headers, null, new HashMap<>()));
 
         assertNotNull(token);
         assertEquals(7, token.getUserId());
@@ -154,8 +178,9 @@ public class AdminTokenServiceTest {
         Cookie cookie = createAdminCookie(service, "secret-key");
         cacheSecretKey(service, 7, "secret-key");
 
-        AdminFullTokenVO token = service.getAdminTokenVO(
-                request("/admin", new HashMap<>(), new Cookie[]{cookie}, new HashMap<>()));
+        AdminFullTokenVO token =
+                service.getAdminTokenVO(
+                        request("/admin", new HashMap<>(), new Cookie[] {cookie}, new HashMap<>()));
 
         assertNotNull(token);
         assertEquals(7, token.getUserId());
@@ -171,8 +196,9 @@ public class AdminTokenServiceTest {
         Map<String, String> headers = new HashMap<>();
         headers.put(AdminTokenService.ADMIN_TOKEN_KEY_IN_REQUEST_HEADER, "bad-token");
 
-        AdminFullTokenVO token = service.getAdminTokenVO(
-                request("/admin", headers, new Cookie[]{cookie}, new HashMap<>()));
+        AdminFullTokenVO token =
+                service.getAdminTokenVO(
+                        request("/admin", headers, new Cookie[] {cookie}, new HashMap<>()));
 
         assertNotNull(token);
         assertEquals(7, token.getUserId());
@@ -185,14 +211,22 @@ public class AdminTokenServiceTest {
         Cookie cookie = createAdminCookie(service, "secret-key");
         cacheSecretKey(service, 7, "wrong-secret");
 
-        assertNull(service.getAdminTokenVO(request("/admin", header("bad-token"), null, new HashMap<>())));
-        assertNull(service.getAdminTokenVO(request("/admin", header("abc#1234"), null, new HashMap<>())));
-        assertNull(service.getAdminTokenVO(request("/admin", header(cookie.getValue()), null, new HashMap<>())));
+        assertNull(
+                service.getAdminTokenVO(
+                        request("/admin", header("bad-token"), null, new HashMap<>())));
+        assertNull(
+                service.getAdminTokenVO(
+                        request("/admin", header("abc#1234"), null, new HashMap<>())));
+        assertNull(
+                service.getAdminTokenVO(
+                        request("/admin", header(cookie.getValue()), null, new HashMap<>())));
         assertFalse(secretCache(service).containsKey(7));
 
         cacheSecretKey(service, 7, "secret-key");
         now += 31 * 60000;
-        assertNull(service.getAdminTokenVO(request("/admin", header(cookie.getValue()), null, new HashMap<>())));
+        assertNull(
+                service.getAdminTokenVO(
+                        request("/admin", header(cookie.getValue()), null, new HashMap<>())));
     }
 
     @Test
@@ -202,21 +236,46 @@ public class AdminTokenServiceTest {
         AdminTokenService service = testService(30);
         Cookie first = createAdminCookie(service, "secret-key");
         cacheSecretKey(service, 7, "secret-key");
-        AdminFullTokenVO original = service.getAdminTokenVO(request("/admin", header(first.getValue()), null, new HashMap<>()));
+        AdminFullTokenVO original =
+                service.getAdminTokenVO(
+                        request("/admin", header(first.getValue()), null, new HashMap<>()));
         assertEquals(Long.valueOf(now + 10 * 60000), original.getExpiresAt());
         personalTimeouts.put(7, 60L);
         service.updateSessionTimeout(120);
         now += 2 * 60000;
         CapturedResponse renewed = new CapturedResponse();
-        service.refreshAdminToken(original, request("/admin", new HashMap<>(), null, new HashMap<>()), renewed.response());
-        AdminFullTokenVO refreshed = service.getAdminTokenVO(request("/admin", header(renewed.cookies.get(0).getValue()), null, new HashMap<>()));
+        service.refreshAdminToken(
+                original,
+                request("/admin", new HashMap<>(), null, new HashMap<>()),
+                renewed.response());
+        AdminFullTokenVO refreshed =
+                service.getAdminTokenVO(
+                        request(
+                                "/admin",
+                                header(renewed.cookies.get(0).getValue()),
+                                null,
+                                new HashMap<>()));
         assertEquals(Long.valueOf(now + 10 * 60000), refreshed.getExpiresAt());
         Cookie signedInAgain = createAdminCookie(service, "secret-key");
-        AdminFullTokenVO next = service.getAdminTokenVO(request("/admin", header(signedInAgain.getValue()), null, new HashMap<>()));
+        AdminFullTokenVO next =
+                service.getAdminTokenVO(
+                        request("/admin", header(signedInAgain.getValue()), null, new HashMap<>()));
         assertEquals(Long.valueOf(now + 60 * 60000), next.getExpiresAt());
         now += 10 * 60000;
-        assertNull(service.getAdminTokenVO(request("/admin", header(renewed.cookies.get(0).getValue()), null, new HashMap<>())));
-        assertNotNull(service.getAdminTokenVO(request("/admin", header(signedInAgain.getValue()), null, new HashMap<>())));
+        assertNull(
+                service.getAdminTokenVO(
+                        request(
+                                "/admin",
+                                header(renewed.cookies.get(0).getValue()),
+                                null,
+                                new HashMap<>())));
+        assertNotNull(
+                service.getAdminTokenVO(
+                        request(
+                                "/admin",
+                                header(signedInAgain.getValue()),
+                                null,
+                                new HashMap<>())));
     }
 
     @Test
@@ -229,21 +288,49 @@ public class AdminTokenServiceTest {
         legacy.setCreatedDate(now);
         legacy.setSessionId("legacy");
         legacy.setProtocol("http");
-        java.lang.reflect.Method encrypt = AdminTokenService.class.getDeclaredMethod("encrypt", String.class, byte[].class);
+        java.lang.reflect.Method encrypt =
+                AdminTokenService.class.getDeclaredMethod("encrypt", String.class, byte[].class);
         encrypt.setAccessible(true);
-        byte[] encrypted = (byte[]) encrypt.invoke(service, "secret-key", new com.google.gson.Gson().toJson(legacy).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        String token = "7#" + com.zrlog.admin.web.util.ByteUtils.bytesToHexString(java.util.Base64.getEncoder().encode(encrypted));
-        AdminFullTokenVO parsed = service.getAdminTokenVO(request("/admin", header(token), null, new HashMap<>()));
+        byte[] encrypted =
+                (byte[])
+                        encrypt.invoke(
+                                service,
+                                "secret-key",
+                                new com.google.gson.Gson()
+                                        .toJson(legacy)
+                                        .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String token =
+                "7#"
+                        + com.zrlog.admin.web.util.ByteUtils.bytesToHexString(
+                                java.util.Base64.getEncoder().encode(encrypted));
+        AdminFullTokenVO parsed =
+                service.getAdminTokenVO(request("/admin", header(token), null, new HashMap<>()));
         assertNotNull(parsed);
         assertNull(parsed.getExpiresAt());
         personalTimeouts.put(7, 60L);
         CapturedResponse renewed = new CapturedResponse();
-        service.refreshAdminToken(parsed, request("/admin", new HashMap<>(), null, new HashMap<>()), renewed.response());
-        AdminFullTokenVO refreshed = service.getAdminTokenVO(request("/admin", header(renewed.cookies.get(0).getValue()), null, new HashMap<>()));
+        service.refreshAdminToken(
+                parsed,
+                request("/admin", new HashMap<>(), null, new HashMap<>()),
+                renewed.response());
+        AdminFullTokenVO refreshed =
+                service.getAdminTokenVO(
+                        request(
+                                "/admin",
+                                header(renewed.cookies.get(0).getValue()),
+                                null,
+                                new HashMap<>()));
         assertEquals(Long.valueOf(now + 30 * 60000), refreshed.getExpiresAt());
         service.updateSessionTimeout(-1);
-        assertNull(service.getAdminTokenVO(request("/admin", header(token), null, new HashMap<>())));
-        assertNotNull(service.getAdminTokenVO(request("/admin", header(renewed.cookies.get(0).getValue()), null, new HashMap<>())));
+        assertNull(
+                service.getAdminTokenVO(request("/admin", header(token), null, new HashMap<>())));
+        assertNotNull(
+                service.getAdminTokenVO(
+                        request(
+                                "/admin",
+                                header(renewed.cookies.get(0).getValue()),
+                                null,
+                                new HashMap<>())));
     }
 
     @Test
@@ -263,15 +350,26 @@ public class AdminTokenServiceTest {
         cookie.setName("other-token");
         cookie.setValue("token");
 
-        assertNull(service.getAdminTokenVO(request("/admin", new HashMap<>(), null, new HashMap<>())));
-        assertNull(service.getAdminTokenVO(request("/admin", new HashMap<>(), new Cookie[]{cookie}, new HashMap<>())));
+        assertNull(
+                service.getAdminTokenVO(request("/admin", new HashMap<>(), null, new HashMap<>())));
+        assertNull(
+                service.getAdminTokenVO(
+                        request(
+                                "/admin",
+                                new HashMap<>(),
+                                new Cookie[] {cookie},
+                                new HashMap<>())));
     }
 
     @Test
     public void shouldFollowStaticModeForCookieAndLogoutWithoutGlobalConfig() throws Exception {
         AdminTokenService service = testService(30);
-        HttpRequest request = request("/admin", Map.of("Referer", "https://site.example/admin/page"),
-                new Cookie[0], Map.of("sp", new String[]{"true"}));
+        HttpRequest request =
+                request(
+                        "/admin",
+                        Map.of("Referer", "https://site.example/admin/page"),
+                        new Cookie[0],
+                        Map.of("sp", new String[] {"true"}));
         CapturedResponse dynamic = new CapturedResponse();
         service.setAdminToken(7, "secret-key", "session-id", "https", request, dynamic.response());
         assertFalse("None".equals(dynamic.cookies.get(0).getSameSite()));
@@ -294,8 +392,13 @@ public class AdminTokenServiceTest {
         Map<String, String> headers = new HashMap<>();
         headers.put("Origin", "https://admin.example.com");
 
-        service.setAdminToken(7, "secret-key", "session-id", "https",
-                request("/admin", headers, null, new HashMap<>()), capturedResponse.response());
+        service.setAdminToken(
+                7,
+                "secret-key",
+                "session-id",
+                "https",
+                request("/admin", headers, null, new HashMap<>()),
+                capturedResponse.response());
 
         Cookie cookie = capturedResponse.cookies.get(0);
         assertTrue(cookie.isSecure());
@@ -320,8 +423,9 @@ public class AdminTokenServiceTest {
     public void shouldReturnNullWhenSiteIsNotInstalled() {
         installed = false;
 
-        AdminFullTokenVO token = testService(30)
-                .getAdminTokenVO(request("/", new HashMap<>(), null, new HashMap<>()));
+        AdminFullTokenVO token =
+                testService(30)
+                        .getAdminTokenVO(request("/", new HashMap<>(), null, new HashMap<>()));
 
         assertNull(token);
     }
@@ -333,9 +437,10 @@ public class AdminTokenServiceTest {
         cookie.setName("admin-token");
         cookie.setValue("token");
 
-        testService(30).removeAdminToken(
-                request("/", new HashMap<>(), new Cookie[]{cookie}, new HashMap<>()),
-                capturedResponse.response());
+        testService(30)
+                .removeAdminToken(
+                        request("/", new HashMap<>(), new Cookie[] {cookie}, new HashMap<>()),
+                        capturedResponse.response());
 
         assertEquals("", capturedResponse.cookies.get(0).getValue());
         assertEquals("/", capturedResponse.cookies.get(0).getPath());
@@ -350,9 +455,10 @@ public class AdminTokenServiceTest {
         Map<String, String> headers = new HashMap<>();
         headers.put("Referer", "https://example.com/admin/page");
 
-        testService(30).removeAdminToken(
-                request("/admin", headers, new Cookie[0], new HashMap<>()),
-                capturedResponse.response());
+        testService(30)
+                .removeAdminToken(
+                        request("/admin", headers, new Cookie[0], new HashMap<>()),
+                        capturedResponse.response());
 
         assertEquals(TokenService.ADMIN_LOGIN_URI_PATH, capturedResponse.redirects.get(0));
     }
@@ -365,13 +471,15 @@ public class AdminTokenServiceTest {
         headers.put("Referer", "https://example.com/admin/page");
         headers.put("Origin", "https://example.com");
         Map<String, String[]> params = new HashMap<>();
-        params.put("sp", new String[]{"true"});
+        params.put("sp", new String[] {"true"});
 
-        testService(30).removeAdminToken(
-                request("/admin", headers, new Cookie[0], params),
-                capturedResponse.response());
+        testService(30)
+                .removeAdminToken(
+                        request("/admin", headers, new Cookie[0], params),
+                        capturedResponse.response());
 
-        assertEquals("https://example.com/admin/admin/login.html", capturedResponse.redirects.get(0));
+        assertEquals(
+                "https://example.com/admin/admin/login.html", capturedResponse.redirects.get(0));
     }
 
     private static class CapturedResponse {
@@ -379,27 +487,27 @@ public class AdminTokenServiceTest {
         private final List<String> redirects = new ArrayList<>();
 
         HttpResponse response() {
-            return (HttpResponse) Proxy.newProxyInstance(
-                    getClass().getClassLoader(),
-                    new Class[]{HttpResponse.class},
-                    (proxy, method, args) -> {
-                        if ("addCookie".equals(method.getName())) {
-                            cookies.add((Cookie) args[0]);
-                            return null;
-                        }
-                        if ("redirect".equals(method.getName())) {
-                            redirects.add((String) args[0]);
-                            return null;
-                        }
-                        if ("getHeader".equals(method.getName())) {
-                            return new HashMap<String, String>();
-                        }
-                        if ("toString".equals(method.getName())) {
-                            return "HttpResponseProxy";
-                        }
-                        return null;
-                    });
+            return (HttpResponse)
+                    Proxy.newProxyInstance(
+                            getClass().getClassLoader(),
+                            new Class[] {HttpResponse.class},
+                            (proxy, method, args) -> {
+                                if ("addCookie".equals(method.getName())) {
+                                    cookies.add((Cookie) args[0]);
+                                    return null;
+                                }
+                                if ("redirect".equals(method.getName())) {
+                                    redirects.add((String) args[0]);
+                                    return null;
+                                }
+                                if ("getHeader".equals(method.getName())) {
+                                    return new HashMap<String, String>();
+                                }
+                                if ("toString".equals(method.getName())) {
+                                    return "HttpResponseProxy";
+                                }
+                                return null;
+                            });
         }
     }
-
 }

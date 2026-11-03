@@ -1,25 +1,26 @@
 package com.zrlog.data.util;
 
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import org.junit.Test;
 
 public class DateValueFormatUtilsTest {
 
     @Test
     public void shouldFormatStandardDateValues() {
-        assertEquals("2026-01-20",
-                DateValueFormatUtils.format("2026-01-20 11:00:00", "yyyy-MM-dd"));
+        assertEquals(
+                "2026-01-20", DateValueFormatUtils.format("2026-01-20 11:00:00", "yyyy-MM-dd"));
     }
 
     @Test
     public void shouldFallbackToLocalizedEnglishDateString() {
-        assertEquals("2026-01-20 11:00:00",
-                DateValueFormatUtils.format("Jan 20, 2026, 11:00:00\u202fAM", "yyyy-MM-dd HH:mm:ss"));
+        assertEquals(
+                "2026-01-20 11:00:00",
+                DateValueFormatUtils.format(
+                        "Jan 20, 2026, 11:00:00\u202fAM", "yyyy-MM-dd HH:mm:ss"));
     }
 
     @Test
@@ -30,10 +31,12 @@ public class DateValueFormatUtilsTest {
 
     @Test
     public void shouldKeepUtilityConstructorPrivate() throws Exception {
-        Constructor<DateValueFormatUtils> constructor = DateValueFormatUtils.class.getDeclaredConstructor();
+        Constructor<DateValueFormatUtils> constructor =
+                DateValueFormatUtils.class.getDeclaredConstructor();
         constructor.setAccessible(true);
 
-        InvocationTargetException thrown = assertThrows(InvocationTargetException.class, constructor::newInstance);
+        InvocationTargetException thrown =
+                assertThrows(InvocationTargetException.class, constructor::newInstance);
 
         assertEquals(UnsupportedOperationException.class, thrown.getCause().getClass());
     }

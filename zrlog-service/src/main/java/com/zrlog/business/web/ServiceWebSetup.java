@@ -14,12 +14,9 @@ import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.web.WebSetup;
 import com.zrlog.web.WebSetupContext;
-
 import java.io.File;
 
-/**
- * Owns shared service plugins and database upgrades.
- */
+/** Owns shared service plugins and database upgrades. */
 public final class ServiceWebSetup implements WebSetup {
     private final ZrLogConfig config;
     private final File dbPropertiesFile;
@@ -72,15 +69,21 @@ public final class ServiceWebSetup implements WebSetup {
                         .build()
                         .get(ServiceComponent.class)
                         .cacheManager());
-        plugins.add(new PluginCorePluginImpl(dbPropertiesFile, contextPath,
-                config.getServerConfig()::getPort, cache::getPublicWebSiteInfo));
+        plugins.add(
+                new PluginCorePluginImpl(
+                        dbPropertiesFile,
+                        contextPath,
+                        config.getServerConfig()::getPort,
+                        cache::getPublicWebSiteInfo));
         return plugins;
     }
 
     @Override
     public void beforeDatabaseReady(DataSourceWrapper dataSource) throws java.sql.SQLException {
         // Read only the historical schema marker before cache construction or Entity-backed writes.
-        String stored = new WebSiteRepository(dataSource).findValueByName(CacheService.ZRLOG_SQL_VERSION_KEY);
+        String stored =
+                new WebSiteRepository(dataSource)
+                        .findValueByName(CacheService.ZRLOG_SQL_VERSION_KEY);
         long sqlVersion = stored == null ? -1 : Long.parseLong(stored);
         if (sqlVersion >= 0) {
             DbUpgradeService upgrade;
@@ -88,8 +91,13 @@ public final class ServiceWebSetup implements WebSetup {
                 if (stopping) {
                     throw new java.sql.SQLException("Application stopped before schema migration");
                 }
-                upgrade = config.getServerConfig().getBindings().build().get(ServiceComponent.class)
-                        .databaseUpgrades().create(sqlVersion);
+                upgrade =
+                        config.getServerConfig()
+                                .getBindings()
+                                .build()
+                                .get(ServiceComponent.class)
+                                .databaseUpgrades()
+                                .create(sqlVersion);
                 migration = upgrade;
             }
             upgrade.tryDoUpgrade();
@@ -107,7 +115,8 @@ public final class ServiceWebSetup implements WebSetup {
             try {
                 current.close();
             } catch (java.sql.SQLException failure) {
-                throw new IllegalStateException("Cannot release schema migration lock during application stop", failure);
+                throw new IllegalStateException(
+                        "Cannot release schema migration lock during application stop", failure);
             }
         }
     }

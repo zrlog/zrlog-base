@@ -1,5 +1,7 @@
 package com.zrlog.business.util;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.DatabaseConnectPoolInfo;
 import com.hibegin.common.util.SystemType;
@@ -30,14 +32,6 @@ import com.zrlog.plugin.Plugins;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.ExecutionDeadline;
 import com.zrlog.web.WebSiteInfoProvider;
-import org.apache.commons.dbutils.QueryRunner;
-import org.apache.commons.dbutils.ResultSetHandler;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -66,14 +60,18 @@ import java.util.jar.JarOutputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.CRC32;
-
-import static org.junit.Assert.*;
+import org.apache.commons.dbutils.QueryRunner;
+import org.apache.commons.dbutils.ResultSetHandler;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 public class ServiceUtilityFallbackTest {
 
     private final Logger cmdLogger = Logger.getLogger(CmdUtil.class.getName());
-    @Rule
-    public TemporaryFolder temporaryFolder = new TemporaryFolder();
+    @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
     private DataSourceWrapper queryDataSource;
     private com.zrlog.common.ZrLogConfig applicationConfig;
     private Level previousLevel;
@@ -91,18 +89,19 @@ public class ServiceUtilityFallbackTest {
     }
 
     private static HttpRequest request(String scheme) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                ServiceUtilityFallbackTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getScheme".equals(method.getName())) {
-                        return scheme;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
+        return (HttpRequest)
+                Proxy.newProxyInstance(
+                        ServiceUtilityFallbackTest.class.getClassLoader(),
+                        new Class[] {HttpRequest.class},
+                        (proxy, method, args) -> {
+                            if ("getScheme".equals(method.getName())) {
+                                return scheme;
+                            }
+                            if ("toString".equals(method.getName())) {
+                                return "HttpRequestProxy";
+                            }
+                            return null;
+                        });
     }
 
     private static byte[] pluginCoreJar() throws IOException {
@@ -209,7 +208,8 @@ public class ServiceUtilityFallbackTest {
     private static int indexOf(byte[] value, byte[] pattern) {
         for (int index = 0; index <= value.length - pattern.length; index++) {
             int patternIndex = 0;
-            while (patternIndex < pattern.length && value[index + patternIndex] == pattern[patternIndex]) {
+            while (patternIndex < pattern.length
+                    && value[index + patternIndex] == pattern[patternIndex]) {
                 patternIndex++;
             }
             if (patternIndex == pattern.length) {
@@ -219,56 +219,68 @@ public class ServiceUtilityFallbackTest {
         return -1;
     }
 
-    private static HttpServer startDownloadServer(String fileName, int statusCode, long contentLength,
-                                                  byte[] body) throws IOException {
+    private static HttpServer startDownloadServer(
+            String fileName, int statusCode, long contentLength, byte[] body) throws IOException {
         return startDownloadServer(fileName, statusCode, contentLength, body, null);
     }
 
-    private static HttpServer startDownloadServer(String fileName, int statusCode, long contentLength,
-                                                  byte[] body, AtomicInteger requestCount) throws IOException {
+    private static HttpServer startDownloadServer(
+            String fileName,
+            int statusCode,
+            long contentLength,
+            byte[] body,
+            AtomicInteger requestCount)
+            throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/plugin/core/" + fileName, exchange -> {
-            if (requestCount != null) {
-                requestCount.incrementAndGet();
-            }
-            exchange.sendResponseHeaders(statusCode, contentLength);
-            try {
-                exchange.getResponseBody().write(body);
-            } finally {
-                exchange.close();
-            }
-        });
+        server.createContext(
+                "/plugin/core/" + fileName,
+                exchange -> {
+                    if (requestCount != null) {
+                        requestCount.incrementAndGet();
+                    }
+                    exchange.sendResponseHeaders(statusCode, contentLength);
+                    try {
+                        exchange.getResponseBody().write(body);
+                    } finally {
+                        exchange.close();
+                    }
+                });
         server.start();
         return server;
     }
 
-    private static HttpServer startNativeDownloadServer(String fileName, long contentLength,
-                                                        byte[] body, String checksum) throws IOException {
+    private static HttpServer startNativeDownloadServer(
+            String fileName, long contentLength, byte[] body, String checksum) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/plugin/core/" + fileName, exchange -> {
-            exchange.sendResponseHeaders(200, contentLength);
-            try {
-                exchange.getResponseBody().write(body);
-            } finally {
-                exchange.close();
-            }
-        });
+        server.createContext(
+                "/plugin/core/" + fileName,
+                exchange -> {
+                    exchange.sendResponseHeaders(200, contentLength);
+                    try {
+                        exchange.getResponseBody().write(body);
+                    } finally {
+                        exchange.close();
+                    }
+                });
         byte[] checksumBody = (checksum + "  " + fileName + "\n").getBytes(StandardCharsets.UTF_8);
-        server.createContext("/plugin/core/" + fileName + ".md5", exchange -> {
-            exchange.sendResponseHeaders(200, checksumBody.length);
-            try {
-                exchange.getResponseBody().write(checksumBody);
-            } finally {
-                exchange.close();
-            }
-        });
+        server.createContext(
+                "/plugin/core/" + fileName + ".md5",
+                exchange -> {
+                    exchange.sendResponseHeaders(200, checksumBody.length);
+                    try {
+                        exchange.getResponseBody().write(checksumBody);
+                    } finally {
+                        exchange.close();
+                    }
+                });
         server.start();
         return server;
     }
 
     private static void assertNoPluginCoreDownloadParts(File pluginsFolder) {
-        File[] downloadParts = pluginsFolder.listFiles((dir, name) -> name.startsWith("plugin-core")
-                && name.endsWith(".part"));
+        File[] downloadParts =
+                pluginsFolder.listFiles(
+                        (dir, name) -> name.startsWith("plugin-core") && name.endsWith(".part"));
         assertNotNull(downloadParts);
         assertEquals(0, downloadParts.length);
     }
@@ -282,40 +294,42 @@ public class ServiceUtilityFallbackTest {
     }
 
     private static DataSourceWrapper dataSource(QueryRunner queryRunner) {
-        return (DataSourceWrapper) Proxy.newProxyInstance(
-                ServiceUtilityFallbackTest.class.getClassLoader(),
-                new Class[]{DataSourceWrapper.class},
-                (proxy, method, args) -> {
-                    if ("getQueryRunner".equals(method.getName())) {
-                        return queryRunner;
-                    }
-                    if ("getDataSourceProperties".equals(method.getName())) {
-                        return new Properties();
-                    }
-                    if ("getDatabaseConnectPoolInfo".equals(method.getName())) {
-                        return new DatabaseConnectPoolInfo(0, 0);
-                    }
-                    if ("getDbInfo".equals(method.getName())) {
-                        return "test-db";
-                    }
-                    if ("isWebApi".equals(method.getName()) || "isDev".equals(method.getName())) {
-                        return false;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "DataSourceWrapperProxy";
-                    }
-                    Class<?> returnType = method.getReturnType();
-                    if (returnType == boolean.class) {
-                        return false;
-                    }
-                    if (returnType == int.class) {
-                        return 0;
-                    }
-                    if (returnType == long.class) {
-                        return 0L;
-                    }
-                    return null;
-                });
+        return (DataSourceWrapper)
+                Proxy.newProxyInstance(
+                        ServiceUtilityFallbackTest.class.getClassLoader(),
+                        new Class[] {DataSourceWrapper.class},
+                        (proxy, method, args) -> {
+                            if ("getQueryRunner".equals(method.getName())) {
+                                return queryRunner;
+                            }
+                            if ("getDataSourceProperties".equals(method.getName())) {
+                                return new Properties();
+                            }
+                            if ("getDatabaseConnectPoolInfo".equals(method.getName())) {
+                                return new DatabaseConnectPoolInfo(0, 0);
+                            }
+                            if ("getDbInfo".equals(method.getName())) {
+                                return "test-db";
+                            }
+                            if ("isWebApi".equals(method.getName())
+                                    || "isDev".equals(method.getName())) {
+                                return false;
+                            }
+                            if ("toString".equals(method.getName())) {
+                                return "DataSourceWrapperProxy";
+                            }
+                            Class<?> returnType = method.getReturnType();
+                            if (returnType == boolean.class) {
+                                return false;
+                            }
+                            if (returnType == int.class) {
+                                return 0;
+                            }
+                            if (returnType == long.class) {
+                                return 0L;
+                            }
+                            return null;
+                        });
     }
 
     @Before
@@ -345,10 +359,11 @@ public class ServiceUtilityFallbackTest {
 
     @Test
     public void shouldParseLinuxPidFromNetstatOutput() {
-        String output = "Active Internet connections (servers and established)\n"
-                + "Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name\n"
-                + "tcp        0      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      1234/java\n"
-                + "tcp        0      0 127.0.0.1:not-a-port    0.0.0.0:*               LISTEN      4321/java\n";
+        String output =
+                "Active Internet connections (servers and established)\n"
+                        + "Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name\n"
+                        + "tcp        0      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      1234/java\n"
+                        + "tcp        0      0 127.0.0.1:not-a-port    0.0.0.0:*               LISTEN      4321/java\n";
 
         assertEquals(1234, CmdUtil.findPidByPort(output, 8080, SystemType.LINUX));
         assertEquals(-1, CmdUtil.findPidByPort(output, 9090, SystemType.LINUX));
@@ -356,18 +371,22 @@ public class ServiceUtilityFallbackTest {
 
     @Test
     public void shouldIgnoreMissingOrNonLinuxPidFromNetstatOutput() {
-        String windowsStyleOutput = "Active Connections\n"
-                + "Proto  Local Address          Foreign Address        State\n"
-                + "TCP    0.0.0.0:8080           0.0.0.0:0              LISTENING\n";
-        String shortLinuxOutput = "Active Internet connections (servers and established)\n"
-                + "Proto Recv-Q Send-Q Local Address Foreign Address State PID/Program name\n"
-                + "tcp 0 0\n";
-        String linuxWithoutPidOutput = "Active Internet connections (servers and established)\n"
-                + "Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name\n"
-                + "tcp        0      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      -\n";
-        String linuxWithoutPortOutput = "Active Internet connections (servers and established)\n"
-                + "Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name\n"
-                + "tcp        0      0 0.0.0.0                 0.0.0.0:*               LISTEN      1234/java\n";
+        String windowsStyleOutput =
+                "Active Connections\n"
+                        + "Proto  Local Address          Foreign Address        State\n"
+                        + "TCP    0.0.0.0:8080           0.0.0.0:0              LISTENING\n";
+        String shortLinuxOutput =
+                "Active Internet connections (servers and established)\n"
+                        + "Proto Recv-Q Send-Q Local Address Foreign Address State PID/Program name\n"
+                        + "tcp 0 0\n";
+        String linuxWithoutPidOutput =
+                "Active Internet connections (servers and established)\n"
+                        + "Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name\n"
+                        + "tcp        0      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      -\n";
+        String linuxWithoutPortOutput =
+                "Active Internet connections (servers and established)\n"
+                        + "Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name\n"
+                        + "tcp        0      0 0.0.0.0                 0.0.0.0:*               LISTEN      1234/java\n";
 
         assertEquals(-1, CmdUtil.findPidByPort(null, 8080, SystemType.LINUX));
         assertEquals(-1, CmdUtil.findPidByPort("", 8080, SystemType.LINUX));
@@ -381,10 +400,13 @@ public class ServiceUtilityFallbackTest {
     public void shouldKillFoundPidByPortThroughInjectedHandlers() {
         AtomicInteger killedPid = new AtomicInteger(-1);
 
-        CmdUtil.killProcByPort(8080, port -> {
-            assertEquals(8080, port);
-            return 1234;
-        }, killedPid::set);
+        CmdUtil.killProcByPort(
+                8080,
+                port -> {
+                    assertEquals(8080, port);
+                    return 1234;
+                },
+                killedPid::set);
 
         assertEquals(1234, killedPid.get());
     }
@@ -394,12 +416,18 @@ public class ServiceUtilityFallbackTest {
         AtomicInteger killedPid = new AtomicInteger(-1);
 
         CmdUtil.killProcByPort(8080, port -> -1, killedPid::set);
-        CmdUtil.killProcByPort(8080, port -> {
-            throw new IllegalStateException("find failed");
-        }, killedPid::set);
-        CmdUtil.killProcByPort(8080, port -> 1234, pid -> {
-            throw new IllegalStateException("kill failed");
-        });
+        CmdUtil.killProcByPort(
+                8080,
+                port -> {
+                    throw new IllegalStateException("find failed");
+                },
+                killedPid::set);
+        CmdUtil.killProcByPort(
+                8080,
+                port -> 1234,
+                pid -> {
+                    throw new IllegalStateException("kill failed");
+                });
 
         assertEquals(-1, killedPid.get());
         assertNotNull(new CmdUtil());
@@ -409,15 +437,18 @@ public class ServiceUtilityFallbackTest {
     public void shouldReturnExistingPluginCoreFileWithoutDownload() throws Exception {
         AtomicInteger requestCount = new AtomicInteger();
         byte[] pluginCoreJar = pluginCoreJar();
-        HttpServer server = startDownloadServer("plugin-core.jar", 200, pluginCoreJar.length, pluginCoreJar,
-                requestCount);
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        HttpServer server =
+                startDownloadServer(
+                        "plugin-core.jar", 200, pluginCoreJar.length, pluginCoreJar, requestCount);
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core").toFile();
         File pluginCore = new File(pluginsFolder, "plugin-core.jar");
         Files.write(pluginCore.toPath(), pluginCoreJar);
         try {
-            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
+            File result =
+                    PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
 
             assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
             assertArrayEquals(pluginCoreJar, Files.readAllBytes(result.toPath()));
@@ -433,12 +464,14 @@ public class ServiceUtilityFallbackTest {
     public void shouldDownloadPluginCoreFileFromConfiguredResourceHost() throws Exception {
         byte[] body = pluginCoreJar();
         HttpServer server = startDownloadServer("plugin-core.jar", 200, body.length, body);
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
             File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-download").toFile();
 
-            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
+            File result =
+                    PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
 
             assertEquals("plugin-core.jar", result.getName());
             assertArrayEquals(body, Files.readAllBytes(result.toPath()));
@@ -456,36 +489,51 @@ public class ServiceUtilityFallbackTest {
         java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
         AtomicInteger requests = new AtomicInteger();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/plugin/core/plugin-core.jar", exchange -> {
-            requests.incrementAndGet();
-            try {
-                exchange.sendResponseHeaders(200, 0);
-                exchange.getResponseBody().write(jar, 0, 2);
-                exchange.getResponseBody().flush();
-                entered.countDown();
-                release.await();
-                exchange.getResponseBody().write(jar, 2, jar.length - 2);
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-            } finally {
-                exchange.close();
-            }
-        });
+        server.createContext(
+                "/plugin/core/plugin-core.jar",
+                exchange -> {
+                    requests.incrementAndGet();
+                    try {
+                        exchange.sendResponseHeaders(200, 0);
+                        exchange.getResponseBody().write(jar, 0, 2);
+                        exchange.getResponseBody().flush();
+                        entered.countDown();
+                        release.await();
+                        exchange.getResponseBody().write(jar, 2, jar.length - 2);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        exchange.close();
+                    }
+                });
         server.start();
-        String previous = setBlogBuildInfoString("resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
+        String previous =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         File folder = temporaryFolder.newFolder("download-owner");
         java.util.concurrent.CompletableFuture<File> owner = null;
         try {
-            owner = java.util.concurrent.CompletableFuture.supplyAsync(() -> PluginCoreUtils.tryDownloadPluginCoreFile(
-                    folder.toString(), ExecutionDeadline.afterMillis(4000)));
+            owner =
+                    java.util.concurrent.CompletableFuture.supplyAsync(
+                            () ->
+                                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                                            folder.toString(),
+                                            ExecutionDeadline.afterMillis(4000)));
             assertTrue(entered.await(1, java.util.concurrent.TimeUnit.SECONDS));
-            RuntimeException failure = assertThrows(RuntimeException.class, () -> PluginCoreUtils.tryDownloadPluginCoreFile(
-                    folder.toString(), ExecutionDeadline.afterMillis(150)));
+            RuntimeException failure =
+                    assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                                            folder.toString(), ExecutionDeadline.afterMillis(150)));
             assertTrue(failure.getCause() instanceof java.net.http.HttpTimeoutException);
             assertFalse(owner.isDone());
             assertEquals(1, requests.get());
             release.countDown();
-            assertArrayEquals(jar, Files.readAllBytes(owner.get(2, java.util.concurrent.TimeUnit.SECONDS).toPath()));
+            assertArrayEquals(
+                    jar,
+                    Files.readAllBytes(
+                            owner.get(2, java.util.concurrent.TimeUnit.SECONDS).toPath()));
             assertNoPluginCoreDownloadParts(folder);
         } finally {
             release.countDown();
@@ -505,25 +553,42 @@ public class ServiceUtilityFallbackTest {
         byte[] checksum = (md5(artifact) + "  " + fileName + "\n").getBytes(StandardCharsets.UTF_8);
         AtomicInteger requests = new AtomicInteger();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/plugin/core/", exchange -> {
-            requests.incrementAndGet();
-            try {
-                exchange.sendResponseHeaders(200, 0);
-                exchange.getResponseBody().flush();
-                Thread.sleep(600);
-                exchange.getResponseBody().write(exchange.getRequestURI().getPath().endsWith(".md5") ? checksum : artifact);
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-            } catch (IOException disconnected) { /* The shared deadline closes the artifact transfer. */ } finally {
-                exchange.close();
-            }
-        });
+        server.createContext(
+                "/plugin/core/",
+                exchange -> {
+                    requests.incrementAndGet();
+                    try {
+                        exchange.sendResponseHeaders(200, 0);
+                        exchange.getResponseBody().flush();
+                        Thread.sleep(600);
+                        exchange.getResponseBody()
+                                .write(
+                                        exchange.getRequestURI().getPath().endsWith(".md5")
+                                                ? checksum
+                                                : artifact);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    } catch (IOException disconnected) {
+                        /* The shared deadline closes the artifact transfer. */
+                    } finally {
+                        exchange.close();
+                    }
+                });
         server.start();
-        String previous = setBlogBuildInfoString("resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
+        String previous =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         File folder = temporaryFolder.newFolder("native-download-budget");
         try {
-            RuntimeException failure = assertThrows(RuntimeException.class, () -> PluginCoreUtils.tryDownloadPluginCoreFile(
-                    folder.toString(), true, "Linux-x86_64", ExecutionDeadline.afterMillis(1000)));
+            RuntimeException failure =
+                    assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                                            folder.toString(),
+                                            true,
+                                            "Linux-x86_64",
+                                            ExecutionDeadline.afterMillis(1000)));
             assertTrue(failure.getCause() instanceof java.net.http.HttpTimeoutException);
             assertEquals(2, requests.get());
             assertFalse(new File(folder, fileName).exists());
@@ -541,13 +606,18 @@ public class ServiceUtilityFallbackTest {
         try (java.net.ServerSocket serverSocket = new java.net.ServerSocket(0)) {
             unusedPort = serverSocket.getLocalPort();
         }
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + unusedPort);
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString("resourceDownloadUrl", "http://127.0.0.1:" + unusedPort);
         try {
-            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-download-fail").toFile();
+            File pluginsFolder =
+                    Files.createTempDirectory("zrlog-plugin-core-download-fail").toFile();
 
-            RuntimeException thrown = assertThrows(RuntimeException.class,
-                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath()));
+            RuntimeException thrown =
+                    assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                                            pluginsFolder.getAbsolutePath()));
 
             assertTrue(thrown.getMessage().contains("download plugin core error"));
             assertFalse(new File(pluginsFolder, "plugin-core.jar").exists());
@@ -561,14 +631,16 @@ public class ServiceUtilityFallbackTest {
     public void shouldReplaceInvalidPluginCoreJarAfterSuccessfulDownload() throws Exception {
         byte[] body = pluginCoreJar();
         HttpServer server = startDownloadServer("plugin-core.jar", 200, body.length, body);
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
             File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-invalid").toFile();
             File pluginCore = new File(pluginsFolder, "plugin-core.jar");
             Files.writeString(pluginCore.toPath(), "truncated-jar", StandardCharsets.UTF_8);
 
-            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
+            File result =
+                    PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
 
             assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
             assertArrayEquals(body, Files.readAllBytes(result.toPath()));
@@ -585,16 +657,20 @@ public class ServiceUtilityFallbackTest {
         try (java.net.ServerSocket serverSocket = new java.net.ServerSocket(0)) {
             unusedPort = serverSocket.getLocalPort();
         }
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + unusedPort);
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString("resourceDownloadUrl", "http://127.0.0.1:" + unusedPort);
         try {
-            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-invalid-download-fail").toFile();
+            File pluginsFolder =
+                    Files.createTempDirectory("zrlog-plugin-core-invalid-download-fail").toFile();
             File pluginCore = new File(pluginsFolder, "plugin-core.jar");
             byte[] invalidJar = "truncated-jar".getBytes(StandardCharsets.UTF_8);
             Files.write(pluginCore.toPath(), invalidJar);
 
-            assertThrows(RuntimeException.class,
-                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath()));
+            assertThrows(
+                    RuntimeException.class,
+                    () ->
+                            PluginCoreUtils.tryDownloadPluginCoreFile(
+                                    pluginsFolder.getAbsolutePath()));
 
             assertTrue(pluginCore.isFile());
             assertArrayEquals(invalidJar, Files.readAllBytes(pluginCore.toPath()));
@@ -608,8 +684,9 @@ public class ServiceUtilityFallbackTest {
     public void shouldRemoveStalePluginCorePartWithoutTouchingOtherFiles() throws Exception {
         byte[] body = pluginCoreJar();
         HttpServer server = startDownloadServer("plugin-core.jar", 200, body.length, body);
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
             File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-stale-part").toFile();
             File stalePart = new File(pluginsFolder, "plugin-core.jar.999999999.12345.part");
@@ -617,7 +694,8 @@ public class ServiceUtilityFallbackTest {
             Files.writeString(stalePart.toPath(), "stale", StandardCharsets.UTF_8);
             Files.writeString(unrelatedPart.toPath(), "keep", StandardCharsets.UTF_8);
 
-            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
+            File result =
+                    PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
 
             assertArrayEquals(body, Files.readAllBytes(result.toPath()));
             assertFalse(stalePart.exists());
@@ -635,8 +713,10 @@ public class ServiceUtilityFallbackTest {
         File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-live-part").toFile();
         File pluginCore = new File(pluginsFolder, "plugin-core.jar");
         Files.write(pluginCore.toPath(), pluginCoreJar());
-        File livePart = new File(pluginsFolder, "plugin-core.jar." + ProcessHandle.current().pid()
-                + ".active.part");
+        File livePart =
+                new File(
+                        pluginsFolder,
+                        "plugin-core.jar." + ProcessHandle.current().pid() + ".active.part");
         Files.writeString(livePart.toPath(), "in-progress", StandardCharsets.UTF_8);
 
         File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath());
@@ -648,15 +728,22 @@ public class ServiceUtilityFallbackTest {
 
     @Test
     public void shouldPreserveNativeChecksumPartOwnedByCurrentProcess() throws Exception {
-        File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-live-checksum-part").toFile();
+        File pluginsFolder =
+                Files.createTempDirectory("zrlog-plugin-core-live-checksum-part").toFile();
         File pluginCore = new File(pluginsFolder, "plugin-core-Linux-x86_64.bin");
         Files.write(pluginCore.toPath(), nativeElf());
-        File livePart = new File(pluginsFolder, pluginCore.getName() + ".md5."
-                + ProcessHandle.current().pid() + ".active.part");
+        File livePart =
+                new File(
+                        pluginsFolder,
+                        pluginCore.getName()
+                                + ".md5."
+                                + ProcessHandle.current().pid()
+                                + ".active.part");
         Files.writeString(livePart.toPath(), "in-progress", StandardCharsets.UTF_8);
 
-        File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
-                true, "Linux-x86_64");
+        File result =
+                PluginCoreUtils.tryDownloadPluginCoreFile(
+                        pluginsFolder.getAbsolutePath(), true, "Linux-x86_64");
 
         assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
         assertTrue(livePart.isFile());
@@ -667,13 +754,19 @@ public class ServiceUtilityFallbackTest {
     public void shouldRejectPluginCoreJarWithInvalidEntryCrcWithoutPublishingIt() throws Exception {
         byte[] body = pluginCoreJarWithInvalidEntryCrc();
         HttpServer server = startDownloadServer("plugin-core.jar", 200, body.length, body);
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
-            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-invalid-crc").toFile();
+            File pluginsFolder =
+                    Files.createTempDirectory("zrlog-plugin-core-invalid-crc").toFile();
 
-            RuntimeException thrown = assertThrows(RuntimeException.class,
-                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath()));
+            RuntimeException thrown =
+                    assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                                            pluginsFolder.getAbsolutePath()));
 
             assertTrue(thrown.getMessage().contains("download plugin core error"));
             assertFalse(new File(pluginsFolder, "plugin-core.jar").exists());
@@ -688,14 +781,20 @@ public class ServiceUtilityFallbackTest {
     public void shouldRejectTruncatedPluginCoreJarWithoutPublishingIt() throws Exception {
         byte[] completeBody = pluginCoreJar();
         byte[] partialBody = Arrays.copyOf(completeBody, completeBody.length / 2);
-        HttpServer server = startDownloadServer("plugin-core.jar", 200, completeBody.length, partialBody);
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        HttpServer server =
+                startDownloadServer("plugin-core.jar", 200, completeBody.length, partialBody);
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
             File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-truncated").toFile();
 
-            RuntimeException thrown = assertThrows(RuntimeException.class,
-                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath()));
+            RuntimeException thrown =
+                    assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                                            pluginsFolder.getAbsolutePath()));
 
             assertTrue(thrown.getMessage().contains("download plugin core error"));
             assertFalse(new File(pluginsFolder, "plugin-core.jar").exists());
@@ -710,13 +809,18 @@ public class ServiceUtilityFallbackTest {
     public void shouldRejectHttpErrorWithoutPublishingPluginCoreJar() throws Exception {
         byte[] body = "unavailable".getBytes(StandardCharsets.UTF_8);
         HttpServer server = startDownloadServer("plugin-core.jar", 503, body.length, body);
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
             File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-http-error").toFile();
 
-            RuntimeException thrown = assertThrows(RuntimeException.class,
-                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath()));
+            RuntimeException thrown =
+                    assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                                            pluginsFolder.getAbsolutePath()));
 
             assertTrue(thrown.getMessage().contains("HTTP 503"));
             assertFalse(new File(pluginsFolder, "plugin-core.jar").exists());
@@ -736,9 +840,11 @@ public class ServiceUtilityFallbackTest {
 
     @Test
     public void shouldBuildNativePluginCoreFileNameByFileArch() throws Exception {
-        assertEquals(new File("/plugins/plugin-core-Linux-x86_64.bin"),
+        assertEquals(
+                new File("/plugins/plugin-core-Linux-x86_64.bin"),
                 PluginCoreUtils.getPluginFileName("/plugins", true, "Linux-x86_64"));
-        assertEquals(new File("/plugins/plugin-core-Windows-x86_64.exe"),
+        assertEquals(
+                new File("/plugins/plugin-core-Windows-x86_64.exe"),
                 PluginCoreUtils.getPluginFileName("/plugins", true, "Windows-x86_64"));
     }
 
@@ -751,8 +857,9 @@ public class ServiceUtilityFallbackTest {
         assertTrue(pluginCore.setExecutable(false, false));
         assertFalse(pluginCore.canExecute());
 
-        File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
-                true, "Linux-x86_64");
+        File result =
+                PluginCoreUtils.tryDownloadPluginCoreFile(
+                        pluginsFolder.getAbsolutePath(), true, "Linux-x86_64");
 
         assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
         assertArrayEquals(body, Files.readAllBytes(result.toPath()));
@@ -762,15 +869,17 @@ public class ServiceUtilityFallbackTest {
     @Test
     public void shouldPreserveExistingNativePluginCoreExecutablePermissions() throws Exception {
         Path pluginsFolder = temporaryFolder.newFolder("executable-core").toPath();
-        org.junit.Assume.assumeTrue(Files.getFileStore(pluginsFolder).supportsFileAttributeView("posix"));
+        org.junit.Assume.assumeTrue(
+                Files.getFileStore(pluginsFolder).supportsFileAttributeView("posix"));
         Path pluginCore = pluginsFolder.resolve("plugin-core-Linux-x86_64.bin");
         byte[] body = nativeElf();
         Files.write(pluginCore, body);
         var permissions = PosixFilePermissions.fromString("r-x------");
         Files.setPosixFilePermissions(pluginCore, permissions);
 
-        File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.toString(),
-                true, "Linux-x86_64");
+        File result =
+                PluginCoreUtils.tryDownloadPluginCoreFile(
+                        pluginsFolder.toString(), true, "Linux-x86_64");
 
         assertEquals(pluginCore.toFile().getCanonicalFile(), result.getCanonicalFile());
         assertArrayEquals(body, Files.readAllBytes(pluginCore));
@@ -782,21 +891,27 @@ public class ServiceUtilityFallbackTest {
         String fileName = "plugin-core-Linux-x86_64.bin";
         byte[] completeBody = nativeElf();
         byte[] truncatedBody = Arrays.copyOf(completeBody, completeBody.length / 2);
-        HttpServer server = startNativeDownloadServer(fileName, completeBody.length, completeBody,
-                md5(completeBody));
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        HttpServer server =
+                startNativeDownloadServer(
+                        fileName, completeBody.length, completeBody, md5(completeBody));
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
-            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-existing-truncated").toFile();
+            File pluginsFolder =
+                    Files.createTempDirectory("zrlog-plugin-core-native-existing-truncated")
+                            .toFile();
             File pluginCore = new File(pluginsFolder, fileName);
             Files.write(pluginCore.toPath(), truncatedBody);
 
-            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
-                    true, "Linux-x86_64");
+            File result =
+                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                            pluginsFolder.getAbsolutePath(), true, "Linux-x86_64");
 
             assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
             assertArrayEquals(completeBody, Files.readAllBytes(result.toPath()));
-            assertEquals(md5(completeBody) + "  " + fileName + "\n",
+            assertEquals(
+                    md5(completeBody) + "  " + fileName + "\n",
                     Files.readString(new File(pluginsFolder, fileName + ".md5").toPath()));
             assertTrue(result.canExecute());
             assertNoPluginCoreDownloadParts(pluginsFolder);
@@ -811,16 +926,20 @@ public class ServiceUtilityFallbackTest {
         String fileName = "plugin-core-Linux-x86_64.bin";
         byte[] body = nativeElf();
         HttpServer server = startNativeDownloadServer(fileName, 0, body, md5(body));
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
-            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-chunked").toFile();
+            File pluginsFolder =
+                    Files.createTempDirectory("zrlog-plugin-core-native-chunked").toFile();
 
-            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
-                    true, "Linux-x86_64");
+            File result =
+                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                            pluginsFolder.getAbsolutePath(), true, "Linux-x86_64");
 
             assertArrayEquals(body, Files.readAllBytes(result.toPath()));
-            assertEquals(md5(body) + "  " + fileName + "\n",
+            assertEquals(
+                    md5(body) + "  " + fileName + "\n",
                     Files.readString(new File(pluginsFolder, fileName + ".md5").toPath()));
             assertNoPluginCoreDownloadParts(pluginsFolder);
         } finally {
@@ -833,16 +952,23 @@ public class ServiceUtilityFallbackTest {
     public void shouldRejectNativePluginCoreWhenPublishedChecksumDoesNotMatch() throws Exception {
         String fileName = "plugin-core-Linux-x86_64.bin";
         byte[] body = nativeElf();
-        HttpServer server = startNativeDownloadServer(fileName, body.length, body,
-                "00000000000000000000000000000000");
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        HttpServer server =
+                startNativeDownloadServer(
+                        fileName, body.length, body, "00000000000000000000000000000000");
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
-            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-checksum-mismatch").toFile();
+            File pluginsFolder =
+                    Files.createTempDirectory("zrlog-plugin-core-native-checksum-mismatch")
+                            .toFile();
 
-            RuntimeException thrown = assertThrows(RuntimeException.class,
-                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
-                            true, "Linux-x86_64"));
+            RuntimeException thrown =
+                    assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                                            pluginsFolder.getAbsolutePath(), true, "Linux-x86_64"));
 
             assertTrue(thrown.getMessage().contains("checksum mismatch"));
             assertFalse(new File(pluginsFolder, fileName).exists());
@@ -859,17 +985,21 @@ public class ServiceUtilityFallbackTest {
         String fileName = "plugin-core-Linux-x86_64.bin";
         byte[] body = nativeElf();
         HttpServer server = startNativeDownloadServer(fileName, body.length, body, md5(body));
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
-            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-checksum-publish").toFile();
+            File pluginsFolder =
+                    Files.createTempDirectory("zrlog-plugin-core-native-checksum-publish").toFile();
             Path checksumPath = new File(pluginsFolder, fileName + ".md5").toPath();
             Files.createDirectory(checksumPath);
             Files.writeString(checksumPath.resolve("keep"), "occupied", StandardCharsets.UTF_8);
 
-            assertThrows(RuntimeException.class,
-                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
-                            true, "Linux-x86_64"));
+            assertThrows(
+                    RuntimeException.class,
+                    () ->
+                            PluginCoreUtils.tryDownloadPluginCoreFile(
+                                    pluginsFolder.getAbsolutePath(), true, "Linux-x86_64"));
 
             assertFalse(new File(pluginsFolder, fileName).exists());
             assertTrue(Files.isDirectory(checksumPath));
@@ -887,8 +1017,9 @@ public class ServiceUtilityFallbackTest {
         byte[] body = nativePortableExecutable();
         Files.write(pluginCore.toPath(), body);
 
-        File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
-                true, "Windows-x86_64");
+        File result =
+                PluginCoreUtils.tryDownloadPluginCoreFile(
+                        pluginsFolder.getAbsolutePath(), true, "Windows-x86_64");
 
         assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
         assertArrayEquals(body, Files.readAllBytes(result.toPath()));
@@ -901,8 +1032,9 @@ public class ServiceUtilityFallbackTest {
         byte[] body = nativeMachO();
         Files.write(pluginCore.toPath(), body);
 
-        File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
-                true, "Darwin-arm64");
+        File result =
+                PluginCoreUtils.tryDownloadPluginCoreFile(
+                        pluginsFolder.getAbsolutePath(), true, "Darwin-arm64");
 
         assertEquals(pluginCore.getCanonicalFile(), result.getCanonicalFile());
         assertArrayEquals(body, Files.readAllBytes(result.toPath()));
@@ -914,20 +1046,25 @@ public class ServiceUtilityFallbackTest {
         String fileName = "plugin-core-Linux-x86_64.bin";
         byte[] body = nativeElf();
         HttpServer server = startNativeDownloadServer(fileName, body.length, body, md5(body));
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
-            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-local-checksum").toFile();
+            File pluginsFolder =
+                    Files.createTempDirectory("zrlog-plugin-core-native-local-checksum").toFile();
             File pluginCore = new File(pluginsFolder, fileName);
             Files.write(pluginCore.toPath(), body);
-            Files.writeString(new File(pluginsFolder, fileName + ".md5").toPath(),
+            Files.writeString(
+                    new File(pluginsFolder, fileName + ".md5").toPath(),
                     "00000000000000000000000000000000  " + fileName + "\n");
 
-            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
-                    true, "Linux-x86_64");
+            File result =
+                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                            pluginsFolder.getAbsolutePath(), true, "Linux-x86_64");
 
             assertArrayEquals(body, Files.readAllBytes(result.toPath()));
-            assertEquals(md5(body) + "  " + fileName + "\n",
+            assertEquals(
+                    md5(body) + "  " + fileName + "\n",
                     Files.readString(new File(pluginsFolder, fileName + ".md5").toPath()));
             assertNoPluginCoreDownloadParts(pluginsFolder);
         } finally {
@@ -940,17 +1077,21 @@ public class ServiceUtilityFallbackTest {
     public void shouldReplaceNativeExecutableForWrongTargetPlatform() throws Exception {
         String fileName = "plugin-core-Windows-x86_64.exe";
         byte[] windowsBody = nativePortableExecutable();
-        HttpServer server = startNativeDownloadServer(fileName, windowsBody.length, windowsBody,
-                md5(windowsBody));
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        HttpServer server =
+                startNativeDownloadServer(
+                        fileName, windowsBody.length, windowsBody, md5(windowsBody));
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
-            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-wrong-platform").toFile();
+            File pluginsFolder =
+                    Files.createTempDirectory("zrlog-plugin-core-native-wrong-platform").toFile();
             File pluginCore = new File(pluginsFolder, fileName);
             Files.write(pluginCore.toPath(), nativeElf());
 
-            File result = PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
-                    true, "Windows-x86_64");
+            File result =
+                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                            pluginsFolder.getAbsolutePath(), true, "Windows-x86_64");
 
             assertArrayEquals(windowsBody, Files.readAllBytes(result.toPath()));
             assertNoPluginCoreDownloadParts(pluginsFolder);
@@ -965,14 +1106,19 @@ public class ServiceUtilityFallbackTest {
         String fileName = "plugin-core-Linux-amd64.bin";
         byte[] body = nativeMachO();
         HttpServer server = startNativeDownloadServer(fileName, body.length, body, md5(body));
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
-            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-wrong-os").toFile();
+            File pluginsFolder =
+                    Files.createTempDirectory("zrlog-plugin-core-native-wrong-os").toFile();
 
-            RuntimeException thrown = assertThrows(RuntimeException.class,
-                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
-                            true, "Linux-amd64"));
+            RuntimeException thrown =
+                    assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                                            pluginsFolder.getAbsolutePath(), true, "Linux-amd64"));
 
             assertTrue(thrown.getMessage().contains("target platform"));
             assertFalse(new File(pluginsFolder, fileName).exists());
@@ -989,14 +1135,19 @@ public class ServiceUtilityFallbackTest {
         String fileName = "plugin-core-Linux-arm64.bin";
         byte[] body = nativeElf();
         HttpServer server = startNativeDownloadServer(fileName, body.length, body, md5(body));
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
-            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-wrong-arch").toFile();
+            File pluginsFolder =
+                    Files.createTempDirectory("zrlog-plugin-core-native-wrong-arch").toFile();
 
-            RuntimeException thrown = assertThrows(RuntimeException.class,
-                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
-                            true, "Linux-arm64"));
+            RuntimeException thrown =
+                    assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                                            pluginsFolder.getAbsolutePath(), true, "Linux-arm64"));
 
             assertTrue(thrown.getMessage().contains("architecture does not match"));
             assertFalse(new File(pluginsFolder, fileName).exists());
@@ -1011,16 +1162,22 @@ public class ServiceUtilityFallbackTest {
     @Test
     public void shouldNotPublishTruncatedNativePluginCoreDownload() throws Exception {
         byte[] body = "partial-native".getBytes(StandardCharsets.UTF_8);
-        HttpServer server = startNativeDownloadServer("plugin-core-Linux-x86_64.bin",
-                body.length + 20, body, md5(body));
-        String previousResourceDownloadUrl = setBlogBuildInfoString("resourceDownloadUrl",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        HttpServer server =
+                startNativeDownloadServer(
+                        "plugin-core-Linux-x86_64.bin", body.length + 20, body, md5(body));
+        String previousResourceDownloadUrl =
+                setBlogBuildInfoString(
+                        "resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
         try {
-            File pluginsFolder = Files.createTempDirectory("zrlog-plugin-core-native-truncated").toFile();
+            File pluginsFolder =
+                    Files.createTempDirectory("zrlog-plugin-core-native-truncated").toFile();
 
-            RuntimeException thrown = assertThrows(RuntimeException.class,
-                    () -> PluginCoreUtils.tryDownloadPluginCoreFile(pluginsFolder.getAbsolutePath(),
-                            true, "Linux-x86_64"));
+            RuntimeException thrown =
+                    assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    PluginCoreUtils.tryDownloadPluginCoreFile(
+                                            pluginsFolder.getAbsolutePath(), true, "Linux-x86_64"));
 
             assertTrue(thrown.getMessage().contains("download plugin core error"));
             assertFalse(new File(pluginsFolder, "plugin-core-Linux-x86_64.bin").exists());
@@ -1033,14 +1190,18 @@ public class ServiceUtilityFallbackTest {
 
     @Test
     public void shouldReturnFallbackValuesWhenWebsiteKvDaoIsUnavailable() {
-        WebsiteKvService service = new WebsiteKvService(() -> new WebSiteRepository(queryDataSource));
+        WebsiteKvService service =
+                new WebsiteKvService(() -> new WebSiteRepository(queryDataSource));
 
         assertNull(service.getString("missing"));
-        assertEquals(Collections.emptyMap(), service.getByNames(Collections.singletonList("missing")));
+        assertEquals(
+                Collections.emptyMap(), service.getByNames(Collections.singletonList("missing")));
         assertEquals(Collections.emptyList(), service.listByPrefix("missing."));
 
         UpgradeWebSiteInfo upgrade = service.upgradeWebSiteInfo();
-        assertEquals(Integer.valueOf(AutoUpgradeVersionType.ONE_DAY.getCycle()), upgrade.getAutoUpgradeVersion());
+        assertEquals(
+                Integer.valueOf(AutoUpgradeVersionType.ONE_DAY.getCycle()),
+                upgrade.getAutoUpgradeVersion());
         assertFalse(upgrade.getUpgradePreview());
     }
 
@@ -1049,7 +1210,8 @@ public class ServiceUtilityFallbackTest {
         DataSourceWrapper previousDataSource = setQueryDataSource(null);
         try {
             setQueryDataSource(dataSource(new FailingQueryRunner()));
-            WebsiteKvService service = new WebsiteKvService(() -> new WebSiteRepository(queryDataSource));
+            WebsiteKvService service =
+                    new WebsiteKvService(() -> new WebSiteRepository(queryDataSource));
 
             assertFalse(service.putStringQuietly("missing", "value"));
             assertFalse(service.removeQuietly("missing"));
@@ -1066,9 +1228,15 @@ public class ServiceUtilityFallbackTest {
 
     @Test
     public void shouldReportNoStaticRefreshWhenTheMatchingModuleIsAbsent() {
-        com.zrlog.business.service.CacheRefreshService refresh = new com.zrlog.business.service.CacheRefreshService(
-                new FakeCacheService(0L), () -> null, Collections::emptyList, () -> new WebSiteRepository(queryDataSource));
-        assertFalse(refresh.refreshStaticSiteCache(request("https"), Collections.singletonList(StaticSiteType.BLOG)));
+        com.zrlog.business.service.CacheRefreshService refresh =
+                new com.zrlog.business.service.CacheRefreshService(
+                        new FakeCacheService(0L),
+                        () -> null,
+                        Collections::emptyList,
+                        () -> new WebSiteRepository(queryDataSource));
+        assertFalse(
+                refresh.refreshStaticSiteCache(
+                        request("https"), Collections.singletonList(StaticSiteType.BLOG)));
     }
 
     @Test
@@ -1082,8 +1250,11 @@ public class ServiceUtilityFallbackTest {
             setQueryDataSource(dataSource(queryRunner));
             applicationConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin);
 
-            boolean refreshed = cacheRefresh(null).refreshStaticSiteCache(
-                    request("https"), Collections.singletonList(StaticSiteType.BLOG));
+            boolean refreshed =
+                    cacheRefresh(null)
+                            .refreshStaticSiteCache(
+                                    request("https"),
+                                    Collections.singletonList(StaticSiteType.BLOG));
 
             assertTrue(refreshed);
             assertEquals(1, staticSitePlugin.startCount);
@@ -1094,7 +1265,9 @@ public class ServiceUtilityFallbackTest {
             assertEquals("static-version", queryRunner.params[0]);
             assertEquals(1L, queryRunner.params[3]);
             assertEquals(9L, queryRunner.params[4]);
-            assertTrue(com.hibegin.common.dao.ResultValueConvertUtils.parseDate(queryRunner.params[1]) > 0);
+            assertTrue(
+                    com.hibegin.common.dao.ResultValueConvertUtils.parseDate(queryRunner.params[1])
+                            > 0);
         } finally {
             restoreQueryDataSource(previousDataSource);
         }
@@ -1106,10 +1279,12 @@ public class ServiceUtilityFallbackTest {
         FakeCacheService cacheService = new FakeCacheService(77L);
         {
             PathUtil.setRootPath(temporaryFolder.newFolder("zrlog-update-cache").getAbsolutePath());
-            applicationConfig = new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
+            applicationConfig =
+                    new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
 
             com.zrlog.business.service.CacheRefreshService refresh = cacheRefresh(cacheService);
-            refresh.updateCache(false, request("http"), Collections.singletonList(StaticSiteType.BLOG));
+            refresh.updateCache(
+                    false, request("http"), Collections.singletonList(StaticSiteType.BLOG));
 
             assertEquals(1, cacheService.refreshInitDataCount);
             assertEquals(1, pluginCorePlugin.startCount);
@@ -1123,11 +1298,14 @@ public class ServiceUtilityFallbackTest {
         FakePluginCorePlugin pluginCorePlugin = new FakePluginCorePlugin();
         FakeCacheService cacheService = new FakeCacheService(78L);
         {
-            PathUtil.setRootPath(temporaryFolder.newFolder("zrlog-update-cache-strict").getAbsolutePath());
-            applicationConfig = new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
+            PathUtil.setRootPath(
+                    temporaryFolder.newFolder("zrlog-update-cache-strict").getAbsolutePath());
+            applicationConfig =
+                    new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
 
-            cacheRefresh(cacheService).updateCacheSynchronouslyOrThrow(
-                    request("http"), Collections.singletonList(StaticSiteType.BLOG));
+            cacheRefresh(cacheService)
+                    .updateCacheSynchronouslyOrThrow(
+                            request("http"), Collections.singletonList(StaticSiteType.BLOG));
 
             assertEquals(1, cacheService.refreshInitDataCount);
             assertEquals(1, pluginCorePlugin.startCount);
@@ -1139,7 +1317,9 @@ public class ServiceUtilityFallbackTest {
     @Test
     public void shouldSwallowCacheRefreshFailureDuringUpdateCache() throws Exception {
         CacheService cacheService = new ThrowingCacheService();
-        applicationConfig = new CacheTestConfig(new FakePluginCorePlugin(), new FakeStaticSitePlugin(), cacheService);
+        applicationConfig =
+                new CacheTestConfig(
+                        new FakePluginCorePlugin(), new FakeStaticSitePlugin(), cacheService);
 
         com.zrlog.business.service.CacheRefreshService refresh = cacheRefresh(cacheService);
         refresh.updateCache(false, request("http"), Collections.singletonList(StaticSiteType.BLOG));
@@ -1148,11 +1328,18 @@ public class ServiceUtilityFallbackTest {
     @Test
     public void shouldPropagateCacheRefreshFailureDuringSynchronousStrictUpdate() throws Exception {
         CacheService cacheService = new ThrowingCacheService();
-        applicationConfig = new CacheTestConfig(new FakePluginCorePlugin(), new FakeStaticSitePlugin(), cacheService);
+        applicationConfig =
+                new CacheTestConfig(
+                        new FakePluginCorePlugin(), new FakeStaticSitePlugin(), cacheService);
 
-        IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> cacheRefresh(cacheService).updateCacheSynchronouslyOrThrow(
-                        request("http"), Collections.singletonList(StaticSiteType.BLOG)));
+        IllegalStateException error =
+                assertThrows(
+                        IllegalStateException.class,
+                        () ->
+                                cacheRefresh(cacheService)
+                                        .updateCacheSynchronouslyOrThrow(
+                                                request("http"),
+                                                Collections.singletonList(StaticSiteType.BLOG)));
 
         assertEquals("refresh failed", error.getMessage());
     }
@@ -1166,8 +1353,11 @@ public class ServiceUtilityFallbackTest {
             setQueryDataSource(dataSource(new FailingQueryRunner()));
             applicationConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin);
 
-            boolean refreshed = cacheRefresh(null).refreshStaticSiteCache(
-                    request("https"), Collections.singletonList(StaticSiteType.BLOG));
+            boolean refreshed =
+                    cacheRefresh(null)
+                            .refreshStaticSiteCache(
+                                    request("https"),
+                                    Collections.singletonList(StaticSiteType.BLOG));
 
             assertTrue(refreshed);
             assertEquals(1, staticSitePlugin.startCount);
@@ -1185,9 +1375,14 @@ public class ServiceUtilityFallbackTest {
         FakeCacheService cacheService = new FakeCacheService(99L, true, "blog.example.com");
         try {
             setQueryDataSource(dataSource(new FakeQueryRunner()));
-            applicationConfig = new CacheTestConfig(pluginCorePlugin, staticSitePlugin, cacheService);
+            applicationConfig =
+                    new CacheTestConfig(pluginCorePlugin, staticSitePlugin, cacheService);
 
-            cacheRefresh(cacheService).updateCache(false, request("https"), Collections.singletonList(StaticSiteType.BLOG));
+            cacheRefresh(cacheService)
+                    .updateCache(
+                            false,
+                            request("https"),
+                            Collections.singletonList(StaticSiteType.BLOG));
 
             assertEquals(1, cacheService.refreshInitDataCount);
             assertEquals(1, staticSitePlugin.startCount);
@@ -1203,10 +1398,12 @@ public class ServiceUtilityFallbackTest {
         FakePluginCorePlugin pluginCorePlugin = new FakePluginCorePlugin();
         FakeCacheService cacheService = new FakeCacheService(88L);
         {
-            applicationConfig = new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
+            applicationConfig =
+                    new CacheTestConfig(pluginCorePlugin, new FakeStaticSitePlugin(), cacheService);
 
             com.zrlog.business.service.CacheRefreshService refresh = cacheRefresh(cacheService);
-            refresh.updateCache(true, request("http"), Collections.singletonList(StaticSiteType.BLOG));
+            refresh.updateCache(
+                    true, request("http"), Collections.singletonList(StaticSiteType.BLOG));
             waitUntil(() -> pluginCorePlugin.refreshCacheCount == 1);
 
             assertEquals(1, cacheService.refreshInitDataCount);
@@ -1217,9 +1414,14 @@ public class ServiceUtilityFallbackTest {
 
     private com.zrlog.business.service.CacheRefreshService cacheRefresh(CacheService cache) {
         ZrLogConfig config = applicationConfig;
-        return new com.zrlog.business.service.CacheRefreshService(cache == null ? new FakeCacheService(0L) : cache,
+        return new com.zrlog.business.service.CacheRefreshService(
+                cache == null ? new FakeCacheService(0L) : cache,
                 () -> config == null ? null : config.getPlugin(PluginCorePlugin.class),
-                () -> config == null ? Collections.emptyList() : config.getPluginsByClazz(StaticSitePlugin.class), () -> new WebSiteRepository(queryDataSource));
+                () ->
+                        config == null
+                                ? Collections.emptyList()
+                                : config.getPluginsByClazz(StaticSitePlugin.class),
+                () -> new WebSiteRepository(queryDataSource));
     }
 
     private DataSourceWrapper setQueryDataSource(DataSourceWrapper dataSource) {
@@ -1237,12 +1439,15 @@ public class ServiceUtilityFallbackTest {
         private final FakeStaticSitePlugin staticSitePlugin;
         private final CacheService cacheService;
 
-        CacheTestConfig(FakePluginCorePlugin pluginCorePlugin, FakeStaticSitePlugin staticSitePlugin) {
+        CacheTestConfig(
+                FakePluginCorePlugin pluginCorePlugin, FakeStaticSitePlugin staticSitePlugin) {
             this(pluginCorePlugin, staticSitePlugin, null);
         }
 
-        CacheTestConfig(FakePluginCorePlugin pluginCorePlugin, FakeStaticSitePlugin staticSitePlugin,
-                        CacheService cacheService) {
+        CacheTestConfig(
+                FakePluginCorePlugin pluginCorePlugin,
+                FakeStaticSitePlugin staticSitePlugin,
+                CacheService cacheService) {
             super(18080, null, "");
             this.pluginCorePlugin = pluginCorePlugin;
             this.staticSitePlugin = staticSitePlugin;
@@ -1273,8 +1478,9 @@ public class ServiceUtilityFallbackTest {
         public <T> T getWebSetup(Class<T> capability) {
             if (capability == WebSiteInfoProvider.class) {
                 CacheService cache = cacheForTest();
-                return cache == null ? null : capability.cast(
-                        (WebSiteInfoProvider) cache::getPublicWebSiteInfo);
+                return cache == null
+                        ? null
+                        : capability.cast((WebSiteInfoProvider) cache::getPublicWebSiteInfo);
             }
             return super.getWebSetup(capability);
         }
@@ -1338,7 +1544,8 @@ public class ServiceUtilityFallbackTest {
         }
 
         @Override
-        public <T> T query(String sql, ResultSetHandler<T> rsh, Object... params) throws SQLException {
+        public <T> T query(String sql, ResultSetHandler<T> rsh, Object... params)
+                throws SQLException {
             throw new SQLException("read failed");
         }
     }
@@ -1375,22 +1582,25 @@ public class ServiceUtilityFallbackTest {
         }
 
         @Override
-        public CloseResponseHandle getContext(String uri, HttpMethod method, HttpRequest request,
-                                              AdminTokenVO adminTokenVO)
+        public CloseResponseHandle getContext(
+                String uri, HttpMethod method, HttpRequest request, AdminTokenVO adminTokenVO)
                 throws IOException, URISyntaxException, InterruptedException {
             return null;
         }
 
         @Override
-        public <T> T requestService(HttpRequest inputRequest, Map<String, String[]> params,
-                                    AdminTokenVO adminTokenVO, Class<T> clazz)
+        public <T> T requestService(
+                HttpRequest inputRequest,
+                Map<String, String[]> params,
+                AdminTokenVO adminTokenVO,
+                Class<T> clazz)
                 throws IOException, URISyntaxException, InterruptedException {
             return null;
         }
 
         @Override
-        public boolean accessPlugin(String uri, HttpRequest request, HttpResponse response,
-                                    AdminTokenVO adminTokenVO)
+        public boolean accessPlugin(
+                String uri, HttpRequest request, HttpResponse response, AdminTokenVO adminTokenVO)
                 throws IOException, URISyntaxException, InterruptedException {
             return false;
         }
@@ -1402,7 +1612,8 @@ public class ServiceUtilityFallbackTest {
     }
 
     private static class FakeStaticSitePlugin implements StaticSitePlugin {
-        private final com.zrlog.common.vo.PublicWebSiteInfo site = new com.zrlog.common.vo.PublicWebSiteInfo();
+        private final com.zrlog.common.vo.PublicWebSiteInfo site =
+                new com.zrlog.common.vo.PublicWebSiteInfo();
         private final Lock lock = new ReentrantLock();
         private int startCount;
 

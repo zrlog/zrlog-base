@@ -1,12 +1,12 @@
 package com.zrlog.data.util;
 
+import static org.junit.Assert.*;
+
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.common.vo.SocialPreviewDTO;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
 import org.junit.Test;
-
-import static org.junit.Assert.*;
 
 public class SocialPreviewAndContentProtectorUtilsTest {
 
@@ -21,16 +21,26 @@ public class SocialPreviewAndContentProtectorUtilsTest {
         article.setFullReleaseTime("2026-01-01T10:00:00+08:00");
         article.setFullLastUpdateDate("2026-01-02T10:00:00+08:00");
 
-        SocialPreviewDTO preview = SocialPreviewUtils.article(webSite, article, "<b>Hello</b> \"World\"",
-                "https://example.com/post?a=1&b=2", "https://example.com/cover.png");
+        SocialPreviewDTO preview =
+                SocialPreviewUtils.article(
+                        webSite,
+                        article,
+                        "<b>Hello</b> \"World\"",
+                        "https://example.com/post?a=1&b=2",
+                        "https://example.com/cover.png");
 
         assertEquals("article", preview.getType());
         assertEquals("Hello \"World\"", preview.getTitle());
         assertEquals("Digest & summary with spaces", preview.getDescription());
         assertEquals("summary_large_image", preview.getTwitterCard());
         assertEquals("Article Author", preview.getAuthor());
-        assertTrue(preview.getMetaHtml().contains("property=\"og:title\" content=\"Hello &quot;World&quot;\""));
-        assertTrue(preview.getMetaHtml().contains("property=\"og:site_name\" content=\"ZrLog &amp; &quot;Site&quot;\""));
+        assertTrue(
+                preview.getMetaHtml()
+                        .contains("property=\"og:title\" content=\"Hello &quot;World&quot;\""));
+        assertTrue(
+                preview.getMetaHtml()
+                        .contains(
+                                "property=\"og:site_name\" content=\"ZrLog &amp; &quot;Site&quot;\""));
         assertTrue(preview.getMetaHtml().contains("property=\"article:published_time\""));
         assertFalse(preview.getMetaHtml().contains("<b>"));
     }
@@ -39,8 +49,8 @@ public class SocialPreviewAndContentProtectorUtilsTest {
     public void shouldRenderWebsiteSocialPreviewWithFallbackCardAndTruncatedDescription() {
         String description = "x".repeat(120);
 
-        SocialPreviewDTO preview = SocialPreviewUtils.website(null, "Home", description,
-                "https://example.com", "");
+        SocialPreviewDTO preview =
+                SocialPreviewUtils.website(null, "Home", description, "https://example.com", "");
 
         assertEquals("website", preview.getType());
         assertEquals("summary", preview.getTwitterCard());
@@ -60,12 +70,14 @@ public class SocialPreviewAndContentProtectorUtilsTest {
         ArticleBasicDTO htmlArticle = new ArticleBasicDTO();
         htmlArticle.setContent("<p>HTML content</p>");
 
-        SocialPreviewDTO plainPreview = SocialPreviewUtils.article(webSite, plainArticle, "Plain",
-                "https://example.com/plain", "");
-        SocialPreviewDTO htmlPreview = SocialPreviewUtils.article(webSite, htmlArticle, "HTML",
-                "https://example.com/html", "");
-        SocialPreviewDTO sitePreview = SocialPreviewUtils.article(webSite, null, "Site",
-                "https://example.com/site", "");
+        SocialPreviewDTO plainPreview =
+                SocialPreviewUtils.article(
+                        webSite, plainArticle, "Plain", "https://example.com/plain", "");
+        SocialPreviewDTO htmlPreview =
+                SocialPreviewUtils.article(
+                        webSite, htmlArticle, "HTML", "https://example.com/html", "");
+        SocialPreviewDTO sitePreview =
+                SocialPreviewUtils.article(webSite, null, "Site", "https://example.com/site", "");
 
         assertEquals("Plain content", plainPreview.getDescription());
         assertEquals("HTML content", htmlPreview.getDescription());
@@ -104,18 +116,21 @@ public class SocialPreviewAndContentProtectorUtilsTest {
         PublicWebSiteInfo webSite = new PublicWebSiteInfo();
         webSite.setContent_protector_enabled(true);
         webSite.setContent_protector_license_type("CC_BY_NC_4_0");
-        webSite.setContent_protector_template("{title}|{url}|{author}|{site}|{licenseType}|{licenseName}");
+        webSite.setContent_protector_template(
+                "{title}|{url}|{author}|{site}|{licenseType}|{licenseName}");
         webSite.setTitle("Site <Name>");
         webSite.setAuthor("Site Author");
         ArticleDetailDTO article = new ArticleDetailDTO();
         article.setTitle("Title <A> & \"B\"");
         article.setUserName("Alice 'Admin'");
 
-        String html = ContentProtectorUtils.render(webSite, article,
-                "https://example.com/post?a=1&b=2");
+        String html =
+                ContentProtectorUtils.render(webSite, article, "https://example.com/post?a=1&b=2");
 
-        assertEquals("Title &lt;A&gt; &amp; &quot;B&quot;|https://example.com/post?a=1&amp;b=2|"
-                + "Alice &#39;Admin&#39;|Site &lt;Name&gt;|CC_BY_NC_4_0|CC BY-NC 4.0", html);
+        assertEquals(
+                "Title &lt;A&gt; &amp; &quot;B&quot;|https://example.com/post?a=1&amp;b=2|"
+                        + "Alice &#39;Admin&#39;|Site &lt;Name&gt;|CC_BY_NC_4_0|CC BY-NC 4.0",
+                html);
     }
 
     @Test
@@ -123,7 +138,9 @@ public class SocialPreviewAndContentProtectorUtilsTest {
         PublicWebSiteInfo disabledWebSite = new PublicWebSiteInfo();
         ArticleDetailDTO article = new ArticleDetailDTO();
         article.setTitle("Title");
-        assertEquals("", ContentProtectorUtils.render(disabledWebSite, article, "https://example.com/post"));
+        assertEquals(
+                "",
+                ContentProtectorUtils.render(disabledWebSite, article, "https://example.com/post"));
 
         PublicWebSiteInfo webSite = new PublicWebSiteInfo();
         webSite.setContent_protector_enabled(true);
@@ -133,7 +150,8 @@ public class SocialPreviewAndContentProtectorUtilsTest {
         ArticleDetailDTO fallbackArticle = new ArticleDetailDTO();
         fallbackArticle.setTitle("Fallback");
 
-        String html = ContentProtectorUtils.render(webSite, fallbackArticle, "https://example.com/post");
+        String html =
+                ContentProtectorUtils.render(webSite, fallbackArticle, "https://example.com/post");
 
         assertTrue(html.contains("data-license=\"ALL_RIGHTS_RESERVED\""));
         assertTrue(html.contains("本文作者：Fallback Author"));

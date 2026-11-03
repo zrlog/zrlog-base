@@ -1,12 +1,12 @@
 package com.hibegin.common.util.http;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.common.util.http.handle.CloseResponseHandle;
 import com.hibegin.common.util.http.handle.HttpFileHandle;
 import com.hibegin.common.util.http.handle.HttpResponseJsonHandle;
 import com.hibegin.common.util.http.handle.HttpStringHandle;
 import com.zrlog.util.ThreadUtils;
-import org.junit.Test;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -27,15 +27,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.GZIPOutputStream;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class HttpHandleAndUtilTest {
 
     private static Object invokeStatic(String methodName, Object... args) throws Exception {
         Method method = null;
         for (Method declaredMethod : HttpUtil.class.getDeclaredMethods()) {
-            if (declaredMethod.getName().equals(methodName) && declaredMethod.getParameterCount() == args.length) {
+            if (declaredMethod.getName().equals(methodName)
+                    && declaredMethod.getParameterCount() == args.length) {
                 method = declaredMethod;
                 break;
             }
@@ -51,7 +51,8 @@ public class HttpHandleAndUtilTest {
         return HttpRequest.newBuilder(URI.create(uri)).GET().build();
     }
 
-    private static HttpResponse<InputStream> response(int statusCode, byte[] body, Map<String, List<String>> headers) {
+    private static HttpResponse<InputStream> response(
+            int statusCode, byte[] body, Map<String, List<String>> headers) {
         return new HttpResponse<>() {
             @Override
             public int statusCode() {
@@ -109,8 +110,17 @@ public class HttpHandleAndUtilTest {
         HttpStringHandle gzip = new HttpStringHandle();
         HttpRequest request = request("https://example.com/api");
 
-        assertFalse(plain.handle(request, response(200, "hello".getBytes(StandardCharsets.UTF_8), Map.of())));
-        assertFalse(gzip.handle(request, response(201, gzip("hello gzip"), Map.of("Content-Encoding", List.of("gzip")))));
+        assertFalse(
+                plain.handle(
+                        request,
+                        response(200, "hello".getBytes(StandardCharsets.UTF_8), Map.of())));
+        assertFalse(
+                gzip.handle(
+                        request,
+                        response(
+                                201,
+                                gzip("hello gzip"),
+                                Map.of("Content-Encoding", List.of("gzip")))));
 
         assertEquals(200, plain.getStatusCode());
         assertEquals("hello", plain.getT());
@@ -124,9 +134,16 @@ public class HttpHandleAndUtilTest {
         HttpResponseJsonHandle<SampleJson> success = new HttpResponseJsonHandle<>(SampleJson.class);
         HttpResponseJsonHandle<SampleJson> failed = new HttpResponseJsonHandle<>(SampleJson.class);
 
-        assertTrue(success.handle(request, response(200, gzip("{\"name\":\"zrlog\",\"count\":3}"),
-                Map.of("Content-Encoding", List.of("gzip")))));
-        assertTrue(failed.handle(request, response(500, "{}".getBytes(StandardCharsets.UTF_8), Map.of())));
+        assertTrue(
+                success.handle(
+                        request,
+                        response(
+                                200,
+                                gzip("{\"name\":\"zrlog\",\"count\":3}"),
+                                Map.of("Content-Encoding", List.of("gzip")))));
+        assertTrue(
+                failed.handle(
+                        request, response(500, "{}".getBytes(StandardCharsets.UTF_8), Map.of())));
 
         assertEquals("zrlog", success.getT().name);
         assertEquals(3, success.getT().count);
@@ -141,7 +158,9 @@ public class HttpHandleAndUtilTest {
         HttpRequest request = request("https://example.com/download/plugin-core.jar");
         HttpFileHandle handle = new HttpFileHandle(root.getAbsolutePath());
 
-        assertFalse(handle.handle(request, response(200, "jar".getBytes(StandardCharsets.UTF_8), Map.of())));
+        assertFalse(
+                handle.handle(
+                        request, response(200, "jar".getBytes(StandardCharsets.UTF_8), Map.of())));
 
         assertEquals(200, handle.getStatusCode());
         assertNotNull(handle.getT());
@@ -164,8 +183,8 @@ public class HttpHandleAndUtilTest {
     @Test
     public void shouldBuildUrisAndUserAgentsWithoutSendingNetworkRequests() throws Exception {
         Map<String, String[]> params = new HashMap<>();
-        params.put("q", new String[]{"hello world"});
-        params.put("tag", new String[]{"a", "b"});
+        params.put("q", new String[] {"hello world"});
+        params.put("tag", new String[] {"a", "b"});
 
         URI uri = (URI) invokeStatic("getUri", "https://example.com/search?exists=1", params);
         String query = (String) invokeStatic("mapToQueryStr", params);
@@ -186,15 +205,13 @@ public class HttpHandleAndUtilTest {
         Thread thread = ThreadUtils.start(() -> ran.set(true));
         thread.join(1000);
 
-        Thread unstarted = ThreadUtils.unstarted(() -> {
-        });
+        Thread unstarted = ThreadUtils.unstarted(() -> {});
         ExecutorService executorService = ThreadUtils.newFixedThreadPool(1);
         try {
             assertTrue(ran.get());
             assertFalse(ThreadUtils.isEnableLoom());
             assertFalse(unstarted.isAlive());
-            assertNotNull(ThreadUtils.getThreadFactory().newThread(() -> {
-            }));
+            assertNotNull(ThreadUtils.getThreadFactory().newThread(() -> {}));
             assertNotNull(executorService);
         } finally {
             executorService.shutdownNow();

@@ -41,7 +41,6 @@ public class AdminTokenVO {
         this.userId = userId;
     }
 
-
     public String getSessionId() {
 
         return sessionId;

@@ -1,11 +1,8 @@
 package com.zrlog.common.vo;
 
-
 import java.io.Serializable;
 
-/**
- * 存放全局对外可以访问的配置
- */
+/** 存放全局对外可以访问的配置 */
 public class PublicWebSiteInfo implements Serializable {
 
     private String appId;
@@ -150,7 +147,6 @@ public class PublicWebSiteInfo implements Serializable {
         this.admin_color_primary = admin_color_primary;
     }
 
-
     public Boolean getAdmin_darkMode() {
         return admin_darkMode;
     }
@@ -182,7 +178,6 @@ public class PublicWebSiteInfo implements Serializable {
     public void setRobotRuleContent(String robotRuleContent) {
         this.robotRuleContent = robotRuleContent;
     }
-
 
     public Long getArticle_auto_digest_length() {
         return article_auto_digest_length;

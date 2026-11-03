@@ -10,7 +10,6 @@ import com.zrlog.common.vo.Version;
 import com.zrlog.util.ZrLogUtil;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 import java.util.logging.Logger;
@@ -69,12 +68,11 @@ public class UpgradeNoticeService {
             checkVersionResponse.setUpgrade(false);
             return checkVersionResponse;
         }
-        checkVersionResponse.setUpgrade(ZrLogUtil.greatThenCurrentVersion(
-                version.getBuildId(),
-                version.getBuildDate(),
-                version.getVersion()
-        ));
-        checkVersionResponse.setVersion(UpdateVersionInfoPlugin.normalizeVersionForDisplay(version));
+        checkVersionResponse.setUpgrade(
+                ZrLogUtil.greatThenCurrentVersion(
+                        version.getBuildId(), version.getBuildDate(), version.getVersion()));
+        checkVersionResponse.setVersion(
+                UpdateVersionInfoPlugin.normalizeVersionForDisplay(version));
         return checkVersionResponse;
     }
 

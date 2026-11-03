@@ -4,8 +4,7 @@ public final class ImageInfo {
 
     private static boolean inImageRuntimeCode;
 
-    private ImageInfo() {
-    }
+    private ImageInfo() {}
 
     public static boolean inImageRuntimeCode() {
         return inImageRuntimeCode;

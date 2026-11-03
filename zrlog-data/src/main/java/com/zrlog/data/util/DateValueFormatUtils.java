@@ -1,7 +1,6 @@
 package com.zrlog.data.util;
 
 import com.hibegin.common.dao.ResultValueConvertUtils;
-
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -36,10 +35,13 @@ public class DateValueFormatUtils {
             return null;
         }
         String text = ((String) value).replace('\u202f', ' ').replace('\u00a0', ' ');
-        for (DateFormat format : Arrays.asList(
-                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM, Locale.getDefault()),
-                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM, Locale.ENGLISH),
-                new SimpleDateFormat("MMM d, yyyy, h:mm:ss a", Locale.ENGLISH))) {
+        for (DateFormat format :
+                Arrays.asList(
+                        DateFormat.getDateTimeInstance(
+                                DateFormat.MEDIUM, DateFormat.MEDIUM, Locale.getDefault()),
+                        DateFormat.getDateTimeInstance(
+                                DateFormat.MEDIUM, DateFormat.MEDIUM, Locale.ENGLISH),
+                        new SimpleDateFormat("MMM d, yyyy, h:mm:ss a", Locale.ENGLISH))) {
             try {
                 return format.parse(text).getTime();
             } catch (ParseException ignored) {

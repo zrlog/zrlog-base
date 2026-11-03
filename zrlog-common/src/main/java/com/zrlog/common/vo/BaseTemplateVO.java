@@ -1,7 +1,6 @@
 package com.zrlog.common.vo;
 
 import com.zrlog.business.type.TemplateType;
-
 import java.util.List;
 
 public class BaseTemplateVO {

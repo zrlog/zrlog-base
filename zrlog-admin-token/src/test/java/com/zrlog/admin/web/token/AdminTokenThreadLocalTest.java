@@ -1,10 +1,10 @@
 package com.zrlog.admin.web.token;
 
+import static org.junit.Assert.*;
+
 import com.zrlog.common.vo.AdminTokenVO;
 import org.junit.After;
 import org.junit.Test;
-
-import static org.junit.Assert.*;
 
 public class AdminTokenThreadLocalTest {
 

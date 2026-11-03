@@ -4,6 +4,5 @@ public interface Validator {
 
     void doValid();
 
-    default void doClean() {
-    }
+    default void doClean() {}
 }

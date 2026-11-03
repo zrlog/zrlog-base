@@ -1,5 +1,7 @@
 package com.zrlog.common.adapter;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
@@ -7,34 +9,34 @@ import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.vo.Version;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.updater.spi.UpdateSession;
+import java.io.File;
+import java.util.Collections;
+import java.util.List;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.io.File;
-import java.util.Collections;
-import java.util.List;
-
-import static org.junit.Assert.*;
-
 public class UpdaterHostLifecycleTest {
 
-    @Rule
-    public TemporaryFolder temporaryFolder = new TemporaryFolder();
+    @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     private static Updater updater(int port) {
-        UpdaterHosts.ApplicationHost host = UpdaterHosts.application(new String[]{"--port=" + port}, null);
+        UpdaterHosts.ApplicationHost host =
+                UpdaterHosts.application(new String[] {"--port=" + port}, null);
         return host.adapt(new UpdateSession(host.context(), new FakeUpdater()));
     }
 
     @Test
-    public void upgradeCallbacksFollowTheOwningServerPortAndStopWithoutGlobalConfig() throws Exception {
+    public void upgradeCallbacksFollowTheOwningServerPortAndStopWithoutGlobalConfig()
+            throws Exception {
         String oldRoot = System.getProperty("sws.root.path");
         try {
             System.setProperty("sws.root.path", temporaryFolder.newFolder().getAbsolutePath());
             Updater first = updater(18080);
             assertEquals(18080, UpdaterHosts.context(first).port());
-            UpdaterHosts.context(first).stop.run(); // CLI context is valid before a server is attached.
+            UpdaterHosts.context(first)
+                    .stop
+                    .run(); // CLI context is valid before a server is attached.
             TestConfig firstServer = new TestConfig(19080, first);
             Updater second = updater(18081);
             TestConfig secondServer = new TestConfig(19081, second);

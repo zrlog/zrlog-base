@@ -6,13 +6,10 @@ import com.zrlog.data.dto.VisitorCommentDTO;
 import com.zrlog.data.util.DateValueFormatUtils;
 import com.zrlog.model.Comment;
 import jakarta.inject.Inject;
-
 import java.sql.SQLException;
 import java.util.List;
 
-/**
- * 对应数据里面的 comment 表，用于存放文章对应的评论信息。
- */
+/** 对应数据里面的 comment 表，用于存放文章对应的评论信息。 */
 public class CommentRepository extends BaseRepository<Comment, Long> {
 
     public static final String TABLE_NAME = "comment";
@@ -40,7 +37,8 @@ public class CommentRepository extends BaseRepository<Comment, Long> {
             comment.setCommTime(formatCommentTime(row.getCommTime()));
             comment.setUserHome(row.getUserHome());
             comment.setUserName(row.getUserName());
-            comment.setGravatarId(row.getUserMail() == null ? "" : SecurityUtils.md5(row.getUserMail()));
+            comment.setGravatarId(
+                    row.getUserMail() == null ? "" : SecurityUtils.md5(row.getUserMail()));
             result.add(comment);
         }
         return result;

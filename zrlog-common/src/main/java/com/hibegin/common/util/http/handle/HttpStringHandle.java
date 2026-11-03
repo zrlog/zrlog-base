@@ -1,7 +1,6 @@
 package com.hibegin.common.util.http.handle;
 
 import com.hibegin.common.util.IOUtil;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.http.HttpRequest;
@@ -13,7 +12,6 @@ import java.util.zip.GZIPInputStream;
 public class HttpStringHandle extends HttpHandle<String> {
 
     private int statusCode;
-
 
     @Override
     public int getStatusCode() {

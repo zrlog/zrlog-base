@@ -1,9 +1,7 @@
 package com.hibegin.common.util.http.handle;
 
-
 import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.StringUtils;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,7 +20,6 @@ public class HttpFileHandle extends HttpHandle<File> {
     private final String filePath;
     private final String fileName;
     private int statusCode;
-
 
     public HttpFileHandle(String filePath) {
         this.filePath = filePath;
@@ -77,9 +74,13 @@ public class HttpFileHandle extends HttpHandle<File> {
                 getT().getParentFile().mkdirs();
             }
             if (response.statusCode() == 200) {
-                Files.copy(response.body(), Paths.get(getT().toString()), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(
+                        response.body(),
+                        Paths.get(getT().toString()),
+                        StandardCopyOption.REPLACE_EXISTING);
             } else {
-                LOGGER.warning("FileHandle " + request.uri() + " status error " + response.statusCode());
+                LOGGER.warning(
+                        "FileHandle " + request.uri() + " status error " + response.statusCode());
             }
         } catch (IOException e) {
             LOGGER.warning("FileHandle error " + e.getMessage());

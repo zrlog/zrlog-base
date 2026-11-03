@@ -3,15 +3,16 @@ package com.zrlog.model;
 import com.hibegin.common.dao.entity.BaseEntity;
 import com.hibegin.common.dao.entity.Column;
 import com.hibegin.common.dao.entity.Entity;
-
 import java.sql.Timestamp;
 
 @Entity(table = "comment", idColumn = "commentId", generatedId = true, createdAtColumn = "td")
 public class Comment extends BaseEntity<Long> {
     private Timestamp commTime;
     private Boolean hide;
+
     @Column("have_read")
     private Boolean haveRead = false;
+
     private String userComment;
     private String userHome;
     private String userIp;
@@ -20,8 +21,10 @@ public class Comment extends BaseEntity<Long> {
     private Integer logId;
     private String postId;
     private String header;
+
     @Column("user_agent")
     private String userAgent;
+
     @Column("reply_id")
     private Integer replyId;
 

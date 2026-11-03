@@ -1,19 +1,17 @@
 package com.zrlog.util;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.http.server.util.PathUtil;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.concurrent.TimeUnit;
-
-import static org.junit.Assert.*;
-
 public class NetworkProxyEnvironmentTest {
-    @Rule
-    public TemporaryFolder temporary = new TemporaryFolder();
+    @Rule public TemporaryFolder temporary = new TemporaryFolder();
 
     public static void main(String[] args) throws Exception {
         PathUtil.setRootPath(args[0]);
@@ -34,13 +32,23 @@ public class NetworkProxyEnvironmentTest {
     public void standardProcessEnvironmentWinsWhileTheFileRemainsEditable() throws Exception {
         Path root = temporary.newFolder().toPath();
         Files.createDirectories(root.resolve("conf"));
-        Files.writeString(root.resolve("conf/proxy.properties"),
+        Files.writeString(
+                root.resolve("conf/proxy.properties"),
                 "network.proxy.url=http://file.example:80\nnetwork.proxy.noProxy=.file.example\n");
         Path output = root.resolve("probe.log");
-        ProcessBuilder builder = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                "-cp", System.getProperty("java.class.path"), getClass().getName(), root.toString())
-                .redirectErrorStream(true).redirectOutput(output.toFile());
-        for (String key : new String[]{"http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY", "no_proxy", "NO_PROXY"}) {
+        ProcessBuilder builder =
+                new ProcessBuilder(
+                                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                                "-cp",
+                                System.getProperty("java.class.path"),
+                                getClass().getName(),
+                                root.toString())
+                        .redirectErrorStream(true)
+                        .redirectOutput(output.toFile());
+        for (String key :
+                new String[] {
+                    "http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY", "no_proxy", "NO_PROXY"
+                }) {
             builder.environment().remove(key);
         }
         builder.environment().put("HTTP_PROXY", "http://upper.example:3128");

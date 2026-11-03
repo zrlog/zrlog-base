@@ -2,7 +2,6 @@ package com.zrlog.web;
 
 import com.zrlog.common.Updater;
 import com.zrlog.common.ZrLogConfig;
-
 import java.io.File;
 
 public class WebSetupContext {
@@ -13,8 +12,12 @@ public class WebSetupContext {
     private final String contextPath;
     private final Updater updater;
 
-    public WebSetupContext(ZrLogConfig zrLogConfig, File dbPropertiesFile, File installLockFile,
-                           String contextPath, Updater updater) {
+    public WebSetupContext(
+            ZrLogConfig zrLogConfig,
+            File dbPropertiesFile,
+            File installLockFile,
+            String contextPath,
+            Updater updater) {
         this.zrLogConfig = zrLogConfig;
         this.dbPropertiesFile = dbPropertiesFile;
         this.installLockFile = installLockFile;

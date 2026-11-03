@@ -1,15 +1,12 @@
 package com.zrlog.business.plugin;
 
 import com.zrlog.util.ExecutionDeadline;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Objects;
 
-/**
- * Shared deadline and authority fence for synchronous static generation.
- */
+/** Shared deadline and authority fence for synchronous static generation. */
 public final class StaticGenerationBudget {
     public static final String REQUEST_ATTRIBUTE = StaticGenerationBudget.class.getName();
     private final ExecutionDeadline deadline;
@@ -21,7 +18,8 @@ public final class StaticGenerationBudget {
         this(deadline, fence, null, 0);
     }
 
-    public StaticGenerationBudget(ExecutionDeadline deadline, Runnable fence, String executionId, int actorId) {
+    public StaticGenerationBudget(
+            ExecutionDeadline deadline, Runnable fence, String executionId, int actorId) {
         this.deadline = Objects.requireNonNull(deadline);
         this.fence = Objects.requireNonNull(fence);
         this.executionId = executionId;
@@ -42,9 +40,11 @@ public final class StaticGenerationBudget {
     }
 
     public long remainingMillis() {
-        if (Thread.currentThread().isInterrupted()) throw new IllegalStateException("Static generation interrupted");
+        if (Thread.currentThread().isInterrupted())
+            throw new IllegalStateException("Static generation interrupted");
         long remaining = deadline.remainingMillis();
-        if (remaining == 0) throw new IllegalStateException("Static generation time budget exhausted");
+        if (remaining == 0)
+            throw new IllegalStateException("Static generation time budget exhausted");
         return remaining;
     }
 

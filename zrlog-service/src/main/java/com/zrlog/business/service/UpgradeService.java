@@ -23,7 +23,6 @@ import com.zrlog.util.I18nUtil;
 import com.zrlog.util.ZrLogUtil;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-
 import java.io.File;
 import java.util.Map;
 import java.util.Objects;
@@ -57,14 +56,16 @@ public class UpgradeService {
         if (StringUtils.isEmpty(versionTag)) {
             versionTag = String.valueOf(System.currentTimeMillis());
         }
-        return ("upgrade-" + versionTag + "-" + System.currentTimeMillis()).replaceAll("[^A-Za-z0-9._-]", "-");
+        return ("upgrade-" + versionTag + "-" + System.currentTimeMillis())
+                .replaceAll("[^A-Za-z0-9._-]", "-");
     }
 
     static String backendString(Map<String, Object> backend, String key) {
         return Objects.toString(backend.get(key), key);
     }
 
-    public CheckVersionResponse getCheckVersionResponse(boolean fetchAble, UpdateVersionInfoPlugin plugin) {
+    public CheckVersionResponse getCheckVersionResponse(
+            boolean fetchAble, UpdateVersionInfoPlugin plugin) {
         if (Objects.isNull(plugin)) {
             return upgradeNoticeService.getNotice();
         }
@@ -88,19 +89,23 @@ public class UpgradeService {
             checkVersionResponse.setUpgrade(false);
             return checkVersionResponse;
         }
-        checkVersionResponse.setUpgrade(ZrLogUtil.greatThenCurrentVersion(version.getBuildId(), version.getBuildDate(), version.getVersion()));
+        checkVersionResponse.setUpgrade(
+                ZrLogUtil.greatThenCurrentVersion(
+                        version.getBuildId(), version.getBuildDate(), version.getVersion()));
         checkVersionResponse.setVersion(version);
         return checkVersionResponse;
     }
 
-    public PreCheckVersionResponse getPreCheckVersionResponse(boolean fetchAble, UpdateVersionInfoPlugin plugin) {
+    public PreCheckVersionResponse getPreCheckVersionResponse(
+            boolean fetchAble, UpdateVersionInfoPlugin plugin) {
         CheckVersionResponse checkVersionResponse = getCheckVersionResponse(fetchAble, plugin);
         return BeanUtil.convert(checkVersionResponse, PreCheckVersionResponse.class);
-
     }
 
-    public PreCheckVersionResponse preUpgradeVersion(boolean fetchAble, UpdateVersionInfoPlugin plugin) {
-        PreCheckVersionResponse checkVersionResponse = getPreCheckVersionResponse(fetchAble, plugin);
+    public PreCheckVersionResponse preUpgradeVersion(
+            boolean fetchAble, UpdateVersionInfoPlugin plugin) {
+        PreCheckVersionResponse checkVersionResponse =
+                getPreCheckVersionResponse(fetchAble, plugin);
         checkVersionResponse.setDockerMode(isDockerMode());
         checkVersionResponse.setSystemServiceMode(isSystemServiceMode());
         checkVersionResponse.setFaasMode(isFaaSMode());
@@ -109,9 +114,11 @@ public class UpgradeService {
         boolean disable = isOnlineUpgradeDisabled();
         checkVersionResponse.setOnlineUpgradable(!disable);
         Updater currentUpdater = updater;
-        if (currentUpdater != null && UpdaterHosts.unwrap(currentUpdater) instanceof SystemPackageUpdater) {
+        if (currentUpdater != null
+                && UpdaterHosts.unwrap(currentUpdater) instanceof SystemPackageUpdater) {
             try {
-                checkVersionResponse.setSystemPackageUpgrade(((SystemPackageUpdater) UpdaterHosts.unwrap(currentUpdater)).status());
+                checkVersionResponse.setSystemPackageUpgrade(
+                        ((SystemPackageUpdater) UpdaterHosts.unwrap(currentUpdater)).status());
             } catch (Exception e) {
                 throw new IllegalStateException("Unable to read system package upgrade status", e);
             }
@@ -122,26 +129,44 @@ public class UpgradeService {
                 checkVersionResponse.setOnlineUpgradable(true);
                 checkVersionResponse.setDockerUpdaterAvailable(true);
             } catch (RuntimeException error) {
-                checkVersionResponse.setDisableUpgradeReason(backendString(I18nUtil.getBackend(), "upgrade.docker.updaterUnavailable"));
+                checkVersionResponse.setDisableUpgradeReason(
+                        backendString(I18nUtil.getBackend(), "upgrade.docker.updaterUnavailable"));
             }
         }
         checkVersionResponse.setBackupProtection(backupProtectionService.getStatus());
         if (!Boolean.TRUE.equals(checkVersionResponse.getOnlineUpgradable())
                 && checkVersionResponse.getDisableUpgradeReason() == null
                 && Objects.equals(checkVersionResponse.getUpgrade(), true)) {
-            UpgradeProcessResponse upgradeProcessResponse = buildManualUpgradeResponse(checkVersionResponse.getVersion(),
-                    I18nUtil.getBackend());
+            UpgradeProcessResponse upgradeProcessResponse =
+                    buildManualUpgradeResponse(
+                            checkVersionResponse.getVersion(), I18nUtil.getBackend());
             checkVersionResponse.setDisableUpgradeReason(upgradeProcessResponse.getMessage());
         }
         return checkVersionResponse;
     }
 
-    private File downloadUpgradePackage(Version version, UpgradeProgressListener progressListener, Map<String, Object> backend, Updater updater) {
+    private File downloadUpgradePackage(
+            Version version,
+            UpgradeProgressListener progressListener,
+            Map<String, Object> backend,
+            Updater updater) {
         try {
             UpdateContext.Builder b = new UpdateContext.Builder(UpdaterHosts.context(updater));
             b.packageSource = websiteKv.upgradeWebSiteInfo().getUpgradePackageSource();
-            UpdaterTypeEnum type = isFaaSMode() ? UpdaterTypeEnum.FAAS : updater == null ? UpdaterTypeEnum.ZIP : updater.getType();
-            return UpdateProviders.get(type).download(b.build(), new UpdateRequest(null, version, buildUpgradeKey(version), UpdaterHosts.unwrap(updater), progressListener, UpdaterHosts.text(backend)));
+            UpdaterTypeEnum type =
+                    isFaaSMode()
+                            ? UpdaterTypeEnum.FAAS
+                            : updater == null ? UpdaterTypeEnum.ZIP : updater.getType();
+            return UpdateProviders.get(type)
+                    .download(
+                            b.build(),
+                            new UpdateRequest(
+                                    null,
+                                    version,
+                                    buildUpgradeKey(version),
+                                    UpdaterHosts.unwrap(updater),
+                                    progressListener,
+                                    UpdaterHosts.text(backend)));
         } catch (Exception e) {
             throw new DownloadUpgradeFileException(e);
         }
@@ -151,100 +176,137 @@ public class UpgradeService {
         return doUpgrade(plugin, UpgradeProgressListener.NONE);
     }
 
-    public UpgradeProcessResponse doUpgrade(UpdateVersionInfoPlugin plugin, UpgradeProgressListener progressListener) {
+    public UpgradeProcessResponse doUpgrade(
+            UpdateVersionInfoPlugin plugin, UpgradeProgressListener progressListener) {
         return doUpgrade(plugin, progressListener, I18nUtil.getBackend());
     }
 
-    public UpgradeProcessResponse doUpgrade(UpdateVersionInfoPlugin plugin, UpgradeProgressListener progressListener,
-                                            Map<String, Object> backend) {
+    public UpgradeProcessResponse doUpgrade(
+            UpdateVersionInfoPlugin plugin,
+            UpgradeProgressListener progressListener,
+            Map<String, Object> backend) {
         return doUpgrade(plugin, progressListener, backend, false);
     }
 
-    public UpgradeProcessResponse doUpgrade(UpdateVersionInfoPlugin plugin, UpgradeProgressListener progressListener,
-                                            Map<String, Object> backend, boolean backupRiskAccepted) {
+    public UpgradeProcessResponse doUpgrade(
+            UpdateVersionInfoPlugin plugin,
+            UpgradeProgressListener progressListener,
+            Map<String, Object> backend,
+            boolean backupRiskAccepted) {
         CheckVersionResponse checkVersionResponse = getCheckVersionResponse(true, plugin);
         Version version = checkVersionResponse.getVersion();
         if (Objects.isNull(version) || !Objects.equals(checkVersionResponse.getUpgrade(), true)) {
-            return new UpgradeProcessResponse(true, backendString(backend, "upgrade.result.noChange"));
+            return new UpgradeProcessResponse(
+                    true, backendString(backend, "upgrade.result.noChange"));
         }
         return doUpgradeVersion(version, progressListener, backend);
     }
 
-    /**
-     * Execute the exact version already checked and claimed by the caller.
-     */
-    public UpgradeProcessResponse doUpgradeVersion(Version version, UpgradeProgressListener progressListener,
-                                                   Map<String, Object> backend) {
-        if (Objects.isNull(version) || !ZrLogUtil.greatThenCurrentVersion(version.getBuildId(),
-                version.getBuildDate(), version.getVersion())) {
-            return new UpgradeProcessResponse(true, backendString(backend, "upgrade.result.noChange"));
+    /** Execute the exact version already checked and claimed by the caller. */
+    public UpgradeProcessResponse doUpgradeVersion(
+            Version version,
+            UpgradeProgressListener progressListener,
+            Map<String, Object> backend) {
+        if (Objects.isNull(version)
+                || !ZrLogUtil.greatThenCurrentVersion(
+                        version.getBuildId(), version.getBuildDate(), version.getVersion())) {
+            return new UpgradeProcessResponse(
+                    true, backendString(backend, "upgrade.result.noChange"));
         }
         if (isOnlineUpgradeDisabled()) {
             return buildManualUpgradeResponse(version, backend);
         }
         File upgradePackage = downloadUpgradePackage(version, progressListener, backend, updater);
-        UpdateVersionHandler updateVersionHandler = newOnlineUpdateVersionHandler(version, upgradePackage,
-                progressListener, backend);
+        UpdateVersionHandler updateVersionHandler =
+                newOnlineUpdateVersionHandler(version, upgradePackage, progressListener, backend);
         updateVersionHandler.doHandle();
-        return new UpgradeProcessResponse(updateVersionHandler.isFinish(), updateVersionHandler.getMessage());
+        return new UpgradeProcessResponse(
+                updateVersionHandler.isFinish(), updateVersionHandler.getMessage());
     }
 
-    public UpgradeProcessResponse doUpgrade(Version version, Updater updater,
-                                            UpgradeProgressListener progressListener, Map<String, Object> backend) {
-        if (Objects.isNull(version) || !ZrLogUtil.greatThenCurrentVersion(version.getBuildId(),
-                version.getBuildDate(), version.getVersion())) {
-            return new UpgradeProcessResponse(true, backendString(backend, "upgrade.result.noChange"));
+    public UpgradeProcessResponse doUpgrade(
+            Version version,
+            Updater updater,
+            UpgradeProgressListener progressListener,
+            Map<String, Object> backend) {
+        if (Objects.isNull(version)
+                || !ZrLogUtil.greatThenCurrentVersion(
+                        version.getBuildId(), version.getBuildDate(), version.getVersion())) {
+            return new UpgradeProcessResponse(
+                    true, backendString(backend, "upgrade.result.noChange"));
         }
         if (isOnlineUpgradeDisabled()) {
             return buildManualUpgradeResponse(version, backend);
         }
         if (Objects.isNull(updater)) {
-            return new UpgradeProcessResponse(false, backendString(backend, "upgrade.error.unsupportedRuntime"));
+            return new UpgradeProcessResponse(
+                    false, backendString(backend, "upgrade.error.unsupportedRuntime"));
         }
         File upgradePackage = downloadUpgradePackage(version, progressListener, backend, updater);
-        UpdateVersionHandler updateVersionHandler = newOnlineUpdateVersionHandler(version, upgradePackage,
-                progressListener, backend, updater);
+        UpdateVersionHandler updateVersionHandler =
+                newOnlineUpdateVersionHandler(
+                        version, upgradePackage, progressListener, backend, updater);
         updateVersionHandler.doHandle();
-        return new UpgradeProcessResponse(updateVersionHandler.isFinish(), updateVersionHandler.getMessage());
+        return new UpgradeProcessResponse(
+                updateVersionHandler.isFinish(), updateVersionHandler.getMessage());
     }
 
-    UpdateVersionHandler newOnlineUpdateVersionHandler(Version version, File upgradePackage,
-                                                       UpgradeProgressListener progressListener,
-                                                       Map<String, Object> backend) {
-        return newOnlineUpdateVersionHandler(version, upgradePackage, progressListener, backend, updater);
+    UpdateVersionHandler newOnlineUpdateVersionHandler(
+            Version version,
+            File upgradePackage,
+            UpgradeProgressListener progressListener,
+            Map<String, Object> backend) {
+        return newOnlineUpdateVersionHandler(
+                version, upgradePackage, progressListener, backend, updater);
     }
 
-    UpdateVersionHandler newOnlineUpdateVersionHandler(Version version, File upgradePackage,
-                                                       UpgradeProgressListener progressListener,
-                                                       Map<String, Object> backend, Updater updater) {
-        UpdaterTypeEnum type = updater != null ? updater.getType()
-                : isFaaSMode() ? UpdaterTypeEnum.FAAS : isWarMode() ? UpdaterTypeEnum.WAR : UpdaterTypeEnum.ZIP;
+    UpdateVersionHandler newOnlineUpdateVersionHandler(
+            Version version,
+            File upgradePackage,
+            UpgradeProgressListener progressListener,
+            Map<String, Object> backend,
+            Updater updater) {
+        UpdaterTypeEnum type =
+                updater != null
+                        ? updater.getType()
+                        : isFaaSMode()
+                                ? UpdaterTypeEnum.FAAS
+                                : isWarMode() ? UpdaterTypeEnum.WAR : UpdaterTypeEnum.ZIP;
         File file = type == UpdaterTypeEnum.DEB ? null : upgradePackage;
-        return UpdaterHosts.handler(type, updater, file, version, buildUpgradeKey(version), progressListener, backend);
+        return UpdaterHosts.handler(
+                type, updater, file, version, buildUpgradeKey(version), progressListener, backend);
     }
 
     private boolean isOnlineUpgradeDisabled() {
-        return isDockerMode() || (isSystemServiceMode() && !isDebOnlineUpgradeSupported()) ||
-                (isFaaSMode() && !isFaaSOnlineUpgradeSupported());
+        return isDockerMode()
+                || (isSystemServiceMode() && !isDebOnlineUpgradeSupported())
+                || (isFaaSMode() && !isFaaSOnlineUpgradeSupported());
     }
 
-    private UpgradeProcessResponse buildManualUpgradeResponse(Version version, Map<String, Object> backend) {
+    private UpgradeProcessResponse buildManualUpgradeResponse(
+            Version version, Map<String, Object> backend) {
         UpdateVersionHandler updateVersionHandler;
         if (isDockerMode()) {
-            updateVersionHandler = UpdaterHosts.manualHandler(UpdaterTypeEnum.DOCKER, updater, version, backend);
+            updateVersionHandler =
+                    UpdaterHosts.manualHandler(UpdaterTypeEnum.DOCKER, updater, version, backend);
         } else if (isSystemServiceMode()) {
-            updateVersionHandler = UpdaterHosts.manualHandler(UpdaterTypeEnum.DEB, updater, version, backend);
+            updateVersionHandler =
+                    UpdaterHosts.manualHandler(UpdaterTypeEnum.DEB, updater, version, backend);
         } else if (isFaaSMode()) {
-            updateVersionHandler = UpdaterHosts.manualHandler(UpdaterTypeEnum.FAAS, updater, version, backend);
+            updateVersionHandler =
+                    UpdaterHosts.manualHandler(UpdaterTypeEnum.FAAS, updater, version, backend);
         } else {
             return new UpgradeProcessResponse(false, "");
         }
         updateVersionHandler.doHandle();
-        return new UpgradeProcessResponse(updateVersionHandler.isFinish(), updateVersionHandler.getMessage());
+        return new UpgradeProcessResponse(
+                updateVersionHandler.isFinish(), updateVersionHandler.getMessage());
     }
 
     boolean isDebOnlineUpgradeSupported() {
-        return updater != null && UpdaterHosts.unwrap(updater) instanceof SystemPackageUpdater && ((SystemPackageUpdater) UpdaterHosts.unwrap(updater)).available();
+        return updater != null
+                && UpdaterHosts.unwrap(updater) instanceof SystemPackageUpdater
+                && ((SystemPackageUpdater) UpdaterHosts.unwrap(updater)).available();
     }
 
     boolean isDockerMode() {
@@ -270,5 +332,4 @@ public class UpgradeService {
     boolean isFaaSOnlineUpgradeSupported() {
         return UpdaterHosts.onlineUpgradeSupported(UpdaterTypeEnum.FAAS, updater);
     }
-
 }

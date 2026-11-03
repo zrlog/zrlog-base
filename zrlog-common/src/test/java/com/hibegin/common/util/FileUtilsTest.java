@@ -1,6 +1,7 @@
 package com.hibegin.common.util;
 
-import org.junit.Test;
+import static org.junit.Assert.*;
+import static org.junit.Assume.assumeFalse;
 
 import java.io.File;
 import java.io.UncheckedIOException;
@@ -10,9 +11,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import static org.junit.Assert.*;
-import static org.junit.Assume.assumeFalse;
+import org.junit.Test;
 
 public class FileUtilsTest {
 
@@ -78,7 +77,8 @@ public class FileUtilsTest {
 
         File singleFile = write(new File(root, "single.txt"), "single");
         File singleTarget = new File(root, "single-target");
-        FileUtils.moveOrCopyFolder(singleFile.getAbsolutePath(), singleTarget.getAbsolutePath(), false);
+        FileUtils.moveOrCopyFolder(
+                singleFile.getAbsolutePath(), singleTarget.getAbsolutePath(), false);
         assertEquals("single", Files.readString(new File(singleTarget, "single.txt").toPath()));
     }
 
@@ -133,8 +133,11 @@ public class FileUtilsTest {
         Path targetDirectory = Files.createDirectories(root.resolve("target"));
         Files.writeString(targetDirectory.resolve("existing.txt"), "existing");
 
-        assertThrows(UncheckedIOException.class,
-                () -> FileUtils.moveOrCopyFile(source.toString(), targetDirectory.toString(), true));
+        assertThrows(
+                UncheckedIOException.class,
+                () ->
+                        FileUtils.moveOrCopyFile(
+                                source.toString(), targetDirectory.toString(), true));
         assertEquals("content", Files.readString(source));
     }
 

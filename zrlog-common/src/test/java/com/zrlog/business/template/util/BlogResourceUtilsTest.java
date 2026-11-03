@@ -1,11 +1,10 @@
 package com.zrlog.business.template.util;
 
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
 
 import java.util.List;
 import java.util.stream.Collectors;
-
-import static org.junit.Assert.assertEquals;
+import org.junit.Test;
 
 public class BlogResourceUtilsTest {
 
@@ -15,7 +14,8 @@ public class BlogResourceUtilsTest {
         List<String> resources = utils.getResources();
 
         assertEquals(resources.contains("missing"), utils.existsResource("missing"));
-        assertEquals(resources.stream().filter(e -> e.startsWith("/")).collect(Collectors.toList()),
+        assertEquals(
+                resources.stream().filter(e -> e.startsWith("/")).collect(Collectors.toList()),
                 utils.searchResources("/"));
     }
 }

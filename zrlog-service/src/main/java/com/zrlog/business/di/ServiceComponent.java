@@ -11,7 +11,6 @@ import com.zrlog.data.di.DataComponent;
 import dagger.BindsInstance;
 import dagger.Component;
 import jakarta.inject.Singleton;
-
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
@@ -19,9 +18,7 @@ import java.util.function.Supplier;
 @Singleton
 @Component(modules = {DataBindingsModule.class, ServiceModule.class})
 public interface ServiceComponent {
-    /**
-     * CLI and pre-install upgrades use defaults before an application database exists.
-     */
+    /** CLI and pre-install upgrades use defaults before an application database exists. */
     static ServiceComponent forUninstalledApplication(Updater updater) {
         DataComponent data = DaggerDataComponent.factory().create(() -> null, () -> false);
         return DaggerServiceComponent.factory()

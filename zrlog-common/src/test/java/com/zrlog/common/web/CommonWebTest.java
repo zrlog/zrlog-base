@@ -1,5 +1,7 @@
 package com.zrlog.common.web;
 
+import static org.junit.Assert.*;
+
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import com.hibegin.http.HttpMethod;
@@ -13,44 +15,43 @@ import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.web.WebSetup;
 import com.zrlog.web.WebSetupContext;
 import com.zrlog.web.WebSetupProvider;
-import org.junit.Test;
-
 import java.io.File;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.lang.reflect.Proxy;
 import java.time.LocalDateTime;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class CommonWebTest {
 
     private static HttpRequest request(long createTime) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                CommonWebTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getCreateTime".equals(method.getName())) {
-                        return createTime;
-                    }
-                    if ("getMethod".equals(method.getName())) {
-                        return HttpMethod.GET;
-                    }
-                    if ("getUri".equals(method.getName())) {
-                        return "/admin";
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
+        return (HttpRequest)
+                Proxy.newProxyInstance(
+                        CommonWebTest.class.getClassLoader(),
+                        new Class[] {HttpRequest.class},
+                        (proxy, method, args) -> {
+                            if ("getCreateTime".equals(method.getName())) {
+                                return createTime;
+                            }
+                            if ("getMethod".equals(method.getName())) {
+                                return HttpMethod.GET;
+                            }
+                            if ("getUri".equals(method.getName())) {
+                                return "/admin";
+                            }
+                            if ("toString".equals(method.getName())) {
+                                return "HttpRequestProxy";
+                            }
+                            return null;
+                        });
     }
 
     private static HttpResponse response() {
-        return (HttpResponse) Proxy.newProxyInstance(
-                CommonWebTest.class.getClassLoader(),
-                new Class[]{HttpResponse.class},
-                (proxy, method, args) -> null);
+        return (HttpResponse)
+                Proxy.newProxyInstance(
+                        CommonWebTest.class.getClassLoader(),
+                        new Class[] {HttpResponse.class},
+                        (proxy, method, args) -> null);
     }
 
     private static void restoreProperty(String key, String value) {
@@ -68,12 +69,15 @@ public class CommonWebTest {
         adapter.write(new JsonWriter(writer), LocalDateTime.of(2026, 6, 29, 11, 20, 30));
 
         assertEquals("\"2026-06-29T11:20:30\"", writer.toString());
-        assertEquals(LocalDateTime.of(2026, 6, 29, 11, 20, 30),
+        assertEquals(
+                LocalDateTime.of(2026, 6, 29, 11, 20, 30),
                 adapter.read(new JsonReader(new StringReader("\"2026-06-29T11:20:30\""))));
 
         ZrLogHttpJsonMessageConverter converter = new ZrLogHttpJsonMessageConverter();
-        assertTrue(converter.toJson(new TimeHolder(LocalDateTime.of(2026, 6, 29, 11, 20, 30)))
-                .contains("2026-06-29T11:20:30"));
+        assertTrue(
+                converter
+                        .toJson(new TimeHolder(LocalDateTime.of(2026, 6, 29, 11, 20, 30)))
+                        .contains("2026-06-29T11:20:30"));
         assertNotNull(converter.fromJson("{\"time\":\"2026-06-29T11:20:30\"}"));
     }
 
@@ -113,8 +117,11 @@ public class CommonWebTest {
         assertNotNull(BlogBuildInfoUtil.getPackageType());
         assertNotNull(BlogBuildInfoUtil.getUpdateVersionJsonFilename());
         assertFalse(BlogBuildInfoUtil.getResourceDownloadUrl().endsWith("/"));
-        assertTrue(BlogBuildInfoUtil.isRelease() || BlogBuildInfoUtil.isPreview() || BlogBuildInfoUtil.isDev()
-                || BlogBuildInfoUtil.getRunMode().length() > 0);
+        assertTrue(
+                BlogBuildInfoUtil.isRelease()
+                        || BlogBuildInfoUtil.isPreview()
+                        || BlogBuildInfoUtil.isDev()
+                        || BlogBuildInfoUtil.getRunMode().length() > 0);
         assertTrue(BlogBuildInfoUtil.getBlogProp().containsKey("version"));
         assertTrue(BlogBuildInfoUtil.getVersionShortInfo().contains(" - "));
         assertTrue(BlogBuildInfoUtil.getVersionInfo().contains("("));
@@ -123,53 +130,55 @@ public class CommonWebTest {
 
     @Test
     public void shouldExposeDefaultExtensionContracts() throws Exception {
-        Updater updater = new Updater() {
-            @Override
-            public void restartProcessAsync(Version upgradeVersion) {
-            }
+        Updater updater =
+                new Updater() {
+                    @Override
+                    public void restartProcessAsync(Version upgradeVersion) {}
 
-            @Override
-            public String getUnzipPath() {
-                return "";
-            }
+                    @Override
+                    public String getUnzipPath() {
+                        return "";
+                    }
 
-            @Override
-            public File execFile() {
-                return new File("zrlog");
-            }
+                    @Override
+                    public File execFile() {
+                        return new File("zrlog");
+                    }
 
-            @Override
-            public UpdaterTypeEnum getType() {
-                return UpdaterTypeEnum.ZIP;
-            }
-        };
-        IPlugin plugin = new IPlugin() {
-            @Override
-            public boolean start() {
-                return true;
-            }
+                    @Override
+                    public UpdaterTypeEnum getType() {
+                        return UpdaterTypeEnum.ZIP;
+                    }
+                };
+        IPlugin plugin =
+                new IPlugin() {
+                    @Override
+                    public boolean start() {
+                        return true;
+                    }
 
-            @Override
-            public boolean isStarted() {
-                return false;
-            }
+                    @Override
+                    public boolean isStarted() {
+                        return false;
+                    }
 
-            @Override
-            public boolean stop() {
-                return true;
-            }
-        };
-        WebSetupProvider setupProvider = new WebSetupProvider() {
-            @Override
-            public String name() {
-                return "test";
-            }
+                    @Override
+                    public boolean stop() {
+                        return true;
+                    }
+                };
+        WebSetupProvider setupProvider =
+                new WebSetupProvider() {
+                    @Override
+                    public String name() {
+                        return "test";
+                    }
 
-            @Override
-            public WebSetup create(WebSetupContext context) {
-                return null;
-            }
-        };
+                    @Override
+                    public WebSetup create(WebSetupContext context) {
+                        return null;
+                    }
+                };
 
         assertEquals(null, updater.buildUpgradeFile("upgrade.zip", "key"));
         assertEquals("", updater.backup());

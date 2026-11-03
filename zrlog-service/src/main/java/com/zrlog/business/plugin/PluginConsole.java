@@ -2,7 +2,6 @@ package com.zrlog.business.plugin;
 
 import com.hibegin.common.util.LoggerUtil;
 import com.zrlog.util.ThreadUtils;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -14,9 +13,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-/**
- * 读取 plugin 日志文件，并输出到控制台
- */
+/** 读取 plugin 日志文件，并输出到控制台 */
 public class PluginConsole implements AutoCloseable {
 
     static final int READ_BUFFER_SIZE = 8 * 1024;
@@ -37,30 +34,36 @@ public class PluginConsole implements AutoCloseable {
         this.outputFile = outputFile;
         this.serverFileName = serverFileName;
         this.errorStream = errorStream;
-        this.scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
-            Thread thread = ThreadUtils.unstarted(runnable);
-            thread.setName("plugin-console-print-thread");
-            return thread;
-        });
+        this.scheduler =
+                Executors.newSingleThreadScheduledExecutor(
+                        runnable -> {
+                            Thread thread = ThreadUtils.unstarted(runnable);
+                            thread.setName("plugin-console-print-thread");
+                            return thread;
+                        });
     }
 
     public void printAsync() {
-        scheduler.scheduleAtFixedRate(() -> {
-            if (!outputFile.exists()) {
-                try {
-                    close();
-                } catch (Exception e) {
-                    LOGGER.warning("Error closing PluginConsole: " + e.getMessage());
-                }
-                return;
-            }
+        scheduler.scheduleAtFixedRate(
+                () -> {
+                    if (!outputFile.exists()) {
+                        try {
+                            close();
+                        } catch (Exception e) {
+                            LOGGER.warning("Error closing PluginConsole: " + e.getMessage());
+                        }
+                        return;
+                    }
 
-            try {
-                printNewContent();
-            } catch (Exception e) {
-                LOGGER.warning("Error reading file: " + e.getMessage());
-            }
-        }, 0, 1, TimeUnit.SECONDS); // 每秒检查一次文件大小变化
+                    try {
+                        printNewContent();
+                    } catch (Exception e) {
+                        LOGGER.warning("Error reading file: " + e.getMessage());
+                    }
+                },
+                0,
+                1,
+                TimeUnit.SECONDS); // 每秒检查一次文件大小变化
     }
 
     long printNewContent() throws IOException {
@@ -86,7 +89,8 @@ public class PluginConsole implements AutoCloseable {
         PrintStream output = errorStream ? System.err : System.out;
         long processed = 0L;
         while (remaining > 0) {
-            int bytesRead = fileInputStream.read(buffer, 0, (int) Math.min(buffer.length, remaining));
+            int bytesRead =
+                    fileInputStream.read(buffer, 0, (int) Math.min(buffer.length, remaining));
             if (bytesRead <= 0) {
                 return processed;
             }

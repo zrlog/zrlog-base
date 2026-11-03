@@ -1,9 +1,7 @@
 package com.zrlog.util;
 
-
 import com.hibegin.common.util.LoggerUtil;
 import com.zrlog.common.Constants;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.ParseException;
@@ -17,10 +15,7 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * 读取 ZrLog 构建信息，及 build.properties。
- * 注 build.properties 为使用 CI 工具自动加入的，git代码仓库并没有该文件。
- */
+/** 读取 ZrLog 构建信息，及 build.properties。 注 build.properties 为使用 CI 工具自动加入的，git代码仓库并没有该文件。 */
 public class BlogBuildInfoUtil {
 
     public static final String BUILD_PROPERTIES_FILE_PATH = "/build.properties";
@@ -32,10 +27,10 @@ public class BlogBuildInfoUtil {
     private static final String DEFAULT_RUNTIME_TYPE = "java";
     private static final String DEFAULT_PACKAGE_TYPE = "zip";
     private static final String DEFAULT_UPDATE_VERSION_JSON_FILENAME = "last.version.json";
-    /**
-     * 目前以git的commitId的前7位标记构建的Id
-     */
+
+    /** 目前以git的commitId的前7位标记构建的Id */
     private static String buildId = DEFAULT_BUILD_ID;
+
     private static String version = DEFAULT_VERSION;
     private static Date time = defaultBuildTime();
     private static String runMode = DEFAULT_RUN_MODE;
@@ -48,7 +43,8 @@ public class BlogBuildInfoUtil {
 
     static {
         Properties properties = new Properties();
-        try (InputStream inputStream = BlogBuildInfoUtil.class.getResourceAsStream(BUILD_PROPERTIES_FILE_PATH)) {
+        try (InputStream inputStream =
+                BlogBuildInfoUtil.class.getResourceAsStream(BUILD_PROPERTIES_FILE_PATH)) {
             if (Objects.nonNull(inputStream)) {
                 properties.load(inputStream);
             }
@@ -56,13 +52,18 @@ public class BlogBuildInfoUtil {
             LOGGER.log(Level.SEVERE, "doRead stream error", e);
         }
         applyBuildInfo(loadBuildInfo(properties));
-        dockerUpdateVersionJsonFilename = propertyOrDefault(properties, "dockerUpdateVersionJsonFilename",
-                "last.docker-image.version.json");
+        dockerUpdateVersionJsonFilename =
+                propertyOrDefault(
+                        properties,
+                        "dockerUpdateVersionJsonFilename",
+                        "last.docker-image.version.json");
     }
 
     static BuildInfo loadBuildInfo(Properties properties) {
-        String loadedBuildId = properties.get("buildId") == null
-                ? DEFAULT_BUILD_ID : properties.get("buildId").toString();
+        String loadedBuildId =
+                properties.get("buildId") == null
+                        ? DEFAULT_BUILD_ID
+                        : properties.get("buildId").toString();
         String loadedVersion = propertyOrDefault(properties, "version", DEFAULT_VERSION);
         Date loadedTime = defaultBuildTime();
         String buildTime = propertyOrDefault(properties, "buildTime", "");
@@ -70,21 +71,31 @@ public class BlogBuildInfoUtil {
             try {
                 loadedTime = parseBuildTime(buildTime);
             } catch (ParseException e) {
-                LOGGER.log(Level.SEVERE, "Invalid buildTime in build.properties; using fallback time", e);
+                LOGGER.log(
+                        Level.SEVERE,
+                        "Invalid buildTime in build.properties; using fallback time",
+                        e);
             }
         }
-        String loadedResourceDownloadUrl = propertyOrDefault(properties, "mirrorWebSite",
-                DEFAULT_RESOURCE_DOWNLOAD_URL);
+        String loadedResourceDownloadUrl =
+                propertyOrDefault(properties, "mirrorWebSite", DEFAULT_RESOURCE_DOWNLOAD_URL);
         if (loadedResourceDownloadUrl.endsWith("/")) {
-            loadedResourceDownloadUrl = loadedResourceDownloadUrl.substring(0,
-                    loadedResourceDownloadUrl.length() - 1);
+            loadedResourceDownloadUrl =
+                    loadedResourceDownloadUrl.substring(0, loadedResourceDownloadUrl.length() - 1);
         }
-        return new BuildInfo(loadedBuildId, loadedVersion, loadedTime,
+        return new BuildInfo(
+                loadedBuildId,
+                loadedVersion,
+                loadedTime,
                 propertyOrDefault(properties, "runMode", DEFAULT_RUN_MODE),
-                propertyOrDefault(properties, "fileArch", ""), loadedResourceDownloadUrl,
+                propertyOrDefault(properties, "fileArch", ""),
+                loadedResourceDownloadUrl,
                 propertyOrDefault(properties, "runtimeType", DEFAULT_RUNTIME_TYPE),
                 propertyOrDefault(properties, "packageType", DEFAULT_PACKAGE_TYPE),
-                propertyOrDefault(properties, "updateVersionJsonFilename", DEFAULT_UPDATE_VERSION_JSON_FILENAME));
+                propertyOrDefault(
+                        properties,
+                        "updateVersionJsonFilename",
+                        DEFAULT_UPDATE_VERSION_JSON_FILENAME));
     }
 
     static Date parseBuildTime(String buildTime) throws ParseException {
@@ -97,20 +108,24 @@ public class BlogBuildInfoUtil {
         ParsePosition position = new ParsePosition(0);
         Date parsedTime = dateFormat.parse(normalizedBuildTime, position);
         if (parsedTime == null || position.getIndex() != normalizedBuildTime.length()) {
-            int errorOffset = position.getErrorIndex() >= 0 ? position.getErrorIndex() : position.getIndex();
+            int errorOffset =
+                    position.getErrorIndex() >= 0 ? position.getErrorIndex() : position.getIndex();
             throw new ParseException("Unsupported buildTime: " + buildTime, errorOffset);
         }
         return parsedTime;
     }
 
-    private static String propertyOrDefault(Properties properties, String key, String defaultValue) {
+    private static String propertyOrDefault(
+            Properties properties, String key, String defaultValue) {
         Object value = properties.get(key);
         return value == null || value.toString().isEmpty() ? defaultValue : value.toString();
     }
 
     private static Date defaultBuildTime() {
-        return Date.from(LocalDateTime.of(2015, 3, 29, 0, 0, 0)
-                .atZone(ZoneOffset.systemDefault()).toInstant());
+        return Date.from(
+                LocalDateTime.of(2015, 3, 29, 0, 0, 0)
+                        .atZone(ZoneOffset.systemDefault())
+                        .toInstant());
     }
 
     private static void applyBuildInfo(BuildInfo buildInfo) {
@@ -157,9 +172,7 @@ public class BlogBuildInfoUtil {
         return updateVersionJsonFilename;
     }
 
-    /**
-     * Native ZIPs also run inside Docker; keep both manifest names in build.properties.
-     */
+    /** Native ZIPs also run inside Docker; keep both manifest names in build.properties. */
     public static String getDockerUpdateVersionJsonFilename() {
         return dockerUpdateVersionJsonFilename;
     }
@@ -192,7 +205,9 @@ public class BlogBuildInfoUtil {
         Properties blogProperties = new Properties();
         blogProperties.put("version", BlogBuildInfoUtil.getVersion());
         blogProperties.put("buildId", BlogBuildInfoUtil.getBuildId());
-        blogProperties.put("buildTime", new SimpleDateFormat("yyyy-MM-dd").format(BlogBuildInfoUtil.getTime()));
+        blogProperties.put(
+                "buildTime",
+                new SimpleDateFormat("yyyy-MM-dd").format(BlogBuildInfoUtil.getTime()));
         blogProperties.put("runMode", BlogBuildInfoUtil.getRunMode());
         return blogProperties;
     }
@@ -202,11 +217,19 @@ public class BlogBuildInfoUtil {
     }
 
     public static String getVersionInfo() {
-        return getVersionShortInfo() + " (" + new SimpleDateFormat("yyyy-MM-dd").format(BlogBuildInfoUtil.getTime()) + ")";
+        return getVersionShortInfo()
+                + " ("
+                + new SimpleDateFormat("yyyy-MM-dd").format(BlogBuildInfoUtil.getTime())
+                + ")";
     }
 
     public static String getVersionInfoFull() {
-        return BlogBuildInfoUtil.getVersion() + " - " + BlogBuildInfoUtil.getBuildId() + " (" + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(BlogBuildInfoUtil.getTime()) + ")";
+        return BlogBuildInfoUtil.getVersion()
+                + " - "
+                + BlogBuildInfoUtil.getBuildId()
+                + " ("
+                + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(BlogBuildInfoUtil.getTime())
+                + ")";
     }
 
     static final class BuildInfo {
@@ -221,9 +244,16 @@ public class BlogBuildInfoUtil {
         final String packageType;
         final String updateVersionJsonFilename;
 
-        private BuildInfo(String buildId, String version, Date time, String runMode, String fileArch,
-                          String resourceDownloadUrl, String runtimeType, String packageType,
-                          String updateVersionJsonFilename) {
+        private BuildInfo(
+                String buildId,
+                String version,
+                Date time,
+                String runMode,
+                String fileArch,
+                String resourceDownloadUrl,
+                String runtimeType,
+                String packageType,
+                String updateVersionJsonFilename) {
             this.buildId = buildId;
             this.version = version;
             this.time = time;

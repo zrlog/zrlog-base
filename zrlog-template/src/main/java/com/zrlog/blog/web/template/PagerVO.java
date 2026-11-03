@@ -3,9 +3,7 @@ package com.zrlog.blog.web.template;
 import java.io.Serializable;
 import java.util.List;
 
-/**
- * 分页
- */
+/** 分页 */
 public class PagerVO implements Serializable {
 
     private List<PageEntry> pageList;
@@ -110,5 +108,4 @@ public class PagerVO implements Serializable {
             this.next = next;
         }
     }
-
 }

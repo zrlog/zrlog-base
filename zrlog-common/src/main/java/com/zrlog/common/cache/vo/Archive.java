@@ -2,9 +2,7 @@ package com.zrlog.common.cache.vo;
 
 import java.io.Serializable;
 
-/**
- * 文章存档的值对象，不在数据库中有对应的表记录，通过SQL语言查询完成
- */
+/** 文章存档的值对象，不在数据库中有对应的表记录，通过SQL语言查询完成 */
 public class Archive implements Serializable {
     private String url;
     private String text;

@@ -1,13 +1,12 @@
 package com.zrlog.web;
 
-import org.junit.Test;
+import static org.junit.Assert.*;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class WebSetupLoaderTest {
 
@@ -29,7 +28,8 @@ public class WebSetupLoaderTest {
         List<WebSetupProvider> providers = List.of(admin, ai, access, mcp);
         assertTrue(WebSetupLoader.create(null, providers, Set.of("admin"), true).isEmpty());
         assertEquals(3, WebSetupLoader.create(null, providers, Set.of("admin-ai"), true).size());
-        assertEquals(2, WebSetupLoader.create(null, providers, Set.of("admin-access"), true).size());
+        assertEquals(
+                2, WebSetupLoader.create(null, providers, Set.of("admin-access"), true).size());
         assertEquals(3, WebSetupLoader.create(null, providers, Set.of("admin-mcp"), true).size());
     }
 
@@ -37,48 +37,66 @@ public class WebSetupLoaderTest {
     public void missingOrMisorderedDependencyCannotStartDependentRoutes() {
         FakeProvider child = dependent("admin-ai", 140, "admin");
         assertTrue(WebSetupLoader.create(null, List.of(child), Set.of(), false).isEmpty());
-        assertThrows(IllegalStateException.class, () -> WebSetupLoader.create(null, List.of(child), Set.of(), true));
-        assertThrows(IllegalStateException.class, () -> WebSetupLoader.create(null,
-                List.of(child, new FakeProvider("admin", 150)), Set.of(), true));
+        assertThrows(
+                IllegalStateException.class,
+                () -> WebSetupLoader.create(null, List.of(child), Set.of(), true));
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        WebSetupLoader.create(
+                                null,
+                                List.of(child, new FakeProvider("admin", 150)),
+                                Set.of(),
+                                true));
     }
 
     @Test
     public void disabledProviderIsNeverCreatedAndNamesAreExact() {
-        WebSetup enabled = () -> {
-        };
-        WebSetupProvider disabled = new FakeProvider("admin-ai", 10) {
-            @Override
-            public WebSetup create(WebSetupContext context) {
-                throw new AssertionError("Disabled feature must not initialize");
-            }
-        };
-        WebSetupProvider mcp = new FakeProvider("admin-mcp", 20) {
-            @Override
-            public WebSetup create(WebSetupContext context) {
-                return enabled;
-            }
-        };
-        assertEquals(List.of(enabled), WebSetupLoader.create(null, List.of(disabled, mcp), Set.of("admin-ai"), true));
-        assertEquals(List.of(enabled), WebSetupLoader.create(null, List.of(mcp), Set.of("admin"), true));
+        WebSetup enabled = () -> {};
+        WebSetupProvider disabled =
+                new FakeProvider("admin-ai", 10) {
+                    @Override
+                    public WebSetup create(WebSetupContext context) {
+                        throw new AssertionError("Disabled feature must not initialize");
+                    }
+                };
+        WebSetupProvider mcp =
+                new FakeProvider("admin-mcp", 20) {
+                    @Override
+                    public WebSetup create(WebSetupContext context) {
+                        return enabled;
+                    }
+                };
+        assertEquals(
+                List.of(enabled),
+                WebSetupLoader.create(null, List.of(disabled, mcp), Set.of("admin-ai"), true));
+        assertEquals(
+                List.of(enabled), WebSetupLoader.create(null, List.of(mcp), Set.of("admin"), true));
     }
 
     @Test
     public void providerCreationFailureHonorsStrictMode() {
-        WebSetupProvider broken = new FakeProvider("broken", 10) {
-            @Override
-            public WebSetup create(WebSetupContext context) {
-                throw new IllegalArgumentException("broken");
-            }
-        };
-        WebSetupProvider empty = new FakeProvider("empty", 20) {
-            @Override
-            public WebSetup create(WebSetupContext context) {
-                return null;
-            }
-        };
+        WebSetupProvider broken =
+                new FakeProvider("broken", 10) {
+                    @Override
+                    public WebSetup create(WebSetupContext context) {
+                        throw new IllegalArgumentException("broken");
+                    }
+                };
+        WebSetupProvider empty =
+                new FakeProvider("empty", 20) {
+                    @Override
+                    public WebSetup create(WebSetupContext context) {
+                        return null;
+                    }
+                };
         assertTrue(WebSetupLoader.create(null, List.of(broken, empty), Set.of(), false).isEmpty());
-        assertThrows(IllegalStateException.class, () -> WebSetupLoader.create(null, List.of(broken), Set.of(), true));
-        assertThrows(IllegalStateException.class, () -> WebSetupLoader.create(null, List.of(empty), Set.of(), true));
+        assertThrows(
+                IllegalStateException.class,
+                () -> WebSetupLoader.create(null, List.of(broken), Set.of(), true));
+        assertThrows(
+                IllegalStateException.class,
+                () -> WebSetupLoader.create(null, List.of(empty), Set.of(), true));
     }
 
     @Test
@@ -96,8 +114,9 @@ public class WebSetupLoaderTest {
         FakeProvider blog = new FakeProvider("blog", 10);
         FakeProvider unnamed = new FakeProvider(" ", 1);
 
-        List<WebSetupProvider> providers = WebSetupLoader.normalizeWebSetupProviders(
-                Arrays.asList(lateAdmin, blog, unnamed, earlyAdmin));
+        List<WebSetupProvider> providers =
+                WebSetupLoader.normalizeWebSetupProviders(
+                        Arrays.asList(lateAdmin, blog, unnamed, earlyAdmin));
 
         assertEquals(2, providers.size());
         assertSame(earlyAdmin, providers.get(0));
@@ -110,16 +129,17 @@ public class WebSetupLoaderTest {
         FakeProvider admin = new FakeProvider("admin", 10);
         FakeProvider install = new FakeProvider("install", 20);
 
-        List<WebSetupProvider> providers = WebSetupLoader.normalizeWebSetupProviders(Arrays.asList(install, blog, admin));
+        List<WebSetupProvider> providers =
+                WebSetupLoader.normalizeWebSetupProviders(Arrays.asList(install, blog, admin));
 
         assertEquals(Arrays.asList(admin, blog, install), providers);
     }
 
     @Test
     public void shouldSkipNullProviderNameWhenNormalizing() {
-        List<WebSetupProvider> providers = WebSetupLoader.normalizeWebSetupProviders(Arrays.asList(
-                new FakeProvider(null, 10),
-                new FakeProvider("admin", 20)));
+        List<WebSetupProvider> providers =
+                WebSetupLoader.normalizeWebSetupProviders(
+                        Arrays.asList(new FakeProvider(null, 10), new FakeProvider("admin", 20)));
 
         assertEquals(1, providers.size());
         assertEquals("admin", providers.get(0).name());
@@ -138,16 +158,14 @@ public class WebSetupLoaderTest {
 
     @Test(expected = IllegalStateException.class)
     public void shouldFailStrictModeOnDuplicatedWebSetupProvider() {
-        WebSetupLoader.normalizeWebSetupProviders(Arrays.asList(
-                new FakeProvider("admin", 10),
-                new FakeProvider("admin", 20)), true);
+        WebSetupLoader.normalizeWebSetupProviders(
+                Arrays.asList(new FakeProvider("admin", 10), new FakeProvider("admin", 20)), true);
     }
 
     @Test(expected = IllegalStateException.class)
     public void shouldFailStrictModeOnUnnamedWebSetupProvider() {
-        WebSetupLoader.normalizeWebSetupProviders(Arrays.asList(
-                new FakeProvider(" ", 10),
-                new FakeProvider("admin", 20)), true);
+        WebSetupLoader.normalizeWebSetupProviders(
+                Arrays.asList(new FakeProvider(" ", 10), new FakeProvider("admin", 20)), true);
     }
 
     private static class FakeProvider implements WebSetupProvider {
@@ -172,8 +190,7 @@ public class WebSetupLoaderTest {
 
         @Override
         public WebSetup create(WebSetupContext context) {
-            return () -> {
-            };
+            return () -> {};
         }
     }
 }

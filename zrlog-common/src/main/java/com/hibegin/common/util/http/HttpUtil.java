@@ -8,7 +8,6 @@ import com.zrlog.common.Constants;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.ExecutionDeadline;
 import com.zrlog.util.ThreadUtils;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -45,19 +44,23 @@ public class HttpUtil {
     public static String buildUserAgent(String appName, String appVersion, String buildId) {
         String osName = System.getProperty("os.name", "UnknownOS").replaceAll("\\s+", "");
         String osArch = System.getProperty("os.arch", "UnknownArch").replaceAll("\\s+", "");
-        String javaVendor = System.getProperty("java.vendor", "UnknownVendor").replaceAll("\\s+", "");
+        String javaVendor =
+                System.getProperty("java.vendor", "UnknownVendor").replaceAll("\\s+", "");
         String javaVersion = System.getProperty("java.version", "UnknownVersion");
 
         if (EnvKit.isFaaSMode()) {
-            return String.format("Mozilla/5.0 (%s %s) %s/%s build/%s",
+            return String.format(
+                    "Mozilla/5.0 (%s %s) %s/%s build/%s",
                     osName, osArch, appName, appVersion, buildId);
         }
-        return String.format("Mozilla/5.0 (%s %s; %s) Java/%s %s/%s build/%s",
+        return String.format(
+                "Mozilla/5.0 (%s %s; %s) Java/%s %s/%s build/%s",
                 osName, osArch, javaVendor, javaVersion, appName, appVersion, buildId);
     }
 
     public static String getUserAgent() {
-        return buildUserAgent("ZrLog", BlogBuildInfoUtil.getVersion(), BlogBuildInfoUtil.getBuildId());
+        return buildUserAgent(
+                "ZrLog", BlogBuildInfoUtil.getVersion(), BlogBuildInfoUtil.getBuildId());
     }
 
     private static URI getUri(String urlPath, Map<String, String[]> requestParam) {
@@ -72,51 +75,87 @@ public class HttpUtil {
     }
 
     private static String mapToQueryStr(Map<String, String[]> params) {
-        return params.entrySet().stream().flatMap(entry -> Arrays.stream(entry.getValue()).map(value -> entry.getKey() + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8))).collect(Collectors.joining("&"));
+        return params.entrySet().stream()
+                .flatMap(
+                        entry ->
+                                Arrays.stream(entry.getValue())
+                                        .map(
+                                                value ->
+                                                        entry.getKey()
+                                                                + "="
+                                                                + URLEncoder.encode(
+                                                                        value,
+                                                                        StandardCharsets.UTF_8)))
+                .collect(Collectors.joining("&"));
     }
 
     /**
-     * Reuse the existing client for signed and service-to-service requests. Redirects remain disabled.
+     * Reuse the existing client for signed and service-to-service requests. Redirects remain
+     * disabled.
      */
-    public HttpResponse<String> sendRequest(HttpRequest request) throws IOException, InterruptedException {
+    public HttpResponse<String> sendRequest(HttpRequest request)
+            throws IOException, InterruptedException {
         return sendRequest(request, httpClient);
     }
 
-    /**
-     * Deployment-internal control requests bypass application and JVM proxies.
-     */
-    public HttpResponse<String> sendDirectRequest(HttpRequest request) throws IOException, InterruptedException {
+    /** Deployment-internal control requests bypass application and JVM proxies. */
+    public HttpResponse<String> sendDirectRequest(HttpRequest request)
+            throws IOException, InterruptedException {
         return sendRequest(request, directHttpClient());
     }
 
-    public HttpResponse<String> sendDirectRequest(HttpRequest request, ExecutionDeadline deadline, long maxBytes)
+    public HttpResponse<String> sendDirectRequest(
+            HttpRequest request, ExecutionDeadline deadline, long maxBytes)
             throws IOException, InterruptedException {
-        return BoundedHttpExchange.send(directHttpClient(), withUserAgent(request),
-                () -> HttpResponse.BodySubscribers.ofString(StandardCharsets.UTF_8), maxBytes, deadline);
+        return BoundedHttpExchange.send(
+                directHttpClient(),
+                withUserAgent(request),
+                () -> HttpResponse.BodySubscribers.ofString(StandardCharsets.UTF_8),
+                maxBytes,
+                deadline);
     }
 
-    public HttpResponse<String> sendRequest(HttpRequest request, ExecutionDeadline deadline, long maxBytes)
+    public HttpResponse<String> sendRequest(
+            HttpRequest request, ExecutionDeadline deadline, long maxBytes)
             throws IOException, InterruptedException {
-        return BoundedHttpExchange.send(httpClient, withUserAgent(request),
-                () -> HttpResponse.BodySubscribers.ofString(StandardCharsets.UTF_8), maxBytes, deadline);
+        return BoundedHttpExchange.send(
+                httpClient,
+                withUserAgent(request),
+                () -> HttpResponse.BodySubscribers.ofString(StandardCharsets.UTF_8),
+                maxBytes,
+                deadline);
     }
 
     /**
      * Downloads a complete successful response before replacing the target; failures preserve it.
      */
-    public void downloadToFile(HttpRequest request, Path target, ExecutionDeadline deadline, long maxBytes)
+    public void downloadToFile(
+            HttpRequest request, Path target, ExecutionDeadline deadline, long maxBytes)
             throws IOException, InterruptedException {
         deadline.requireRemainingMillis();
         Path absolute = target.toAbsolutePath();
         Files.createDirectories(absolute.getParent());
-        Path staging = Files.createTempFile(absolute.getParent(),
-                absolute.getFileName() + "." + ProcessHandle.current().pid() + ".", ".part");
+        Path staging =
+                Files.createTempFile(
+                        absolute.getParent(),
+                        absolute.getFileName() + "." + ProcessHandle.current().pid() + ".",
+                        ".part");
         try {
-            HttpResponse<Path> response = BoundedHttpExchange.send(httpClient, withUserAgent(request),
-                    () -> HttpResponse.BodySubscribers.ofFile(staging), maxBytes, deadline);
-            if (response.statusCode() != 200) throw new IOException("Download returned HTTP " + response.statusCode());
+            HttpResponse<Path> response =
+                    BoundedHttpExchange.send(
+                            httpClient,
+                            withUserAgent(request),
+                            () -> HttpResponse.BodySubscribers.ofFile(staging),
+                            maxBytes,
+                            deadline);
+            if (response.statusCode() != 200)
+                throw new IOException("Download returned HTTP " + response.statusCode());
             deadline.requireRemainingMillis();
-            Files.move(staging, absolute, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            Files.move(
+                    staging,
+                    absolute,
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
         } finally {
             Files.deleteIfExists(staging);
         }
@@ -124,68 +163,111 @@ public class HttpUtil {
 
     private synchronized HttpClient directHttpClient() {
         if (directHttpClient == null) {
-            directHttpClient = HttpClient.newBuilder().executor(executorService)
-                    .proxy(HttpClient.Builder.NO_PROXY).followRedirects(HttpClient.Redirect.NEVER).build();
+            directHttpClient =
+                    HttpClient.newBuilder()
+                            .executor(executorService)
+                            .proxy(HttpClient.Builder.NO_PROXY)
+                            .followRedirects(HttpClient.Redirect.NEVER)
+                            .build();
         }
         return directHttpClient;
     }
 
-    private HttpResponse<String> sendRequest(HttpRequest request, HttpClient client) throws IOException, InterruptedException {
+    private HttpResponse<String> sendRequest(HttpRequest request, HttpClient client)
+            throws IOException, InterruptedException {
         return client.send(withUserAgent(request), HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpRequest withUserAgent(HttpRequest request) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder(request.uri())
-                .method(request.method(), request.bodyPublisher().orElse(HttpRequest.BodyPublishers.noBody()))
-                .expectContinue(request.expectContinue());
+        HttpRequest.Builder builder =
+                HttpRequest.newBuilder(request.uri())
+                        .method(
+                                request.method(),
+                                request.bodyPublisher().orElse(HttpRequest.BodyPublishers.noBody()))
+                        .expectContinue(request.expectContinue());
         request.timeout().ifPresent(builder::timeout);
         request.version().ifPresent(builder::version);
-        request.headers().map().forEach((name, values) -> {
-            if (!"User-Agent".equalsIgnoreCase(name)) values.forEach(value -> builder.header(name, value));
-        });
+        request.headers()
+                .map()
+                .forEach(
+                        (name, values) -> {
+                            if (!"User-Agent".equalsIgnoreCase(name))
+                                values.forEach(value -> builder.header(name, value));
+                        });
         return builder.setHeader("User-Agent", getUserAgent()).build();
     }
 
     public void closeHttpClient() {
         this.executorService.shutdown();
-        //close thread
-        Thread.getAllStackTraces().keySet().forEach(t -> {
-            if (t.getName().matches("HttpClient-.*-SelectorManager"))
-                t.interrupt();
-        });
+        // close thread
+        Thread.getAllStackTraces()
+                .keySet()
+                .forEach(
+                        t -> {
+                            if (t.getName().matches("HttpClient-.*-SelectorManager")) t.interrupt();
+                        });
     }
 
-    public <T> HttpHandle<T> sendGetRequest(String urlPath, Map<String, String[]> requestParam, HttpHandle<T> httpHandle, Map<String, String> reqHeaders) throws IOException, InterruptedException, URISyntaxException {
-        HttpRequest.Builder builder = HttpRequest.newBuilder().uri(getUri(urlPath, requestParam)).GET();
+    public <T> HttpHandle<T> sendGetRequest(
+            String urlPath,
+            Map<String, String[]> requestParam,
+            HttpHandle<T> httpHandle,
+            Map<String, String> reqHeaders)
+            throws IOException, InterruptedException, URISyntaxException {
+        HttpRequest.Builder builder =
+                HttpRequest.newBuilder().uri(getUri(urlPath, requestParam)).GET();
         setHttpHeaders(builder, reqHeaders);
         HttpRequest request = builder.build();
-        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        HttpResponse<InputStream> response =
+                httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
         return handleResponse(httpHandle, request, response);
     }
 
-    public <T> HttpHandle<T> sendGetRequest(String urlPath, HttpHandle<T> httpHandle, Map<String, String> reqHeaders) throws IOException, InterruptedException, URISyntaxException {
+    public <T> HttpHandle<T> sendGetRequest(
+            String urlPath, HttpHandle<T> httpHandle, Map<String, String> reqHeaders)
+            throws IOException, InterruptedException, URISyntaxException {
         sendGetRequest(urlPath, new HashMap<>(), httpHandle, reqHeaders);
         return httpHandle;
     }
 
-    public <T> HttpHandle<T> sendPostRequest(String urlPath, Map<String, String[]> params, HttpHandle<T> httpHandle, Map<String, String> reqHeaders) throws IOException, InterruptedException {
-        HttpRequest.Builder builder = HttpRequest.newBuilder().uri(URI.create(urlPath)).POST(HttpRequest.BodyPublishers.ofString(mapToQueryStr(params)));
+    public <T> HttpHandle<T> sendPostRequest(
+            String urlPath,
+            Map<String, String[]> params,
+            HttpHandle<T> httpHandle,
+            Map<String, String> reqHeaders)
+            throws IOException, InterruptedException {
+        HttpRequest.Builder builder =
+                HttpRequest.newBuilder()
+                        .uri(URI.create(urlPath))
+                        .POST(HttpRequest.BodyPublishers.ofString(mapToQueryStr(params)));
         setHttpHeaders(builder, reqHeaders);
-        HttpRequest request = builder.header("Content-Type", "application/x-www-form-urlencoded").build();
-        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        HttpRequest request =
+                builder.header("Content-Type", "application/x-www-form-urlencoded").build();
+        HttpResponse<InputStream> response =
+                httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
         return handleResponse(httpHandle, request, response);
     }
 
-    public <T> HttpHandle<T> sendPostRequest(String urlPath, byte[] bodyBytes, HttpHandle<T> httpHandle, Map<String, String> reqHeaders) throws IOException, InterruptedException {
-        HttpRequest.Builder builder = HttpRequest.newBuilder().uri(URI.create(urlPath)).POST(HttpRequest.BodyPublishers.ofByteArray(bodyBytes));
+    public <T> HttpHandle<T> sendPostRequest(
+            String urlPath,
+            byte[] bodyBytes,
+            HttpHandle<T> httpHandle,
+            Map<String, String> reqHeaders)
+            throws IOException, InterruptedException {
+        HttpRequest.Builder builder =
+                HttpRequest.newBuilder()
+                        .uri(URI.create(urlPath))
+                        .POST(HttpRequest.BodyPublishers.ofByteArray(bodyBytes));
         setHttpHeaders(builder, reqHeaders);
         HttpRequest request = builder.build();
-        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        HttpResponse<InputStream> response =
+                httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
         return handleResponse(httpHandle, request, response);
     }
 
     private void setHttpHeaders(HttpRequest.Builder requestBuilder, Map<String, String> headers) {
-        requestBuilder.headers("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+        requestBuilder.headers(
+                "Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
         requestBuilder.headers("Accept-Charset", "GB2312,UTF-8;q=0.7,*;q=0.7");
         requestBuilder.headers("Accept-Encoding", "gzip, deflate");
         requestBuilder.headers("Accept-Language", "zh-cn,zh;q=0.5");
@@ -198,29 +280,40 @@ public class HttpUtil {
             }
         }
         if (Objects.nonNull(headers)) {
-            headers.forEach((k, v) -> {
-                if (Objects.nonNull(v)) {
-                    try {
-                        requestBuilder.header(k, v);
-                    } catch (Exception e) {
-                        LOGGER.warning("set header " + k + ", " + v + ", error: " + e.getMessage());
-                    }
-                }
-            });
+            headers.forEach(
+                    (k, v) -> {
+                        if (Objects.nonNull(v)) {
+                            try {
+                                requestBuilder.header(k, v);
+                            } catch (Exception e) {
+                                LOGGER.warning(
+                                        "set header "
+                                                + k
+                                                + ", "
+                                                + v
+                                                + ", error: "
+                                                + e.getMessage());
+                            }
+                        }
+                    });
         }
     }
 
-    private <T> HttpHandle<T> handleResponse(HttpHandle<T> httpHandle, HttpRequest request, HttpResponse<InputStream> response) {
+    private <T> HttpHandle<T> handleResponse(
+            HttpHandle<T> httpHandle, HttpRequest request, HttpResponse<InputStream> response) {
         httpHandle.handle(request, response);
         return httpHandle;
     }
 
-    public String getTextByUrl(String url) throws IOException, InterruptedException, URISyntaxException {
+    public String getTextByUrl(String url)
+            throws IOException, InterruptedException, URISyntaxException {
         return sendGetRequest(url, new HttpStringHandle(), new HashMap<>()).getT();
     }
 
-    public String getSuccessTextByUrl(String url) throws IOException, InterruptedException, URISyntaxException {
-        HttpStringHandle httpStringHandle = (HttpStringHandle) sendGetRequest(url, new HttpStringHandle(), new HashMap<>());
+    public String getSuccessTextByUrl(String url)
+            throws IOException, InterruptedException, URISyntaxException {
+        HttpStringHandle httpStringHandle =
+                (HttpStringHandle) sendGetRequest(url, new HttpStringHandle(), new HashMap<>());
         if (httpStringHandle.getStatusCode() == 200) {
             return httpStringHandle.getT();
         }

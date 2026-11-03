@@ -9,7 +9,6 @@ import com.zrlog.common.updater.UpdateVersionCheckResult;
 import com.zrlog.common.vo.Version;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.ZrLogUtil;
-
 import java.io.File;
 import java.util.Objects;
 import java.util.Set;
@@ -26,15 +25,27 @@ final class CommandLineUpgradeNotice {
         this.updater = updater;
     }
 
-    static String nextNotice(UpdateVersionCheckResult checkResult, Updater updater, boolean dockerMode,
-                             boolean systemServiceMode, boolean faasMode, boolean devMode,
-                             Set<String> notifiedUpdates) {
-        if (Objects.isNull(checkResult) || !checkResult.isUpgradeAvailable() ||
-                Objects.isNull(checkResult.getVersion()) || Objects.isNull(checkResult.getChannel()) ||
-                Objects.isNull(updater) || dockerMode || systemServiceMode || faasMode || devMode) {
+    static String nextNotice(
+            UpdateVersionCheckResult checkResult,
+            Updater updater,
+            boolean dockerMode,
+            boolean systemServiceMode,
+            boolean faasMode,
+            boolean devMode,
+            Set<String> notifiedUpdates) {
+        if (Objects.isNull(checkResult)
+                || !checkResult.isUpgradeAvailable()
+                || Objects.isNull(checkResult.getVersion())
+                || Objects.isNull(checkResult.getChannel())
+                || Objects.isNull(updater)
+                || dockerMode
+                || systemServiceMode
+                || faasMode
+                || devMode) {
             return null;
         }
-        if (updater.getType() != UpdaterTypeEnum.ZIP && updater.getType() != UpdaterTypeEnum.NATIVE_IMAGE) {
+        if (updater.getType() != UpdaterTypeEnum.ZIP
+                && updater.getType() != UpdaterTypeEnum.NATIVE_IMAGE) {
             return null;
         }
         File execFile = updater.execFile();
@@ -42,18 +53,27 @@ final class CommandLineUpgradeNotice {
             return null;
         }
         Version version = checkResult.getVersion();
-        String updateKey = Objects.toString(version.getVersion(), "") + ":" +
-                Objects.toString(version.getBuildId(), "");
+        String updateKey =
+                Objects.toString(version.getVersion(), "")
+                        + ":"
+                        + Objects.toString(version.getBuildId(), "");
         if (!notifiedUpdates.add(updateKey)) {
             return null;
         }
         String channel = checkResult.getChannel().getValue();
         String command = buildCommand(updater.getType(), execFile, channel);
-        return "ZrLog update available\n" +
-                "Current: " + displayVersion(BlogBuildInfoUtil.getVersion()) + "\n" +
-                "Latest:  " + displayVersion(version.getVersion()) + "\n" +
-                "Channel: " + channel + "\n\n" +
-                "Upgrade with:\n  " + command;
+        return "ZrLog update available\n"
+                + "Current: "
+                + displayVersion(BlogBuildInfoUtil.getVersion())
+                + "\n"
+                + "Latest:  "
+                + displayVersion(version.getVersion())
+                + "\n"
+                + "Channel: "
+                + channel
+                + "\n\n"
+                + "Upgrade with:\n  "
+                + command;
     }
 
     private static String buildCommand(UpdaterTypeEnum updaterType, File execFile, String channel) {
@@ -76,8 +96,15 @@ final class CommandLineUpgradeNotice {
     }
 
     void notifyUpdate(UpdateVersionCheckResult checkResult) {
-        String notice = nextNotice(checkResult, updater, ZrLogUtil.isDockerMode(),
-                ZrLogUtil.isSystemServiceMode(), EnvKit.isFaaSMode(), EnvKit.isDevMode(), notifiedUpdates);
+        String notice =
+                nextNotice(
+                        checkResult,
+                        updater,
+                        ZrLogUtil.isDockerMode(),
+                        ZrLogUtil.isSystemServiceMode(),
+                        EnvKit.isFaaSMode(),
+                        EnvKit.isDevMode(),
+                        notifiedUpdates);
         if (Objects.nonNull(notice)) {
             LOGGER.info("\n" + notice);
         }

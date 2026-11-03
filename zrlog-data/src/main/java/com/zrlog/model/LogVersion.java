@@ -8,13 +8,18 @@ import com.hibegin.common.dao.entity.Entity;
 public class LogVersion extends BaseEntity<Long> {
     @Column("log_id")
     private Integer logId;
+
     @Column("article_version")
     private Integer articleVersion;
+
     @Column("from_version")
     private Integer fromVersion;
+
     @Column("patch_json")
     private String patchJson;
+
     private String title;
+
     @Column("user_id")
     private Integer userId;
 

@@ -1,5 +1,8 @@
 package com.zrlog.data.cache;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+
 import com.google.gson.Gson;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.common.TokenService;
@@ -14,18 +17,14 @@ import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import sun.misc.Unsafe;
-
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import sun.misc.Unsafe;
 
 @RunWith(Parameterized.class)
 public class CacheServiceImplDatabaseTest {
@@ -68,12 +67,20 @@ public class CacheServiceImplDatabaseTest {
     }
 
     private static void seedLookupTables(ZrLogTestDatabase db) throws Exception {
-        db.update("insert into user(userId, email, password, userName, header) values(?, ?, ?, ?, ?)",
-                1, "db@example.com", "password", "db-user", "/avatar.png");
-        db.update("insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
-                1, "db", "Db Type", "Db posts");
-        db.update("insert into tag(tagId, text, count) values(?, ?, ?)",
-                1, "db-tag", 2);
+        db.update(
+                "insert into user(userId, email, password, userName, header) values(?, ?, ?, ?, ?)",
+                1,
+                "db@example.com",
+                "password",
+                "db-user",
+                "/avatar.png");
+        db.update(
+                "insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
+                1,
+                "db",
+                "Db Type",
+                "Db posts");
+        db.update("insert into tag(tagId, text, count) values(?, ?, ?)", 1, "db-tag", 2);
     }
 
     private static ZrLogConfig testConfig(boolean installed) throws Exception {
@@ -96,12 +103,22 @@ public class CacheServiceImplDatabaseTest {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             applicationConfig = testConfig(true);
             BaseDataInitVO cached = cachedInit();
-            db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                    "base_data_init_cache_v3", new Gson().toJson(cached), "");
-            db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                    "zrlogSqlVersion", "7", "");
+            db.update(
+                    "insert into website(name, value, remark) values(?, ?, ?)",
+                    "base_data_init_cache_v3",
+                    new Gson().toJson(cached),
+                    "");
+            db.update(
+                    "insert into website(name, value, remark) values(?, ?, ?)",
+                    "zrlogSqlVersion",
+                    "7",
+                    "");
 
-            CacheServiceImpl service = ((CacheServiceImpl) DaggerDataComponent.factory().create(() -> db.dataSource(), applicationConfig::isInstalled).cache());
+            CacheServiceImpl service =
+                    ((CacheServiceImpl)
+                            DaggerDataComponent.factory()
+                                    .create(() -> db.dataSource(), applicationConfig::isInstalled)
+                                    .cache());
 
             assertEquals(7L, service.getCurrentSqlVersion());
             assertEquals(99L, service.getWebSiteVersion());
@@ -119,12 +136,22 @@ public class CacheServiceImplDatabaseTest {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             applicationConfig = testConfig(false);
             seedLookupTables(db);
-            db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                    "base_data_init_cache_v3", "{bad-json", "");
-            db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                    "default_setting", "{\"color\":\"blue\"}", "");
+            db.update(
+                    "insert into website(name, value, remark) values(?, ?, ?)",
+                    "base_data_init_cache_v3",
+                    "{bad-json",
+                    "");
+            db.update(
+                    "insert into website(name, value, remark) values(?, ?, ?)",
+                    "default_setting",
+                    "{\"color\":\"blue\"}",
+                    "");
 
-            CacheServiceImpl service = ((CacheServiceImpl) DaggerDataComponent.factory().create(() -> db.dataSource(), applicationConfig::isInstalled).cache());
+            CacheServiceImpl service =
+                    ((CacheServiceImpl)
+                            DaggerDataComponent.factory()
+                                    .create(() -> db.dataSource(), applicationConfig::isInstalled)
+                                    .cache());
 
             assertEquals(-1L, service.getCurrentSqlVersion());
             assertEquals(0L, service.getWebSiteVersion());
@@ -138,17 +165,34 @@ public class CacheServiceImplDatabaseTest {
     }
 
     @Test
-    public void shouldReadPublicWebsiteInfoFromDatabaseWhenInstalledAndCacheIsMissing() throws Exception {
+    public void shouldReadPublicWebsiteInfoFromDatabaseWhenInstalledAndCacheIsMissing()
+            throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             applicationConfig = testConfig(true);
-            db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                    "base_data_init_cache_v3", "{bad-json", "");
-            db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                    "title", "Installed Site", "");
-            db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                    "author", "Installed Author", "");
+            db.update(
+                    "insert into website(name, value, remark) values(?, ?, ?)",
+                    "base_data_init_cache_v3",
+                    "{bad-json",
+                    "");
+            db.update(
+                    "insert into website(name, value, remark) values(?, ?, ?)",
+                    "title",
+                    "Installed Site",
+                    "");
+            db.update(
+                    "insert into website(name, value, remark) values(?, ?, ?)",
+                    "author",
+                    "Installed Author",
+                    "");
 
-            PublicWebSiteInfo info = ((CacheServiceImpl) DaggerDataComponent.factory().create(() -> db.dataSource(), applicationConfig::isInstalled).cache()).getPublicWebSiteInfo();
+            PublicWebSiteInfo info =
+                    ((CacheServiceImpl)
+                                    DaggerDataComponent.factory()
+                                            .create(
+                                                    () -> db.dataSource(),
+                                                    applicationConfig::isInstalled)
+                                            .cache())
+                            .getPublicWebSiteInfo();
 
             assertEquals("Installed Site", info.getTitle());
             assertEquals("Installed Author", info.getAuthor());

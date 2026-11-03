@@ -13,20 +13,19 @@ public class TestLogCapture implements AutoCloseable {
     private final Level previousLevel;
     private final boolean previousUseParentHandlers;
     private final List<LogRecord> records = new ArrayList<>();
-    private final Handler handler = new Handler() {
-        @Override
-        public void publish(LogRecord record) {
-            records.add(record);
-        }
+    private final Handler handler =
+            new Handler() {
+                @Override
+                public void publish(LogRecord record) {
+                    records.add(record);
+                }
 
-        @Override
-        public void flush() {
-        }
+                @Override
+                public void flush() {}
 
-        @Override
-        public void close() {
-        }
-    };
+                @Override
+                public void close() {}
+            };
 
     private TestLogCapture(Class<?> loggerClass) {
         this.logger = Logger.getLogger(loggerClass.getName());
@@ -44,9 +43,11 @@ public class TestLogCapture implements AutoCloseable {
 
     public boolean contains(Level level, String messagePart) {
         return records.stream()
-                .anyMatch(record -> record.getLevel().equals(level)
-                        && record.getMessage() != null
-                        && record.getMessage().contains(messagePart));
+                .anyMatch(
+                        record ->
+                                record.getLevel().equals(level)
+                                        && record.getMessage() != null
+                                        && record.getMessage().contains(messagePart));
     }
 
     @Override

@@ -3,9 +3,7 @@ package com.zrlog.common.vo;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 文章内容的大纲结构
- */
+/** 文章内容的大纲结构 */
 public class Outline {
 
     private String text;

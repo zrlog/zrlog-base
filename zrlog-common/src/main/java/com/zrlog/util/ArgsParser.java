@@ -1,7 +1,6 @@
 package com.zrlog.util;
 
 import com.hibegin.http.server.config.ConfigKit;
-
 import java.util.Objects;
 
 public class ArgsParser {

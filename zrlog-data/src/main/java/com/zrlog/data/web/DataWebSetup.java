@@ -10,9 +10,7 @@ import com.zrlog.data.util.WebSiteUtils;
 import com.zrlog.web.WebSetup;
 import com.zrlog.web.WebSiteInfoProvider;
 
-/**
- * Owns registration and initialization of shared data services.
- */
+/** Owns registration and initialization of shared data services. */
 public final class DataWebSetup implements WebSetup, WebSiteInfoProvider {
     private final ZrLogConfig config;
     private volatile CacheService cache;

@@ -3,13 +3,10 @@ package com.zrlog.blog.web.template.vo;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.common.vo.SocialPreviewDTO;
-
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * 页面公共数据
- */
+/** 页面公共数据 */
 public class BasePageInfo {
 
     protected BaseDataInitVO init;

@@ -4,23 +4,18 @@ import com.hibegin.common.util.EnvKit;
 import com.hibegin.common.util.UrlEncodeUtils;
 import com.hibegin.http.server.api.HttpRequest;
 import com.zrlog.util.ZrLogUtil;
-
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * 存放与Web相关的工具代码
- */
+/** 存放与Web相关的工具代码 */
 public class WebTools {
 
     public static final String REAL_IP_HEADER = "X-Real-IP";
 
-    /**
-     * 处理由于浏览器使用透明代理，或者是WebServer运行在诸如 nginx/apache 这类 HttpServer后面的情况，通过获取请求头真实IP地址
-     */
+    /** 处理由于浏览器使用透明代理，或者是WebServer运行在诸如 nginx/apache 这类 HttpServer后面的情况，通过获取请求头真实IP地址 */
     public static String getRealIp(HttpRequest request) {
         String ip = null;
-        //bae env
+        // bae env
         if (ZrLogUtil.isBae() && header(request, "clientip") != null) {
             ip = header(request, "clientip");
         }
@@ -129,5 +124,4 @@ public class WebTools {
         html = buffer.toString();
         return html;
     }
-
 }

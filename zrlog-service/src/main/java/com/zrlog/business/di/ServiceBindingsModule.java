@@ -4,13 +4,10 @@ import com.zrlog.business.service.*;
 import dagger.Module;
 import dagger.Provides;
 
-/**
- * Exposes services owned by the application's shared-service graph.
- */
+/** Exposes services owned by the application's shared-service graph. */
 @Module
 public final class ServiceBindingsModule {
-    private ServiceBindingsModule() {
-    }
+    private ServiceBindingsModule() {}
 
     @Provides
     static WebsiteKvService websiteKv(ServiceComponent services) {

@@ -1,5 +1,7 @@
 package com.zrlog.business.plugin;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.business.service.WebsiteKvService;
 import com.zrlog.common.CacheService;
@@ -13,12 +15,6 @@ import com.zrlog.plugin.Plugins;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import com.zrlog.web.WebSiteInfoProvider;
-import org.junit.Test;
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.Theories;
-import org.junit.experimental.theories.Theory;
-import org.junit.runner.RunWith;
-
 import java.io.*;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
@@ -29,14 +25,16 @@ import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
+import org.junit.runner.RunWith;
 
 @RunWith(Theories.class)
 public class PluginLifecycleContractTest {
 
-    @DataPoints
-    public static final DatabaseType[] DATABASES = DatabaseType.values();
+    @DataPoints public static final DatabaseType[] DATABASES = DatabaseType.values();
 
     private static String captured(ByteArrayOutputStream outputCapture) {
         return new String(outputCapture.toByteArray(), StandardCharsets.UTF_8);
@@ -66,22 +64,24 @@ public class PluginLifecycleContractTest {
     }
 
     private static CacheService countingCacheService(AtomicInteger refreshCount) {
-        return (CacheService) java.lang.reflect.Proxy.newProxyInstance(
-                PluginLifecycleContractTest.class.getClassLoader(),
-                new Class[]{CacheService.class},
-                (proxy, method, args) -> {
-                    if ("refreshInitData".equals(method.getName())) {
-                        refreshCount.incrementAndGet();
-                        return new BaseDataInitVO();
-                    }
-                    if ("getCurrentSqlVersion".equals(method.getName()) || "getWebSiteVersion".equals(method.getName())) {
-                        return 0L;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "CountingCacheServiceProxy";
-                    }
-                    return null;
-                });
+        return (CacheService)
+                java.lang.reflect.Proxy.newProxyInstance(
+                        PluginLifecycleContractTest.class.getClassLoader(),
+                        new Class[] {CacheService.class},
+                        (proxy, method, args) -> {
+                            if ("refreshInitData".equals(method.getName())) {
+                                refreshCount.incrementAndGet();
+                                return new BaseDataInitVO();
+                            }
+                            if ("getCurrentSqlVersion".equals(method.getName())
+                                    || "getWebSiteVersion".equals(method.getName())) {
+                                return 0L;
+                            }
+                            if ("toString".equals(method.getName())) {
+                                return "CountingCacheServiceProxy";
+                            }
+                            return null;
+                        });
     }
 
     @Test
@@ -109,7 +109,10 @@ public class PluginLifecycleContractTest {
             Files.writeString(output.toPath(), "first", StandardCharsets.UTF_8);
             console.printAsync();
             waitUntil(() -> captured(outputCapture).contains("first"));
-            Files.writeString(output.toPath(), " second", StandardCharsets.UTF_8,
+            Files.writeString(
+                    output.toPath(),
+                    " second",
+                    StandardCharsets.UTF_8,
                     java.nio.file.StandardOpenOption.APPEND);
             waitUntil(() -> captured(outputCapture).contains("first second"));
         } finally {
@@ -204,7 +207,10 @@ public class PluginLifecycleContractTest {
         PluginConsole console = new PluginConsole(output, marker, false);
         PrintStream previousOut = System.out;
         ByteArrayOutputStream outputCapture = new ByteArrayOutputStream();
-        String first = new String(repeatedAsciiBytes(PluginConsole.READ_BUFFER_SIZE + 73, 'x'), StandardCharsets.US_ASCII);
+        String first =
+                new String(
+                        repeatedAsciiBytes(PluginConsole.READ_BUFFER_SIZE + 73, 'x'),
+                        StandardCharsets.US_ASCII);
         String rotated = "rotated";
         try {
             System.setOut(new PrintStream(outputCapture, true, StandardCharsets.UTF_8.name()));
@@ -212,7 +218,10 @@ public class PluginLifecycleContractTest {
             Files.writeString(output.toPath(), first, StandardCharsets.UTF_8);
             console.printAsync();
             waitUntil(() -> outputCapture.size() == first.length());
-            Files.writeString(output.toPath(), rotated, StandardCharsets.UTF_8,
+            Files.writeString(
+                    output.toPath(),
+                    rotated,
+                    StandardCharsets.UTF_8,
                     StandardOpenOption.TRUNCATE_EXISTING);
             waitUntil(() -> outputCapture.size() == first.length() + rotated.length());
         } finally {
@@ -234,11 +243,15 @@ public class PluginLifecycleContractTest {
         try {
             System.setErr(new PrintStream(errorCapture, true, StandardCharsets.UTF_8.name()));
 
-            Files.writeString(output.toPath(), "Error: Invalid or corrupt jarfile plugin-core.jar",
+            Files.writeString(
+                    output.toPath(),
+                    "Error: Invalid or corrupt jarfile plugin-core.jar",
                     StandardCharsets.UTF_8);
             console.printAsync();
-            waitUntil(() -> captured(errorCapture).contains("Invalid or corrupt jarfile")
-                    && !marker.exists());
+            waitUntil(
+                    () ->
+                            captured(errorCapture).contains("Invalid or corrupt jarfile")
+                                    && !marker.exists());
         } finally {
             console.close();
             System.setErr(previousErr);
@@ -262,7 +275,10 @@ public class PluginLifecycleContractTest {
             System.setErr(new PrintStream(errorCapture, true, StandardCharsets.UTF_8.name()));
 
             Files.write(output.toPath(), prefix);
-            Files.writeString(output.toPath(), invalidJarMessage, StandardCharsets.UTF_8,
+            Files.writeString(
+                    output.toPath(),
+                    invalidJarMessage,
+                    StandardCharsets.UTF_8,
                     StandardOpenOption.APPEND);
             console.printAsync();
             waitUntil(() -> captured(errorCapture).contains(invalidJarMessage) && !marker.exists());
@@ -316,9 +332,12 @@ public class PluginLifecycleContractTest {
     public void shouldExposeCacheManagerLifecycleWithoutStartingScheduler() throws Exception {
         CacheManagerPlugin plugin =
                 new CacheManagerPlugin(
-                        countingCacheService(new AtomicInteger()), new WebsiteKvService(() -> {
-                    throw new IllegalStateException("Database is unavailable in this test");
-                }));
+                        countingCacheService(new AtomicInteger()),
+                        new WebsiteKvService(
+                                () -> {
+                                    throw new IllegalStateException(
+                                            "Database is unavailable in this test");
+                                }));
 
         assertTrue(plugin.autoStart());
         assertFalse(plugin.isStarted());
@@ -327,14 +346,18 @@ public class PluginLifecycleContractTest {
     }
 
     @Theory
-    public void shouldRefreshInitDataWhenCacheTimeoutExpiresUsingDatabaseConfig(DatabaseType databaseType) throws Exception {
+    public void shouldRefreshInitDataWhenCacheTimeoutExpiresUsingDatabaseConfig(
+            DatabaseType databaseType) throws Exception {
         long previousLastAccessTime = Constants.getLastAccessTime();
         AtomicInteger refreshCount = new AtomicInteger();
         try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
-            new WebsiteKvService(() -> new WebSiteRepository(ignored.dataSource())).putString("cache_timeout_minutes", "0.001");
+            new WebsiteKvService(() -> new WebSiteRepository(ignored.dataSource()))
+                    .putString("cache_timeout_minutes", "0.001");
             CacheManagerPlugin plugin =
                     new CacheManagerPlugin(
-                            countingCacheService(refreshCount), new WebsiteKvService(() -> new WebSiteRepository(ignored.dataSource())));
+                            countingCacheService(refreshCount),
+                            new WebsiteKvService(
+                                    () -> new WebSiteRepository(ignored.dataSource())));
             try {
                 Constants.setLastAccessTime(System.currentTimeMillis() - 1_000);
 
@@ -367,18 +390,20 @@ public class PluginLifecycleContractTest {
         }
 
         private static CacheService nullCacheService() {
-            return (CacheService) java.lang.reflect.Proxy.newProxyInstance(
-                    PluginLifecycleContractTest.class.getClassLoader(),
-                    new Class[]{CacheService.class},
-                    (proxy, method, args) -> {
-                        if ("getCurrentSqlVersion".equals(method.getName()) || "getWebSiteVersion".equals(method.getName())) {
-                            return 0L;
-                        }
-                        if ("toString".equals(method.getName())) {
-                            return "CacheServiceProxy";
-                        }
-                        return null;
-                    });
+            return (CacheService)
+                    java.lang.reflect.Proxy.newProxyInstance(
+                            PluginLifecycleContractTest.class.getClassLoader(),
+                            new Class[] {CacheService.class},
+                            (proxy, method, args) -> {
+                                if ("getCurrentSqlVersion".equals(method.getName())
+                                        || "getWebSiteVersion".equals(method.getName())) {
+                                    return 0L;
+                                }
+                                if ("toString".equals(method.getName())) {
+                                    return "CacheServiceProxy";
+                                }
+                                return null;
+                            });
         }
 
         @Override
@@ -400,8 +425,9 @@ public class PluginLifecycleContractTest {
         public <T> T getWebSetup(Class<T> capability) {
             if (capability == WebSiteInfoProvider.class) {
                 CacheService cache = cacheForTest();
-                return cache == null ? null : capability.cast(
-                        (WebSiteInfoProvider) cache::getPublicWebSiteInfo);
+                return cache == null
+                        ? null
+                        : capability.cast((WebSiteInfoProvider) cache::getPublicWebSiteInfo);
             }
             return super.getWebSetup(capability);
         }

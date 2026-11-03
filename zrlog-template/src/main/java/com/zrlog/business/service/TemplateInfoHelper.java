@@ -1,5 +1,7 @@
 package com.zrlog.business.service;
 
+import static com.zrlog.common.Constants.TEMPLATE_BASE_PATH;
+
 import com.google.gson.Gson;
 import com.hibegin.common.util.IOUtil;
 import com.hibegin.common.util.LoggerUtil;
@@ -13,17 +15,15 @@ import com.zrlog.common.vo.TemplateVO;
 import com.zrlog.theme.spi.BundledThemes;
 import com.zrlog.util.I18nUtil;
 import com.zrlog.util.StaticFileCacheUtils;
-
 import java.io.*;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static com.zrlog.common.Constants.TEMPLATE_BASE_PATH;
-
 public class TemplateInfoHelper {
 
-    public static final String ADMIN_PREVIEW_IMAGE_URI = Constants.ADMIN_URI_BASE_PATH + "/template/preview-image";
+    public static final String ADMIN_PREVIEW_IMAGE_URI =
+            Constants.ADMIN_URI_BASE_PATH + "/template/preview-image";
     private static final Logger LOGGER = LoggerUtil.getLogger(TemplateInfoHelper.class);
 
     public static List<TemplateVO> getClassPathTemplates() {
@@ -53,11 +53,19 @@ public class TemplateInfoHelper {
         if (Objects.isNull(templateName) || !templateName.startsWith(TEMPLATE_BASE_PATH)) {
             return null;
         }
-        TemplateVO templateVO = getByProperties(templateName, TemplateInfoHelper.class.getResourceAsStream(templateName + "/" + TemplateType.STANDARD.getInfoFile()));
+        TemplateVO templateVO =
+                getByProperties(
+                        templateName,
+                        TemplateInfoHelper.class.getResourceAsStream(
+                                templateName + "/" + TemplateType.STANDARD.getInfoFile()));
         if (Objects.nonNull(templateVO)) {
             templateVO.setClasspathTemplate(true);
         } else {
-            templateVO = getByPackageJson(templateName, TemplateInfoHelper.class.getResourceAsStream(templateName + "/" + TemplateType.NODE_JS.getInfoFile()));
+            templateVO =
+                    getByPackageJson(
+                            templateName,
+                            TemplateInfoHelper.class.getResourceAsStream(
+                                    templateName + "/" + TemplateType.NODE_JS.getInfoFile()));
             if (Objects.nonNull(templateVO)) {
                 templateVO.setClasspathTemplate(true);
             } else {
@@ -75,17 +83,28 @@ public class TemplateInfoHelper {
     }
 
     private static String getTemplateView(TemplateVO templateVO) {
-        Map<String, String> viewMap = Map.of("layout/index.ejs", ".ejs",
-                "layout/index.pug", ".pug", "index.ftl", ".ftl", "layout/index.njk", ".njk");
+        Map<String, String> viewMap =
+                Map.of(
+                        "layout/index.ejs",
+                        ".ejs",
+                        "layout/index.pug",
+                        ".pug",
+                        "index.ftl",
+                        ".ftl",
+                        "layout/index.njk",
+                        ".njk");
         if (templateVO.isClasspathTemplate()) {
             for (Map.Entry<String, String> entry : viewMap.entrySet()) {
-                if (ZrLogResourceLoader.exists("classpath:" + templateVO.getTemplate() + "/" + entry.getKey())) {
+                if (ZrLogResourceLoader.exists(
+                        "classpath:" + templateVO.getTemplate() + "/" + entry.getKey())) {
                     return entry.getValue();
                 }
             }
         } else {
             for (Map.Entry<String, String> entry : viewMap.entrySet()) {
-                if (ZrLogResourceLoader.exists(PathUtil.getStaticFile(templateVO.getTemplate() + "/" + entry.getKey()).toString())) {
+                if (ZrLogResourceLoader.exists(
+                        PathUtil.getStaticFile(templateVO.getTemplate() + "/" + entry.getKey())
+                                .toString())) {
                     return entry.getValue();
                 }
             }
@@ -98,7 +117,10 @@ public class TemplateInfoHelper {
             return null;
         }
         File templateInfoFile = new File(file + "/" + TemplateType.STANDARD.getInfoFile());
-        String templatePath = file.toString().substring(PathUtil.getStaticFile("/").toString().length()).replace("\\", "/");
+        String templatePath =
+                file.toString()
+                        .substring(PathUtil.getStaticFile("/").toString().length())
+                        .replace("\\", "/");
         TemplateVO templateVO = null;
         if (templateInfoFile.exists()) {
             templateVO = getByProperties(templatePath, new FileInputStream(templateInfoFile));
@@ -116,7 +138,6 @@ public class TemplateInfoHelper {
         }
         return templateVO;
     }
-
 
     private static TemplateVO.TemplateConfigMap byJson(InputStream inputStream) {
         String jsonStr = IOUtil.getStringInputStream(inputStream);
@@ -137,13 +158,16 @@ public class TemplateInfoHelper {
         return templateConfigMap;
     }
 
-    private static TemplateVO.TemplateConfigMap getConfigMap(String templatePath, TemplateType templateType) {
+    private static TemplateVO.TemplateConfigMap getConfigMap(
+            String templatePath, TemplateType templateType) {
         if (isDefaultTemplate(templatePath)) {
-            InputStream resourceAsStream = TemplateInfoHelper.class.getResourceAsStream(templatePath + "/" + templateType.getConfigFile());
+            InputStream resourceAsStream =
+                    TemplateInfoHelper.class.getResourceAsStream(
+                            templatePath + "/" + templateType.getConfigFile());
             return getConfigMap(templateType, resourceAsStream);
         }
         File configFile = PathUtil.getStaticFile(templatePath + "/" + templateType.getConfigFile());
-        //文件存在才配置
+        // 文件存在才配置
         if (configFile.exists()) {
             try {
                 InputStream inputStream = new FileInputStream(configFile);
@@ -155,7 +179,8 @@ public class TemplateInfoHelper {
         return new TemplateVO.TemplateConfigMap();
     }
 
-    private static TemplateVO.TemplateConfigMap getConfigMap(TemplateType templateType, InputStream resourceAsStream) {
+    private static TemplateVO.TemplateConfigMap getConfigMap(
+            TemplateType templateType, InputStream resourceAsStream) {
         if (Objects.nonNull(resourceAsStream) && templateType == TemplateType.STANDARD) {
             return byJson(resourceAsStream);
         } else if (Objects.nonNull(resourceAsStream) && templateType == TemplateType.NODE_JS) {
@@ -172,7 +197,8 @@ public class TemplateInfoHelper {
             TemplateVO templateVO = new TemplateVO();
             templateVO.setTemplate(templatePath);
             templateVO.setShortTemplate(new File(templatePath).getName());
-            TemplatePackageJson packageJson = new Gson().fromJson(new InputStreamReader(in), TemplatePackageJson.class);
+            TemplatePackageJson packageJson =
+                    new Gson().fromJson(new InputStreamReader(in), TemplatePackageJson.class);
             Object author = packageJson == null ? null : packageJson.getAuthor();
             if (Objects.nonNull(author)) {
                 if (author instanceof String) {
@@ -259,13 +285,20 @@ public class TemplateInfoHelper {
             templateVO.setPreviewImage(defaultPreviewImage);
             templateVO.setPreviewImages(Collections.singletonList(defaultPreviewImage));
         }
-        if (templateVO.getAdminPreviewImage() == null || templateVO.getAdminPreviewImage().isEmpty()) {
+        if (templateVO.getAdminPreviewImage() == null
+                || templateVO.getAdminPreviewImage().isEmpty()) {
             String adminPreviewImageUrl = "";
             for (int i = 0; i < templateVO.getPreviewImages().size(); i++) {
                 String image = templateVO.getPreviewImages().get(i);
                 if (!image.startsWith("https://") && !image.startsWith("http://")) {
                     if (i == 0) {
-                        adminPreviewImageUrl = ADMIN_PREVIEW_IMAGE_URI + "?shortTemplate=" + templateVO.getShortTemplate() + "&t=" + StaticFileCacheUtils.getInstance().getFileFlagFirstByCache(image);
+                        adminPreviewImageUrl =
+                                ADMIN_PREVIEW_IMAGE_URI
+                                        + "?shortTemplate="
+                                        + templateVO.getShortTemplate()
+                                        + "&t="
+                                        + StaticFileCacheUtils.getInstance()
+                                                .getFileFlagFirstByCache(image);
                     }
                 } else {
                     if (i == 0) {

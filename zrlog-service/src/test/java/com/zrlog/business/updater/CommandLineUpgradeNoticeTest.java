@@ -1,25 +1,27 @@
 package com.zrlog.business.updater;
 
+import static org.junit.Assert.*;
+
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
 import com.zrlog.common.updater.UpdateChannel;
 import com.zrlog.common.updater.UpdateVersionCheckResult;
 import com.zrlog.common.vo.Version;
-import org.junit.Test;
-
 import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class CommandLineUpgradeNoticeTest {
 
-    private static String nextNotice(UpdateVersionCheckResult result, Updater updater, Set<String> notifiedUpdates) {
-        return CommandLineUpgradeNotice.nextNotice(result, updater, false, false, false, false, notifiedUpdates);
+    private static String nextNotice(
+            UpdateVersionCheckResult result, Updater updater, Set<String> notifiedUpdates) {
+        return CommandLineUpgradeNotice.nextNotice(
+                result, updater, false, false, false, false, notifiedUpdates);
     }
 
-    private static UpdateVersionCheckResult result(String versionValue, String buildId, UpdateChannel channel) {
+    private static UpdateVersionCheckResult result(
+            String versionValue, String buildId, UpdateChannel channel) {
         Version version = new Version();
         version.setVersion(versionValue);
         version.setBuildId(buildId);
@@ -28,8 +30,12 @@ public class CommandLineUpgradeNoticeTest {
 
     @Test
     public void shouldBuildReleaseCommandForZipPackage() {
-        String notice = nextNotice(result("3.9.0", "release-build", UpdateChannel.RELEASE),
-                new TestUpdater(UpdaterTypeEnum.ZIP, new File("/opt/zrlog/zrlog-starter.jar")), new HashSet<>());
+        String notice =
+                nextNotice(
+                        result("3.9.0", "release-build", UpdateChannel.RELEASE),
+                        new TestUpdater(
+                                UpdaterTypeEnum.ZIP, new File("/opt/zrlog/zrlog-starter.jar")),
+                        new HashSet<>());
 
         assertNotNull(notice);
         assertTrue(notice.contains("ZrLog update available"));
@@ -41,8 +47,11 @@ public class CommandLineUpgradeNoticeTest {
 
     @Test
     public void shouldBuildPreviewCommandForNativeImage() {
-        String notice = nextNotice(result("3.9.0-SNAPSHOT", "preview-build", UpdateChannel.PREVIEW),
-                new TestUpdater(UpdaterTypeEnum.NATIVE_IMAGE, new File("/opt/zrlog/zrlog")), new HashSet<>());
+        String notice =
+                nextNotice(
+                        result("3.9.0-SNAPSHOT", "preview-build", UpdateChannel.PREVIEW),
+                        new TestUpdater(UpdaterTypeEnum.NATIVE_IMAGE, new File("/opt/zrlog/zrlog")),
+                        new HashSet<>());
 
         assertNotNull(notice);
         assertTrue(notice.contains("Latest:  3.9.0-SNAPSHOT\n"));
@@ -54,33 +63,55 @@ public class CommandLineUpgradeNoticeTest {
     @Test
     public void shouldSkipUnsupportedAndManagedRuntimeTypes() {
         UpdateVersionCheckResult result = result("3.9.0", "build", UpdateChannel.RELEASE);
-        Updater zipUpdater = new TestUpdater(UpdaterTypeEnum.ZIP, new File("/opt/zrlog/zrlog-starter.jar"));
+        Updater zipUpdater =
+                new TestUpdater(UpdaterTypeEnum.ZIP, new File("/opt/zrlog/zrlog-starter.jar"));
 
-        assertNull(nextNotice(result, new TestUpdater(UpdaterTypeEnum.WAR, new File("/opt/zrlog/zrlog.war")),
-                new HashSet<>()));
-        assertNull(CommandLineUpgradeNotice.nextNotice(result, zipUpdater, true, false, false, false,
-                new HashSet<>()));
-        assertNull(CommandLineUpgradeNotice.nextNotice(result, zipUpdater, false, true, false, false,
-                new HashSet<>()));
-        assertNull(CommandLineUpgradeNotice.nextNotice(result, zipUpdater, false, false, true, false,
-                new HashSet<>()));
-        assertNull(CommandLineUpgradeNotice.nextNotice(result, zipUpdater, false, false, false, true,
-                new HashSet<>()));
-        assertNull(nextNotice(new UpdateVersionCheckResult(result.getVersion(), UpdateChannel.RELEASE, false),
-                zipUpdater, new HashSet<>()));
+        assertNull(
+                nextNotice(
+                        result,
+                        new TestUpdater(UpdaterTypeEnum.WAR, new File("/opt/zrlog/zrlog.war")),
+                        new HashSet<>()));
+        assertNull(
+                CommandLineUpgradeNotice.nextNotice(
+                        result, zipUpdater, true, false, false, false, new HashSet<>()));
+        assertNull(
+                CommandLineUpgradeNotice.nextNotice(
+                        result, zipUpdater, false, true, false, false, new HashSet<>()));
+        assertNull(
+                CommandLineUpgradeNotice.nextNotice(
+                        result, zipUpdater, false, false, true, false, new HashSet<>()));
+        assertNull(
+                CommandLineUpgradeNotice.nextNotice(
+                        result, zipUpdater, false, false, false, true, new HashSet<>()));
+        assertNull(
+                nextNotice(
+                        new UpdateVersionCheckResult(
+                                result.getVersion(), UpdateChannel.RELEASE, false),
+                        zipUpdater,
+                        new HashSet<>()));
     }
 
     @Test
     public void shouldNotifyOnlyOnceForTheSameTargetVersion() {
         Set<String> notifiedUpdates = new HashSet<>();
-        Updater updater = new TestUpdater(UpdaterTypeEnum.ZIP, new File("/opt/zrlog/zrlog-starter.jar"));
+        Updater updater =
+                new TestUpdater(UpdaterTypeEnum.ZIP, new File("/opt/zrlog/zrlog-starter.jar"));
 
-        assertNotNull(nextNotice(result("3.9.0", "same-build", UpdateChannel.RELEASE), updater,
-                notifiedUpdates));
-        assertNull(nextNotice(result("3.9.0", "same-build", UpdateChannel.PREVIEW), updater,
-                notifiedUpdates));
-        assertNotNull(nextNotice(result("3.9.1", "next-build", UpdateChannel.RELEASE), updater,
-                notifiedUpdates));
+        assertNotNull(
+                nextNotice(
+                        result("3.9.0", "same-build", UpdateChannel.RELEASE),
+                        updater,
+                        notifiedUpdates));
+        assertNull(
+                nextNotice(
+                        result("3.9.0", "same-build", UpdateChannel.PREVIEW),
+                        updater,
+                        notifiedUpdates));
+        assertNotNull(
+                nextNotice(
+                        result("3.9.1", "next-build", UpdateChannel.RELEASE),
+                        updater,
+                        notifiedUpdates));
     }
 
     private static class TestUpdater implements Updater {
@@ -94,8 +125,7 @@ public class CommandLineUpgradeNoticeTest {
         }
 
         @Override
-        public void restartProcessAsync(Version upgradeVersion) {
-        }
+        public void restartProcessAsync(Version upgradeVersion) {}
 
         @Override
         public String getUnzipPath() {

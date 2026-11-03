@@ -1,13 +1,12 @@
 package com.hibegin.common.util;
 
-import org.junit.Test;
+import static org.junit.Assert.*;
 
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class CommonUtilityContractsTest {
 
@@ -32,7 +31,8 @@ public class CommonUtilityContractsTest {
         assertEquals(ObjectHelpers.class, new ObjectHelpers().getClass());
         assertSame(value, ObjectHelpers.requireNonNullElse(value, fallback));
         assertSame(fallback, ObjectHelpers.requireNonNullElse(null, fallback));
-        assertThrows(NullPointerException.class, () -> ObjectHelpers.requireNonNullElse(null, null));
+        assertThrows(
+                NullPointerException.class, () -> ObjectHelpers.requireNonNullElse(null, null));
     }
 
     @Test
@@ -40,14 +40,21 @@ public class CommonUtilityContractsTest {
         Object value = new Object();
         AtomicBoolean called = new AtomicBoolean(false);
 
-        assertSame(value, ObjectHelpers.requireNonNullElseGet(value, () -> {
-            called.set(true);
-            return new Object();
-        }));
+        assertSame(
+                value,
+                ObjectHelpers.requireNonNullElseGet(
+                        value,
+                        () -> {
+                            called.set(true);
+                            return new Object();
+                        }));
         assertFalse(called.get());
         assertNotNull(ObjectHelpers.requireNonNullElseGet(null, Object::new));
-        assertThrows(NullPointerException.class, () -> ObjectHelpers.requireNonNullElseGet(null, null));
-        assertThrows(NullPointerException.class, () -> ObjectHelpers.requireNonNullElseGet(null, () -> null));
+        assertThrows(
+                NullPointerException.class, () -> ObjectHelpers.requireNonNullElseGet(null, null));
+        assertThrows(
+                NullPointerException.class,
+                () -> ObjectHelpers.requireNonNullElseGet(null, () -> null));
     }
 
     @Test

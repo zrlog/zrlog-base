@@ -21,19 +21,16 @@ import com.zrlog.util.*;
 import com.zrlog.web.BaseWebSetup;
 import com.zrlog.web.TokenServiceProvider;
 import com.zrlog.web.WebSetup;
-import sun.misc.Signal;
-
-import javax.sql.DataSource;
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.sql.DataSource;
+import sun.misc.Signal;
 
-/**
- * 全局服务配置，包含 数据库，插件，更新的实现者等
- */
+/** 全局服务配置，包含 数据库，插件，更新的实现者等 */
 public abstract class ZrLogConfig extends AbstractServerConfig {
 
     protected static final Logger LOGGER = LoggerUtil.getLogger(ZrLogConfig.class);
@@ -66,8 +63,12 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         this.updater = updater;
         this.serverConfig = initServerConfig(contextPath, port);
         UpdaterHosts.bindLifecycle(updater, serverConfig::getPort, this::stop);
-        //init
-        this.installLockFile = PathUtil.getConfFile("/" + Objects.requireNonNullElse(System.getenv("INSTALL_LOCK_FILE_NAME"), "install.lock"));
+        // init
+        this.installLockFile =
+                PathUtil.getConfFile(
+                        "/"
+                                + Objects.requireNonNullElse(
+                                        System.getenv("INSTALL_LOCK_FILE_NAME"), "install.lock"));
         this.dbPropertiesFile = DbUtils.initDbPropertiesFile(this);
         this.dataSource = DbUtils.configDatabaseWithRetry(30, this);
         this.webSetups.add(new BaseWebSetup(this));
@@ -81,9 +82,11 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         return executor instanceof ExecutorService ? (ExecutorService) executor : null;
     }
 
-    private static void awaitExecutor(ExecutorService executor, long deadline) throws InterruptedException {
+    private static void awaitExecutor(ExecutorService executor, long deadline)
+            throws InterruptedException {
         if (executor != null) {
-            executor.awaitTermination(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+            executor.awaitTermination(
+                    Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
         }
     }
 
@@ -93,9 +96,13 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
 
     public String getProgramUptime() {
         if (EnvKit.isFaaSMode()) {
-            return ParseUtil.toNamingDurationString(zrLogHttpRequestListener.getTotalHandleTime(), I18nUtil.getCurrentLocale().contains("en"));
+            return ParseUtil.toNamingDurationString(
+                    zrLogHttpRequestListener.getTotalHandleTime(),
+                    I18nUtil.getCurrentLocale().contains("en"));
         }
-        return ParseUtil.toNamingDurationString(System.currentTimeMillis() - createdDate, I18nUtil.getCurrentLocale().contains("en"));
+        return ParseUtil.toNamingDurationString(
+                System.currentTimeMillis() - createdDate,
+                I18nUtil.getCurrentLocale().contains("en"));
     }
 
     public boolean isTest() {
@@ -115,13 +122,15 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
             try {
                 for (WebSetup webSetup : webSetups) {
                     if (stopped) {
-                        throw new IllegalStateException("Application stopped during database initialization");
+                        throw new IllegalStateException(
+                                "Application stopped during database initialization");
                     }
                     webSetup.beforeDatabaseReady(dataSource);
                 }
                 for (WebSetup webSetup : webSetups) {
                     if (stopped) {
-                        throw new IllegalStateException("Application stopped during database initialization");
+                        throw new IllegalStateException(
+                                "Application stopped during database initialization");
                     }
                     webSetup.onDatabaseReady(dataSource);
                 }
@@ -133,9 +142,7 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         return dataSource;
     }
 
-    /**
-     * Complete module registration before any database-backed service is resolved.
-     */
+    /** Complete module registration before any database-backed service is resolved. */
     protected final synchronized void initializeWebSetups() {
         if (!webSetupsInitialized) {
             webSetups.forEach(WebSetup::setup);
@@ -171,9 +178,7 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         return updater;
     }
 
-    /**
-     * Session access for application assembly; the admin module owns the service instance.
-     */
+    /** Session access for application assembly; the admin module owns the service instance. */
     public TokenService getTokenService() {
         return initTokenService();
     }
@@ -187,25 +192,24 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         return dataSource;
     }
 
-    /**
-     * 配置的常用参数，这里可以看出来推崇使用代码进行配置的，而不是像Spring这样的通过预定配置方式。代码控制的好处在于高度可控制性，
-     * 当然这也导致了很多程序员直接硬编码的问题。
-     */
+    /** 配置的常用参数，这里可以看出来推崇使用代码进行配置的，而不是像Spring这样的通过预定配置方式。代码控制的好处在于高度可控制性， 当然这也导致了很多程序员直接硬编码的问题。 */
     @Override
     public ServerConfig getServerConfig() {
         return serverConfig;
     }
 
-    /**
-     * Find an enabled module's capability without depending on its implementation.
-     */
+    /** Find an enabled module's capability without depending on its implementation. */
     public <T> T getWebSetup(Class<T> capability) {
-        return webSetups.stream().filter(capability::isInstance).map(capability::cast).findFirst().orElse(null);
+        return webSetups.stream()
+                .filter(capability::isInstance)
+                .map(capability::cast)
+                .findFirst()
+                .orElse(null);
     }
 
     /**
-     * Stop work owned by this configuration once, including overlapping TERM and
-     * JVM shutdown-hook calls. Host-specific cleanup belongs in the stop hooks.
+     * Stop work owned by this configuration once, including overlapping TERM and JVM shutdown-hook
+     * calls. Host-specific cleanup belongs in the stop hooks.
      */
     public void stop() {
         // Requests may still call synchronized configDatabase() while draining.
@@ -234,17 +238,11 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         }
     }
 
-    /**
-     * Stop the host from accepting new work before draining HTTP executors.
-     */
-    protected void beforeStop() {
-    }
+    /** Stop the host from accepting new work before draining HTTP executors. */
+    protected void beforeStop() {}
 
-    /**
-     * Release host-specific resources after HTTP work and shared resources close.
-     */
-    protected void afterStop() {
-    }
+    /** Release host-specific resources after HTTP work and shared resources close. */
+    protected void afterStop() {}
 
     private void stopSharedResources() {
         try {
@@ -312,9 +310,7 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         }
     }
 
-    /**
-     * 通过检查特定目录下面是否存在 install.lock 文件，同时判断环境变量里面是否存在配置，进行判断是否已经完成安装
-     */
+    /** 通过检查特定目录下面是否存在 install.lock 文件，同时判断环境变量里面是否存在配置，进行判断是否已经完成安装 */
     public boolean isInstalled() {
         if (StringUtils.isNotEmpty(ZrLogUtil.getDbInfoByEnv())) {
             return true;
@@ -323,7 +319,11 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
     }
 
     public ServerConfig initServerConfig(String contextPath, Integer port) {
-        ServerConfig serverConfig = new ServerConfig().setApplicationName("zrlog").setApplicationVersion(BlogBuildInfoUtil.getVersionInfo()).setDisablePrintWebServerInfo(true);
+        ServerConfig serverConfig =
+                new ServerConfig()
+                        .setApplicationName("zrlog")
+                        .setApplicationVersion(BlogBuildInfoUtil.getVersionInfo())
+                        .setDisablePrintWebServerInfo(true);
         serverConfig.setNativeImageAgent(nativeImageAgent);
         serverConfig.setDisableSession(true);
         serverConfig.setPort(port);
@@ -338,19 +338,27 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         serverConfig.addErrorHandle(500, new ZrLogErrorHandle(500));
         serverConfig.setRequestExecutor(ThreadUtils.newFixedThreadPool(200));
         serverConfig.setDecodeExecutor(ThreadUtils.newFixedThreadPool(20));
-        //optimize cpu usage
+        // optimize cpu usage
         serverConfig.setSelectNowSleepTime(200);
-        serverConfig.setRequestCheckerExecutor(new ScheduledThreadPoolExecutor(1, ThreadUtils::unstarted));
+        serverConfig.setRequestCheckerExecutor(
+                new ScheduledThreadPoolExecutor(1, ThreadUtils::unstarted));
         serverConfig.addRequestListener(zrLogHttpRequestListener);
-        //启动成功，更新一次缓存数据
-        serverConfig.addCreateSuccessHandle(() -> {
-            startPlugins(!EnvKit.isFaaSMode());
-            return null;
-        });
-        serverConfig.addCreateSuccessHandle(() -> {
-            LOGGER.info("Start " + serverConfig.getApplicationName() + " used time " + (System.currentTimeMillis() - createdDate) + "ms");
-            return null;
-        });
+        // 启动成功，更新一次缓存数据
+        serverConfig.addCreateSuccessHandle(
+                () -> {
+                    startPlugins(!EnvKit.isFaaSMode());
+                    return null;
+                });
+        serverConfig.addCreateSuccessHandle(
+                () -> {
+                    LOGGER.info(
+                            "Start "
+                                    + serverConfig.getApplicationName()
+                                    + " used time "
+                                    + (System.currentTimeMillis() - createdDate)
+                                    + "ms");
+                    return null;
+                });
         Runtime rt = Runtime.getRuntime();
         rt.addShutdownHook(new Thread(this::stop));
         Signal signalTerm = new Signal(TERM_SIGNAL);
@@ -363,7 +371,7 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         RequestConfig requestConfig = new RequestConfig();
         requestConfig.setDisableSession(true);
         requestConfig.setRouter(getServerConfig().getRouter());
-        //最大的提交的body的大小
+        // 最大的提交的body的大小
         requestConfig.setMaxRequestBodySize(1024 * 1024 * 1024);
         return requestConfig;
     }
@@ -373,15 +381,14 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         ResponseConfig config = new ResponseConfig();
         config.setCharSet("utf-8");
         config.setEnableGzip(true);
-        config.setGzipMimeTypes(Arrays.asList("text/", "application/javascript", "application/json"));
+        config.setGzipMimeTypes(
+                Arrays.asList("text/", "application/javascript", "application/json"));
         return config;
     }
 
     public abstract List<IPlugin> getBasePluginList();
 
-    /**
-     * 调用了该方法，主要用于启动插件功能，以及相应的 ZrLog 插件服务。
-     */
+    /** 调用了该方法，主要用于启动插件功能，以及相应的 ZrLog 插件服务。 */
     public void startPlugins(boolean async) {
         if (!isInstalled()) {
             return;
@@ -426,5 +433,4 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         }
         return StringUtils.isEmpty(ZrLogUtil.getDbInfoByEnv());
     }
-
 }

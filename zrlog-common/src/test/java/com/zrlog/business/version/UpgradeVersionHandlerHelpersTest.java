@@ -1,16 +1,17 @@
 package com.zrlog.business.version;
 
-import org.junit.Test;
-
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
 
 public class UpgradeVersionHandlerHelpersTest {
 
     @Test
     public void shouldCreateExistingUpgradeHandlerByVersion() {
-        assertTrue(UpgradeVersionHandlerHelpers.getUpgradeVersionHandler(1234)
-                instanceof V1234UpgradeVersionHandler);
+        assertTrue(
+                UpgradeVersionHandlerHelpers.getUpgradeVersionHandler(1234)
+                        instanceof V1234UpgradeVersionHandler);
     }
 
     @Test

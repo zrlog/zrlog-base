@@ -1,19 +1,17 @@
 package com.zrlog.test.support;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
-import static org.junit.Assert.*;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 public class MemoryRuntimeTest {
 
-    @Rule
-    public TemporaryFolder temporary = new TemporaryFolder();
+    @Rule public TemporaryFolder temporary = new TemporaryFolder();
 
     @Test
     public void resetOnlyRemovesTheReservedRuntimeAndDoesNotFollowLinks() throws Exception {
@@ -45,7 +43,7 @@ public class MemoryRuntimeTest {
         Path module = Files.createDirectory(project.resolve("module"));
         String previous = System.getProperty("user.dir");
         try {
-            for (Path workingDirectory : new Path[]{project, module}) {
+            for (Path workingDirectory : new Path[] {project, module}) {
                 System.setProperty("user.dir", workingDirectory.toString());
                 assertEquals(project, MemoryRuntime.projectRoot());
             }
@@ -59,10 +57,12 @@ public class MemoryRuntimeTest {
     @Test
     public void invalidPortsFailBeforeStartingAnApplication() {
         assertEquals(7080, MemoryRuntime.resolvePort(null, 7080));
-        assertEquals(17080, MemoryRuntime.resolvePort(new String[]{"--debug", "--port=17080"}, 7080));
-        for (String value : new String[]{"0", "-1", "65536", "bad", ""}) {
-            assertThrows(IllegalArgumentException.class,
-                    () -> MemoryRuntime.resolvePort(new String[]{"--port=" + value}, 7080));
+        assertEquals(
+                17080, MemoryRuntime.resolvePort(new String[] {"--debug", "--port=17080"}, 7080));
+        for (String value : new String[] {"0", "-1", "65536", "bad", ""}) {
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> MemoryRuntime.resolvePort(new String[] {"--port=" + value}, 7080));
         }
     }
 }

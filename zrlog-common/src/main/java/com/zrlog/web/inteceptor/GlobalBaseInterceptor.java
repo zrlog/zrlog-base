@@ -6,22 +6,18 @@ import com.hibegin.http.server.api.Interceptor;
 import com.zrlog.common.Constants;
 import com.zrlog.plugin.BaseStaticSitePlugin;
 import com.zrlog.util.BlogBuildInfoUtil;
-
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * 用于对静态文件的请求的检查
- */
+/** 用于对静态文件的请求的检查 */
 public class GlobalBaseInterceptor implements Interceptor {
-
 
     private final Set<String> forbiddenUriExtSet = new HashSet<>();
 
     public GlobalBaseInterceptor(boolean warMode) {
-        //由于程序的.flt文件没有存放在conf目录，为了防止访问.ftl页面获得的没有数据的页面，或则是错误的页面。
+        // 由于程序的.flt文件没有存放在conf目录，为了防止访问.ftl页面获得的没有数据的页面，或则是错误的页面。
         forbiddenUriExtSet.add(".ftl");
-        //这主要用在主题目录下面的配置文件。
+        // 这主要用在主题目录下面的配置文件。
         forbiddenUriExtSet.add(".properties");
         forbiddenUriExtSet.add(".yml");
         forbiddenUriExtSet.add(".ejs");
@@ -41,11 +37,11 @@ public class GlobalBaseInterceptor implements Interceptor {
     private boolean isForbiddenUri(HttpRequest request) {
         String target = request.getUri();
         if (forbiddenUriExtSet.stream().anyMatch(target::endsWith)) {
-            //非法请求, 返回403
+            // 非法请求, 返回403
             return true;
         }
         if (target.startsWith(Constants.ADMIN_URI_BASE_PATH) && target.endsWith(".html")) {
-            //非法请求, 返回403
+            // 非法请求, 返回403
             return !BaseStaticSitePlugin.isStaticPluginRequest(request);
         }
         return false;
@@ -55,10 +51,10 @@ public class GlobalBaseInterceptor implements Interceptor {
     public boolean doInterceptor(HttpRequest request, HttpResponse response) {
         String target = request.getUri();
         Constants.setLastAccessTime(System.currentTimeMillis());
-        //便于Wappalyzer读取
+        // 便于Wappalyzer读取
         response.addHeader("X-ZrLog", BlogBuildInfoUtil.getVersion());
         if (isForbiddenUri(request)) {
-            //非法请求, 返回403
+            // 非法请求, 返回403
             response.renderCode(403);
             return false;
         }
@@ -67,5 +63,4 @@ public class GlobalBaseInterceptor implements Interceptor {
         }
         return true;
     }
-
 }

@@ -3,7 +3,6 @@ package com.zrlog.business.web;
 import com.zrlog.web.WebSetup;
 import com.zrlog.web.WebSetupContext;
 import com.zrlog.web.WebSetupProvider;
-
 import java.util.Set;
 
 public final class ServiceWebSetupProvider implements WebSetupProvider {

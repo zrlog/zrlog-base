@@ -3,7 +3,6 @@ package com.zrlog.common.web;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.hibegin.http.server.config.GsonHttpJsonMessageConverter;
-
 import java.time.LocalDateTime;
 
 public class ZrLogHttpJsonMessageConverter extends GsonHttpJsonMessageConverter {

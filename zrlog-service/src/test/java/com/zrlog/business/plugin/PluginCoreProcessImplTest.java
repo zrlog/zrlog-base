@@ -1,13 +1,10 @@
 package com.zrlog.business.plugin;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.NetworkProxy;
-import org.graalvm.nativeimage.ImageInfo;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,15 +23,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
-
-import static org.junit.Assert.*;
+import org.graalvm.nativeimage.ImageInfo;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 public class PluginCoreProcessImplTest {
     private Field proxyPolicy;
     private Object previousProxyPolicy;
 
-    private static NetworkProxy.Settings proxySettings(String url, String noProxy) throws Exception {
-        // These process-argument fixtures specify their policy; environment precedence has its own tests.
+    private static NetworkProxy.Settings proxySettings(String url, String noProxy)
+            throws Exception {
+        // These process-argument fixtures specify their policy; environment precedence has its own
+        // tests.
         var resolve = NetworkProxy.class.getDeclaredMethod("resolve", Map.class, Properties.class);
         resolve.setAccessible(true);
         var values = new Properties();
@@ -93,13 +94,15 @@ public class PluginCoreProcessImplTest {
             return;
         }
         try (Stream<Path> paths = Files.walk(path)) {
-            paths.sorted(Comparator.reverseOrder()).forEach(item -> {
-                try {
-                    Files.deleteIfExists(item);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            });
+            paths.sorted(Comparator.reverseOrder())
+                    .forEach(
+                            item -> {
+                                try {
+                                    Files.deleteIfExists(item);
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            });
         }
     }
 
@@ -140,16 +143,21 @@ public class PluginCoreProcessImplTest {
             assertFalse(fixture.thread.get().isAlive());
             assertFalse(fixture.child.isAlive());
             assertEquals(1, fixture.launches.get());
-            assertFalse(fixture.runtime.confirmStarted(port, com.zrlog.util.ExecutionDeadline.afterMillis(100)));
+            assertFalse(
+                    fixture.runtime.confirmStarted(
+                            port, com.zrlog.util.ExecutionDeadline.afterMillis(100)));
         }
     }
 
     @Test(timeout = 4000)
-    public void confirmedCoreSurvivesStartupDeadlineAndRejectsLateStartupCancellation() throws Exception {
+    public void confirmedCoreSurvivesStartupDeadlineAndRejectsLateStartupCancellation()
+            throws Exception {
         try (BoundedLaunchFixture fixture = new BoundedLaunchFixture(false)) {
             int port = fixture.start(500);
             assertTrue(fixture.spawned.await(1, TimeUnit.SECONDS));
-            assertTrue(fixture.runtime.confirmStarted(port, com.zrlog.util.ExecutionDeadline.afterMillis(300)));
+            assertTrue(
+                    fixture.runtime.confirmStarted(
+                            port, com.zrlog.util.ExecutionDeadline.afterMillis(300)));
             new java.util.concurrent.CountDownLatch(1).await(650, TimeUnit.MILLISECONDS);
             fixture.runtime.cancelStartup(port, com.zrlog.util.ExecutionDeadline.afterMillis(100));
             assertTrue(fixture.child.isAlive());
@@ -191,8 +199,10 @@ public class PluginCoreProcessImplTest {
         backoff = PluginCoreProcessImpl.nextRestartBackoffMillis(backoff, 1000L);
         assertEquals(60000L, backoff);
         assertEquals(60000L, PluginCoreProcessImpl.nextRestartBackoffMillis(backoff, 1000L));
-        assertEquals(5000L, PluginCoreProcessImpl.nextRestartBackoffMillis(
-                backoff, PluginCoreProcessImpl.STABLE_PROCESS_RUNTIME_MILLIS));
+        assertEquals(
+                5000L,
+                PluginCoreProcessImpl.nextRestartBackoffMillis(
+                        backoff, PluginCoreProcessImpl.STABLE_PROCESS_RUNTIME_MILLIS));
     }
 
     @Test
@@ -218,7 +228,9 @@ public class PluginCoreProcessImplTest {
             new PluginCoreProcessImpl(null, "", () -> 19084);
 
             try (Stream<Path> paths = Files.list(logDir)) {
-                assertFalse(paths.anyMatch(path -> path.getFileName().toString().startsWith("plugin-core-")));
+                assertFalse(
+                        paths.anyMatch(
+                                path -> path.getFileName().toString().startsWith("plugin-core-")));
             }
         } finally {
             restoreProperty("sws.log.path", previousLogPath);
@@ -239,7 +251,10 @@ public class PluginCoreProcessImplTest {
 
             assertTrue(javaProgram.replace("\\", "/").endsWith("/bin/java"));
             assertEquals(new File(root + "/conf").toString(), workerPath);
-            assertTrue(installedPlugins.replace("\\", "/").endsWith("/conf/plugins/installed-plugins"));
+            assertTrue(
+                    installedPlugins
+                            .replace("\\", "/")
+                            .endsWith("/conf/plugins/installed-plugins"));
         } finally {
             delete(root);
         }
@@ -253,31 +268,58 @@ public class PluginCoreProcessImplTest {
             Path sqliteProperties = root.resolve("sqlite.properties");
             Path mysqlProperties = root.resolve("mysql.properties");
             Path webApiProperties = root.resolve("webapi.properties");
-            Files.writeString(sqliteProperties, "jdbcUrl=jdbc:sqlite:/tmp/zrlog.db\n", StandardCharsets.UTF_8);
-            Files.writeString(mysqlProperties, "jdbcUrl=jdbc:mysql://localhost/zrlog\n", StandardCharsets.UTF_8);
-            Files.writeString(webApiProperties, "jdbcUrl=jdbc:webapi://example.com/zrlog\n", StandardCharsets.UTF_8);
+            Files.writeString(
+                    sqliteProperties,
+                    "jdbcUrl=jdbc:sqlite:/tmp/zrlog.db\n",
+                    StandardCharsets.UTF_8);
+            Files.writeString(
+                    mysqlProperties,
+                    "jdbcUrl=jdbc:mysql://localhost/zrlog\n",
+                    StandardCharsets.UTF_8);
+            Files.writeString(
+                    webApiProperties,
+                    "jdbcUrl=jdbc:webapi://example.com/zrlog\n",
+                    StandardCharsets.UTF_8);
 
-            List<String> sqliteArgs = PluginCoreProcessImpl.jvmLaunchArguments(
-                    pluginCore, sqliteProperties.toString(), "-Xmx64m", 25);
+            List<String> sqliteArgs =
+                    PluginCoreProcessImpl.jvmLaunchArguments(
+                            pluginCore, sqliteProperties.toString(), "-Xmx64m", 25);
             assertEquals("-Xmx64m", sqliteArgs.get(0));
             assertEquals(PluginCoreProcessImpl.ENABLE_NATIVE_ACCESS_ARGUMENT, sqliteArgs.get(1));
             assertEquals("-cp", sqliteArgs.get(2));
-            assertEquals(pluginCore + File.pathSeparator + System.getProperty("java.class.path"), sqliteArgs.get(3));
+            assertEquals(
+                    pluginCore + File.pathSeparator + System.getProperty("java.class.path"),
+                    sqliteArgs.get(3));
             assertEquals(PluginCoreProcessImpl.PLUGIN_CORE_MAIN_CLASS, sqliteArgs.get(4));
             assertFalse(sqliteArgs.contains("-jar"));
 
-            assertEquals(List.of("-Xmx64m", PluginCoreProcessImpl.ENABLE_NATIVE_ACCESS_ARGUMENT,
-                            "-jar", pluginCore.toString()),
-                    PluginCoreProcessImpl.jvmLaunchArguments(pluginCore, mysqlProperties.toString(), "-Xmx64m", 25));
-            assertEquals(List.of("-Xmx64m", PluginCoreProcessImpl.ENABLE_NATIVE_ACCESS_ARGUMENT,
-                            "-jar", pluginCore.toString()),
-                    PluginCoreProcessImpl.jvmLaunchArguments(pluginCore, webApiProperties.toString(), "-Xmx64m", 25));
-            assertEquals(List.of("-Xmx64m", "-jar", pluginCore.toString()),
-                    PluginCoreProcessImpl.jvmLaunchArguments(pluginCore, root.resolve("missing.properties").toString(),
-                            "-Xmx64m", 11));
-            assertFalse(PluginCoreProcessImpl.jvmLaunchArguments(
-                            pluginCore, sqliteProperties.toString(), "-Xmx64m", 11)
-                    .contains(PluginCoreProcessImpl.ENABLE_NATIVE_ACCESS_ARGUMENT));
+            assertEquals(
+                    List.of(
+                            "-Xmx64m",
+                            PluginCoreProcessImpl.ENABLE_NATIVE_ACCESS_ARGUMENT,
+                            "-jar",
+                            pluginCore.toString()),
+                    PluginCoreProcessImpl.jvmLaunchArguments(
+                            pluginCore, mysqlProperties.toString(), "-Xmx64m", 25));
+            assertEquals(
+                    List.of(
+                            "-Xmx64m",
+                            PluginCoreProcessImpl.ENABLE_NATIVE_ACCESS_ARGUMENT,
+                            "-jar",
+                            pluginCore.toString()),
+                    PluginCoreProcessImpl.jvmLaunchArguments(
+                            pluginCore, webApiProperties.toString(), "-Xmx64m", 25));
+            assertEquals(
+                    List.of("-Xmx64m", "-jar", pluginCore.toString()),
+                    PluginCoreProcessImpl.jvmLaunchArguments(
+                            pluginCore,
+                            root.resolve("missing.properties").toString(),
+                            "-Xmx64m",
+                            11));
+            assertFalse(
+                    PluginCoreProcessImpl.jvmLaunchArguments(
+                                    pluginCore, sqliteProperties.toString(), "-Xmx64m", 11)
+                            .contains(PluginCoreProcessImpl.ENABLE_NATIVE_ACCESS_ARGUMENT));
         } finally {
             delete(root);
         }
@@ -297,7 +339,8 @@ public class PluginCoreProcessImplTest {
     }
 
     @Test
-    public void activeProxyOptionsPrecedeJvmEntryPointAndNativePositionalArguments() throws Exception {
+    public void activeProxyOptionsPrecedeJvmEntryPointAndNativePositionalArguments()
+            throws Exception {
         Path root = Files.createTempDirectory("zrlog-plugin-proxy");
         String previousRoot = System.getProperty("sws.root.path");
         Field effective = NetworkProxy.class.getDeclaredField("effective");
@@ -305,13 +348,16 @@ public class PluginCoreProcessImplTest {
         Object previousPolicy = effective.get(null);
         try {
             System.setProperty("sws.root.path", root.toString());
-            NetworkProxy.Settings active = proxySettings("http://proxy.example:3128", ".internal.example");
+            NetworkProxy.Settings active =
+                    proxySettings("http://proxy.example:3128", ".internal.example");
             effective.set(null, active);
             NetworkProxy.save("http://pending.example:8080", "");
             Path sqlite = root.resolve("sqlite.properties");
             Files.writeString(sqlite, "jdbcUrl=jdbc:sqlite:/tmp/zrlog-proxy-test.db\n");
             for (String database : List.of("webapi.properties", sqlite.toString())) {
-                List<String> args = PluginCoreProcessImpl.jvmLaunchArguments(new File("plugin-core.jar"), database, "-Xmx64m", 25);
+                List<String> args =
+                        PluginCoreProcessImpl.jvmLaunchArguments(
+                                new File("plugin-core.jar"), database, "-Xmx64m", 25);
                 int entryPoint = args.contains("-jar") ? args.indexOf("-jar") : args.indexOf("-cp");
                 assertTrue(args.indexOf("-Dhttps.proxyHost=proxy.example") < entryPoint);
                 assertTrue(args.contains("-Dhttp.proxyPort=3128"));
@@ -321,11 +367,22 @@ public class PluginCoreProcessImplTest {
             Path argsFile = root.resolve("args.txt");
             Path nativeProgram = root.resolve("conf/plugins/plugin-core-test.bin");
             Files.createDirectories(nativeProgram.getParent());
-            Files.writeString(nativeProgram, "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsFile + "\n");
+            Files.writeString(
+                    nativeProgram, "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsFile + "\n");
             assertTrue(nativeProgram.toFile().setExecutable(true));
             ImageInfo.setInImageRuntimeCode(true);
-            Process process = new PluginCoreProcessImpl(null, "/blog", () -> 19084).startPluginCore(nativeProgram.toFile(),
-                    "db=ok", "-Xmx64m", root.toString(), "4.0.1", "test-token", 21000, 41000, 51000);
+            Process process =
+                    new PluginCoreProcessImpl(null, "/blog", () -> 19084)
+                            .startPluginCore(
+                                    nativeProgram.toFile(),
+                                    "db=ok",
+                                    "-Xmx64m",
+                                    root.toString(),
+                                    "4.0.1",
+                                    "test-token",
+                                    21000,
+                                    41000,
+                                    51000);
             assertNotNull(process);
             assertTrue(process.waitFor(5, TimeUnit.SECONDS));
             assertEquals(0, process.exitValue());
@@ -347,7 +404,8 @@ public class PluginCoreProcessImplTest {
         Path argsFile = root.resolve("plugin-args.txt");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-test.bin");
         Files.createDirectories(pluginCore.getParent());
-        Files.writeString(pluginCore,
+        Files.writeString(
+                pluginCore,
                 "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsFile + "\n",
                 StandardCharsets.UTF_8);
         assertTrue(pluginCore.toFile().setExecutable(true));
@@ -358,9 +416,17 @@ public class PluginCoreProcessImplTest {
             PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog", () -> 19084);
 
             process.setExternallyScheduled(true);
-            Process started = process.startPluginCore(pluginCore.toFile(), "db=ok",
-                    "-Xmx64m", root.resolve("static").toString(), "3.6.0", "token-123",
-                    21000, 41000, 51000);
+            Process started =
+                    process.startPluginCore(
+                            pluginCore.toFile(),
+                            "db=ok",
+                            "-Xmx64m",
+                            root.resolve("static").toString(),
+                            "3.6.0",
+                            "token-123",
+                            21000,
+                            41000,
+                            51000);
 
             assertNotNull(started);
             assertEquals(0, started.waitFor());
@@ -387,27 +453,41 @@ public class PluginCoreProcessImplTest {
     }
 
     @Test
-    public void jvmLaunchOnlyTransfersSchedulerOwnershipWhenExplicitlyConfigured() throws Exception {
+    public void jvmLaunchOnlyTransfersSchedulerOwnershipWhenExplicitlyConfigured()
+            throws Exception {
         Path root = Files.createTempDirectory("zrlog-plugin-core-owned-scheduler");
         Path argsFile = root.resolve("args.txt");
         Path launcher = root.resolve("launcher");
-        Files.writeString(launcher, "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsFile + "\n", StandardCharsets.UTF_8);
+        Files.writeString(
+                launcher,
+                "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsFile + "\n",
+                StandardCharsets.UTF_8);
         assertTrue(launcher.toFile().setExecutable(true));
         Path artifact = root.resolve("plugin-core.jar");
         Files.writeString(artifact, "controlled process fixture");
         String previousRoot = System.getProperty("sws.root.path");
         try {
             System.setProperty("sws.root.path", root.toString());
-            PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/sub", () -> 19084) {
-                @Override
-                String programName(File file) {
-                    return launcher.toString();
-                }
-            };
-            for (boolean owned : new boolean[]{false, true}) {
+            PluginCoreProcessImpl process =
+                    new PluginCoreProcessImpl(null, "/sub", () -> 19084) {
+                        @Override
+                        String programName(File file) {
+                            return launcher.toString();
+                        }
+                    };
+            for (boolean owned : new boolean[] {false, true}) {
                 process.setExternallyScheduled(owned);
-                Process child = process.startPluginCore(artifact.toFile(), "missing-db", "-Xmx64m", root.toString(),
-                        "4.0.0", "fixture-token", 21000, 41000, 51000);
+                Process child =
+                        process.startPluginCore(
+                                artifact.toFile(),
+                                "missing-db",
+                                "-Xmx64m",
+                                root.toString(),
+                                "4.0.0",
+                                "fixture-token",
+                                21000,
+                                41000,
+                                51000);
                 assertTrue(child.waitFor(5, TimeUnit.SECONDS));
                 assertEquals(0, child.exitValue());
                 List<String> args = Files.readAllLines(argsFile);
@@ -424,21 +504,29 @@ public class PluginCoreProcessImplTest {
 
     @Test
     public void nativeHeapSizeShouldUseValidatedByteRange() {
-        assertEquals(PluginCoreProcessImpl.DEFAULT_NATIVE_MAX_HEAP_SIZE,
+        assertEquals(
+                PluginCoreProcessImpl.DEFAULT_NATIVE_MAX_HEAP_SIZE,
                 PluginCoreProcessImpl.resolveNativeMaxHeapSize(null));
-        assertEquals(PluginCoreProcessImpl.DEFAULT_NATIVE_MAX_HEAP_SIZE,
+        assertEquals(
+                PluginCoreProcessImpl.DEFAULT_NATIVE_MAX_HEAP_SIZE,
                 PluginCoreProcessImpl.resolveNativeMaxHeapSize("not-a-number"));
-        assertEquals(PluginCoreProcessImpl.DEFAULT_NATIVE_MAX_HEAP_SIZE,
+        assertEquals(
+                PluginCoreProcessImpl.DEFAULT_NATIVE_MAX_HEAP_SIZE,
                 PluginCoreProcessImpl.resolveNativeMaxHeapSize("67108863"));
-        assertEquals(PluginCoreProcessImpl.MIN_NATIVE_MAX_HEAP_SIZE,
+        assertEquals(
+                PluginCoreProcessImpl.MIN_NATIVE_MAX_HEAP_SIZE,
                 PluginCoreProcessImpl.resolveNativeMaxHeapSize("67108864"));
-        assertEquals(PluginCoreProcessImpl.DEFAULT_NATIVE_MAX_HEAP_SIZE,
+        assertEquals(
+                PluginCoreProcessImpl.DEFAULT_NATIVE_MAX_HEAP_SIZE,
                 PluginCoreProcessImpl.resolveNativeMaxHeapSize("134217728"));
-        assertEquals(PluginCoreProcessImpl.MAX_NATIVE_MAX_HEAP_SIZE,
+        assertEquals(
+                PluginCoreProcessImpl.MAX_NATIVE_MAX_HEAP_SIZE,
                 PluginCoreProcessImpl.resolveNativeMaxHeapSize("536870912"));
-        assertEquals(PluginCoreProcessImpl.DEFAULT_NATIVE_MAX_HEAP_SIZE,
+        assertEquals(
+                PluginCoreProcessImpl.DEFAULT_NATIVE_MAX_HEAP_SIZE,
                 PluginCoreProcessImpl.resolveNativeMaxHeapSize("536870913"));
-        assertEquals(PluginCoreProcessImpl.DEFAULT_NATIVE_MAX_HEAP_SIZE,
+        assertEquals(
+                PluginCoreProcessImpl.DEFAULT_NATIVE_MAX_HEAP_SIZE,
                 PluginCoreProcessImpl.resolveNativeMaxHeapSize("999999999999999999999999"));
     }
 
@@ -450,9 +538,17 @@ public class PluginCoreProcessImplTest {
             System.setProperty("sws.root.path", root.toString());
             PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/blog", () -> 19084);
 
-            Process started = process.startPluginCore(root.resolve("missing.jar").toFile(),
-                    "db=ok", "-Xmx64m", root.resolve("static").toString(), "3.6.0", "token-123",
-                    21000, 41000, 51000);
+            Process started =
+                    process.startPluginCore(
+                            root.resolve("missing.jar").toFile(),
+                            "db=ok",
+                            "-Xmx64m",
+                            root.resolve("static").toString(),
+                            "3.6.0",
+                            "token-123",
+                            21000,
+                            41000,
+                            51000);
 
             assertEquals(null, started);
         } finally {
@@ -467,7 +563,8 @@ public class PluginCoreProcessImplTest {
         Path argsFile = root.resolve("plugin-args.txt");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-test.bin");
         Files.createDirectories(pluginCore.getParent());
-        Files.writeString(pluginCore,
+        Files.writeString(
+                pluginCore,
                 "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsFile + "\n",
                 StandardCharsets.UTF_8);
         assertTrue(pluginCore.toFile().setExecutable(true));
@@ -477,9 +574,17 @@ public class PluginCoreProcessImplTest {
             ImageInfo.setInImageRuntimeCode(true);
             PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/", () -> 19084);
 
-            Process started = process.startPluginCore(pluginCore.toFile(), "db=ok",
-                    "-Xmx64m", root.resolve("static").toString(), "3.6.0", "token-123",
-                    21000, 41000, 51000);
+            Process started =
+                    process.startPluginCore(
+                            pluginCore.toFile(),
+                            "db=ok",
+                            "-Xmx64m",
+                            root.resolve("static").toString(),
+                            "3.6.0",
+                            "token-123",
+                            21000,
+                            41000,
+                            51000);
 
             assertNotNull(started);
             assertEquals(0, started.waitFor());
@@ -493,7 +598,8 @@ public class PluginCoreProcessImplTest {
     }
 
     @Test
-    public void pluginServerStartShouldBuildRunnableHandleWithoutBackgroundThread() throws Exception {
+    public void pluginServerStartShouldBuildRunnableHandleWithoutBackgroundThread()
+            throws Exception {
         Path root = Files.createTempDirectory("zrlog-plugin-core-handle");
         Path argsFile = root.resolve("plugin-args.txt");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
@@ -505,10 +611,16 @@ public class PluginCoreProcessImplTest {
         try {
             System.setProperty("sws.root.path", root.toString());
             ImageInfo.setInImageRuntimeCode(true);
-            TestablePluginCoreProcessImpl process = new TestablePluginCoreProcessImpl(null, "/blog", argsFile);
+            TestablePluginCoreProcessImpl process =
+                    new TestablePluginCoreProcessImpl(null, "/blog", argsFile);
 
-            int port = process.pluginServerStart("db=ok", "-Xmx64m", root.resolve("static").toString(),
-                    "3.6.0", "token-456");
+            int port =
+                    process.pluginServerStart(
+                            "db=ok",
+                            "-Xmx64m",
+                            root.resolve("static").toString(),
+                            "3.6.0",
+                            "token-456");
 
             assertTrue(port >= 20000);
             assertNotNull(process.handle.get());
@@ -530,7 +642,8 @@ public class PluginCoreProcessImplTest {
     }
 
     @Test
-    public void watcherShouldRetryStartupConnectionAndStopOldProcessBeforeReplacement() throws Exception {
+    public void watcherShouldRetryStartupConnectionAndStopOldProcessBeforeReplacement()
+            throws Exception {
         Path root = Files.createTempDirectory("zrlog-plugin-core-restart");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
         Files.createDirectories(pluginCore.getParent());
@@ -542,19 +655,26 @@ public class PluginCoreProcessImplTest {
         try {
             System.setProperty("sws.root.path", root.toString());
             ImageInfo.setInImageRuntimeCode(true);
-            RestartTrackingPluginCoreProcessImpl process = new RestartTrackingPluginCoreProcessImpl(
-                    oldProcess, replacementProcess, 1);
-            setField(process, "infoLogFile", Files.createFile(root.resolve("plugin-info.log")).toFile());
-            setField(process, "errorLogFile", Files.createFile(root.resolve("plugin-error.log")).toFile());
+            RestartTrackingPluginCoreProcessImpl process =
+                    new RestartTrackingPluginCoreProcessImpl(oldProcess, replacementProcess, 1);
+            setField(
+                    process,
+                    "infoLogFile",
+                    Files.createFile(root.resolve("plugin-info.log")).toFile());
+            setField(
+                    process,
+                    "errorLogFile",
+                    Files.createFile(root.resolve("plugin-error.log")).toFile());
 
-            process.pluginServerStart("db=ok", "-Xmx64m", root.resolve("static").toString(),
-                    "3.6.0", "token-789");
+            process.pluginServerStart(
+                    "db=ok", "-Xmx64m", root.resolve("static").toString(), "3.6.0", "token-789");
             process.handle.get().run();
 
             assertEquals(2, process.startCount.get());
             assertEquals(3, process.watcherCount.get());
             assertEquals(1, process.restartDelays.size());
-            assertEquals(PluginCoreProcessImpl.MIN_RESTART_BACKOFF_MILLIS,
+            assertEquals(
+                    PluginCoreProcessImpl.MIN_RESTART_BACKOFF_MILLIS,
                     process.restartDelays.get(0).longValue());
             assertFalse(process.oldProcessAliveAtReplacement.get());
             assertEquals(1, oldProcess.destroyCount.get());
@@ -582,13 +702,23 @@ public class PluginCoreProcessImplTest {
         try {
             System.setProperty("sws.root.path", root.toString());
             ImageInfo.setInImageRuntimeCode(true);
-            RestartTrackingPluginCoreProcessImpl process = new RestartTrackingPluginCoreProcessImpl(
-                    oldProcess, replacementProcess, 3, 3);
-            setField(process, "infoLogFile", Files.createFile(root.resolve("plugin-info.log")).toFile());
-            setField(process, "errorLogFile", Files.createFile(root.resolve("plugin-error.log")).toFile());
+            RestartTrackingPluginCoreProcessImpl process =
+                    new RestartTrackingPluginCoreProcessImpl(oldProcess, replacementProcess, 3, 3);
+            setField(
+                    process,
+                    "infoLogFile",
+                    Files.createFile(root.resolve("plugin-info.log")).toFile());
+            setField(
+                    process,
+                    "errorLogFile",
+                    Files.createFile(root.resolve("plugin-error.log")).toFile());
 
-            process.pluginServerStart("db=ok", "-Xmx64m", root.resolve("static").toString(),
-                    "3.6.0", "token-connect-retry");
+            process.pluginServerStart(
+                    "db=ok",
+                    "-Xmx64m",
+                    root.resolve("static").toString(),
+                    "3.6.0",
+                    "token-connect-retry");
             process.handle.get().run();
 
             assertEquals(1, process.startCount.get());
@@ -616,14 +746,28 @@ public class PluginCoreProcessImplTest {
         try {
             System.setProperty("sws.root.path", root.toString());
             ImageInfo.setInImageRuntimeCode(true);
-            RestartTrackingPluginCoreProcessImpl process = new RestartTrackingPluginCoreProcessImpl(
-                    oldProcess, replacementProcess, Integer.MAX_VALUE, 2,
-                    PluginCoreProcessImpl.PLUGIN_CORE_READY_TIMEOUT_MILLIS);
-            setField(process, "infoLogFile", Files.createFile(root.resolve("plugin-info.log")).toFile());
-            setField(process, "errorLogFile", Files.createFile(root.resolve("plugin-error.log")).toFile());
+            RestartTrackingPluginCoreProcessImpl process =
+                    new RestartTrackingPluginCoreProcessImpl(
+                            oldProcess,
+                            replacementProcess,
+                            Integer.MAX_VALUE,
+                            2,
+                            PluginCoreProcessImpl.PLUGIN_CORE_READY_TIMEOUT_MILLIS);
+            setField(
+                    process,
+                    "infoLogFile",
+                    Files.createFile(root.resolve("plugin-info.log")).toFile());
+            setField(
+                    process,
+                    "errorLogFile",
+                    Files.createFile(root.resolve("plugin-error.log")).toFile());
 
-            process.pluginServerStart("db=ok", "-Xmx64m", root.resolve("static").toString(),
-                    "3.6.0", "token-ready-timeout");
+            process.pluginServerStart(
+                    "db=ok",
+                    "-Xmx64m",
+                    root.resolve("static").toString(),
+                    "3.6.0",
+                    "token-ready-timeout");
             process.handle.get().run();
 
             assertEquals(2, process.startCount.get());
@@ -651,12 +795,23 @@ public class PluginCoreProcessImplTest {
         try {
             System.setProperty("sws.root.path", root.toString());
             ImageInfo.setInImageRuntimeCode(true);
-            CrashLoopPluginCoreProcessImpl process = new CrashLoopPluginCoreProcessImpl(1000L, 1000L);
-            setField(process, "infoLogFile", Files.createFile(root.resolve("plugin-info.log")).toFile());
-            setField(process, "errorLogFile", Files.createFile(root.resolve("plugin-error.log")).toFile());
+            CrashLoopPluginCoreProcessImpl process =
+                    new CrashLoopPluginCoreProcessImpl(1000L, 1000L);
+            setField(
+                    process,
+                    "infoLogFile",
+                    Files.createFile(root.resolve("plugin-info.log")).toFile());
+            setField(
+                    process,
+                    "errorLogFile",
+                    Files.createFile(root.resolve("plugin-error.log")).toFile());
 
-            process.pluginServerStart("db=ok", "-Xmx64m", root.resolve("static").toString(),
-                    "3.6.0", "token-crash-backoff");
+            process.pluginServerStart(
+                    "db=ok",
+                    "-Xmx64m",
+                    root.resolve("static").toString(),
+                    "3.6.0",
+                    "token-crash-backoff");
             process.handle.get().run();
 
             assertEquals(3, process.startCount.get());
@@ -686,11 +841,21 @@ public class PluginCoreProcessImplTest {
             System.setProperty("sws.root.path", root.toString());
             ImageInfo.setInImageRuntimeCode(true);
             CrashLoopPluginCoreProcessImpl process = new CrashLoopPluginCoreProcessImpl(1, 1000L);
-            setField(process, "infoLogFile", Files.createFile(root.resolve("plugin-info.log")).toFile());
-            setField(process, "errorLogFile", Files.createFile(root.resolve("plugin-error.log")).toFile());
+            setField(
+                    process,
+                    "infoLogFile",
+                    Files.createFile(root.resolve("plugin-info.log")).toFile());
+            setField(
+                    process,
+                    "errorLogFile",
+                    Files.createFile(root.resolve("plugin-error.log")).toFile());
 
-            process.pluginServerStart("db=ok", "-Xmx64m", root.resolve("static").toString(),
-                    "3.6.0", "token-restart-io");
+            process.pluginServerStart(
+                    "db=ok",
+                    "-Xmx64m",
+                    root.resolve("static").toString(),
+                    "3.6.0",
+                    "token-restart-io");
             process.handle.get().run();
 
             assertEquals(3, process.startCount.get());
@@ -707,7 +872,8 @@ public class PluginCoreProcessImplTest {
     }
 
     @Test
-    public void supervisorShouldRetryInitialIOExceptionAndNullLaunchWithRotatingMasterPorts() throws Exception {
+    public void supervisorShouldRetryInitialIOExceptionAndNullLaunchWithRotatingMasterPorts()
+            throws Exception {
         Path root = Files.createTempDirectory("zrlog-plugin-core-initial-retry");
         Path pluginCore = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
         Files.createDirectories(pluginCore.getParent());
@@ -717,12 +883,24 @@ public class PluginCoreProcessImplTest {
         try {
             System.setProperty("sws.root.path", root.toString());
             ImageInfo.setInImageRuntimeCode(true);
-            InitialLaunchRetryPluginCoreProcessImpl process = new InitialLaunchRetryPluginCoreProcessImpl();
-            setField(process, "infoLogFile", Files.createFile(root.resolve("plugin-info.log")).toFile());
-            setField(process, "errorLogFile", Files.createFile(root.resolve("plugin-error.log")).toFile());
+            InitialLaunchRetryPluginCoreProcessImpl process =
+                    new InitialLaunchRetryPluginCoreProcessImpl();
+            setField(
+                    process,
+                    "infoLogFile",
+                    Files.createFile(root.resolve("plugin-info.log")).toFile());
+            setField(
+                    process,
+                    "errorLogFile",
+                    Files.createFile(root.resolve("plugin-error.log")).toFile());
 
-            int serverPort = process.pluginServerStart("db=ok", "-Xmx64m", root.resolve("static").toString(),
-                    "3.6.0", "token-initial-retry");
+            int serverPort =
+                    process.pluginServerStart(
+                            "db=ok",
+                            "-Xmx64m",
+                            root.resolve("static").toString(),
+                            "3.6.0",
+                            "token-initial-retry");
             process.handle.get().run();
 
             assertEquals(3, process.startCount.get());
@@ -753,11 +931,21 @@ public class PluginCoreProcessImplTest {
             ImageInfo.setInImageRuntimeCode(true);
             RecoverableWatcherFailurePluginCoreProcessImpl process =
                     new RecoverableWatcherFailurePluginCoreProcessImpl();
-            setField(process, "infoLogFile", Files.createFile(root.resolve("plugin-info.log")).toFile());
-            setField(process, "errorLogFile", Files.createFile(root.resolve("plugin-error.log")).toFile());
+            setField(
+                    process,
+                    "infoLogFile",
+                    Files.createFile(root.resolve("plugin-info.log")).toFile());
+            setField(
+                    process,
+                    "errorLogFile",
+                    Files.createFile(root.resolve("plugin-error.log")).toFile());
 
-            process.pluginServerStart("db=ok", "-Xmx64m", root.resolve("static").toString(),
-                    "3.6.0", "token-watcher-runtime");
+            process.pluginServerStart(
+                    "db=ok",
+                    "-Xmx64m",
+                    root.resolve("static").toString(),
+                    "3.6.0",
+                    "token-watcher-runtime");
             process.handle.get().run();
 
             assertEquals(2, process.startCount.get());
@@ -786,11 +974,21 @@ public class PluginCoreProcessImplTest {
             System.setProperty("sws.root.path", root.toString());
             ImageInfo.setInImageRuntimeCode(true);
             process = new CrashLoopPluginCoreProcessImpl(true, 1000L);
-            setField(process, "infoLogFile", Files.createFile(root.resolve("plugin-info.log")).toFile());
-            setField(process, "errorLogFile", Files.createFile(root.resolve("plugin-error.log")).toFile());
+            setField(
+                    process,
+                    "infoLogFile",
+                    Files.createFile(root.resolve("plugin-info.log")).toFile());
+            setField(
+                    process,
+                    "errorLogFile",
+                    Files.createFile(root.resolve("plugin-error.log")).toFile());
 
-            process.pluginServerStart("db=ok", "-Xmx64m", root.resolve("static").toString(),
-                    "3.6.0", "token-stop-backoff");
+            process.pluginServerStart(
+                    "db=ok",
+                    "-Xmx64m",
+                    root.resolve("static").toString(),
+                    "3.6.0",
+                    "token-stop-backoff");
             assertTrue(process.backoffEntered.await(1, TimeUnit.SECONDS));
 
             process.stopPluginCore();
@@ -819,27 +1017,34 @@ public class PluginCoreProcessImplTest {
         String previousRootPath = System.getProperty("sws.root.path");
         String previousFileArch = setFileArch("Linux-x86_64");
         AtomicInteger forcedStopAttempts = new AtomicInteger();
-        ControlledProcess oldProcess = new ControlledProcess(false, false) {
-            @Override
-            public Process destroyForcibly() {
-                Process result = super.destroyForcibly();
-                if (forcedStopAttempts.incrementAndGet() >= 2) {
-                    markExited();
-                }
-                return result;
-            }
-        };
+        ControlledProcess oldProcess =
+                new ControlledProcess(false, false) {
+                    @Override
+                    public Process destroyForcibly() {
+                        Process result = super.destroyForcibly();
+                        if (forcedStopAttempts.incrementAndGet() >= 2) {
+                            markExited();
+                        }
+                        return result;
+                    }
+                };
         ControlledProcess replacementProcess = new ControlledProcess(true, true);
         try {
             System.setProperty("sws.root.path", root.toString());
             ImageInfo.setInImageRuntimeCode(true);
-            RestartTrackingPluginCoreProcessImpl process = new RestartTrackingPluginCoreProcessImpl(
-                    oldProcess, replacementProcess, 0);
-            setField(process, "infoLogFile", Files.createFile(root.resolve("plugin-info.log")).toFile());
-            setField(process, "errorLogFile", Files.createFile(root.resolve("plugin-error.log")).toFile());
+            RestartTrackingPluginCoreProcessImpl process =
+                    new RestartTrackingPluginCoreProcessImpl(oldProcess, replacementProcess, 0);
+            setField(
+                    process,
+                    "infoLogFile",
+                    Files.createFile(root.resolve("plugin-info.log")).toFile());
+            setField(
+                    process,
+                    "errorLogFile",
+                    Files.createFile(root.resolve("plugin-error.log")).toFile());
 
-            process.pluginServerStart("db=ok", "-Xmx64m", root.resolve("static").toString(),
-                    "3.6.0", "token-999");
+            process.pluginServerStart(
+                    "db=ok", "-Xmx64m", root.resolve("static").toString(), "3.6.0", "token-999");
             process.handle.get().run();
 
             assertEquals(2, process.startCount.get());
@@ -859,7 +1064,8 @@ public class PluginCoreProcessImplTest {
     @Test
     public void stopPluginCoreShouldCloseHandleAndRunCallbackOnlyOnce() throws Exception {
         AtomicInteger stopCallbacks = new AtomicInteger();
-        PluginCoreProcessImpl process = new PluginCoreProcessImpl(stopCallbacks::incrementAndGet, "/blog", () -> 19084);
+        PluginCoreProcessImpl process =
+                new PluginCoreProcessImpl(stopCallbacks::incrementAndGet, "/blog", () -> 19084);
         TestPluginCoreProcessHandle handle = new TestPluginCoreProcessHandle();
         Field field = PluginCoreProcessImpl.class.getDeclaredField("pluginCoreProcessHandle");
         field.setAccessible(true);
@@ -875,7 +1081,8 @@ public class PluginCoreProcessImplTest {
     @Test
     public void stopPluginCoreShouldRetryHandleCloseAfterFailure() throws Exception {
         AtomicInteger stopCallbacks = new AtomicInteger();
-        PluginCoreProcessImpl process = new PluginCoreProcessImpl(stopCallbacks::incrementAndGet, "/blog", () -> 19084);
+        PluginCoreProcessImpl process =
+                new PluginCoreProcessImpl(stopCallbacks::incrementAndGet, "/blog", () -> 19084);
         TestPluginCoreProcessHandle handle = new TestPluginCoreProcessHandle(1);
         Field field = PluginCoreProcessImpl.class.getDeclaredField("pluginCoreProcessHandle");
         field.setAccessible(true);
@@ -894,8 +1101,10 @@ public class PluginCoreProcessImplTest {
         final String previousRoot;
         final String previousArch;
         final ControlledProcess child = new ControlledProcess(true, true);
-        final java.util.concurrent.CountDownLatch spawned = new java.util.concurrent.CountDownLatch(1);
-        final java.util.concurrent.CountDownLatch releaseSpawn = new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch spawned =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch releaseSpawn =
+                new java.util.concurrent.CountDownLatch(1);
         final AtomicInteger launches = new AtomicInteger();
         final AtomicReference<Thread> thread = new AtomicReference<>();
         final PluginCoreProcessImpl runtime;
@@ -909,35 +1118,50 @@ public class PluginCoreProcessImplTest {
             previousArch = setFileArch("Linux-x86_64");
             System.setProperty("sws.root.path", root.toString());
             ImageInfo.setInImageRuntimeCode(true);
-            runtime = new PluginCoreProcessImpl(null, "/blog", () -> 19084) {
-                @Override
-                Process startPluginCore(File file, String db, String args, String path, String version,
-                                        String token, int httpPort, int masterPort, int watcherPort) throws IOException {
-                    launches.incrementAndGet();
-                    spawned.countDown();
-                    if (blockSpawn) {
-                        try {
-                            releaseSpawn.await();
-                        } catch (InterruptedException interrupted) {
-                            Thread.currentThread().interrupt();
-                            throw new IOException(interrupted);
+            runtime =
+                    new PluginCoreProcessImpl(null, "/blog", () -> 19084) {
+                        @Override
+                        Process startPluginCore(
+                                File file,
+                                String db,
+                                String args,
+                                String path,
+                                String version,
+                                String token,
+                                int httpPort,
+                                int masterPort,
+                                int watcherPort)
+                                throws IOException {
+                            launches.incrementAndGet();
+                            spawned.countDown();
+                            if (blockSpawn) {
+                                try {
+                                    releaseSpawn.await();
+                                } catch (InterruptedException interrupted) {
+                                    Thread.currentThread().interrupt();
+                                    throw new IOException(interrupted);
+                                }
+                            }
+                            return child;
                         }
-                    }
-                    return child;
-                }
 
-                @Override
-                Thread startPluginCoreHandle(AbstractPluginCoreProcessHandle handle) {
-                    Thread worker = new Thread(handle);
-                    thread.set(worker);
-                    worker.start();
-                    return worker;
-                }
-            };
+                        @Override
+                        Thread startPluginCoreHandle(AbstractPluginCoreProcessHandle handle) {
+                            Thread worker = new Thread(handle);
+                            thread.set(worker);
+                            worker.start();
+                            return worker;
+                        }
+                    };
         }
 
         int start(long budget) {
-            return runtime.pluginServerStart("unused", "-Xmx64m", root.toString(), "test", "fixture-token",
+            return runtime.pluginServerStart(
+                    "unused",
+                    "-Xmx64m",
+                    root.toString(),
+                    "test",
+                    "fixture-token",
                     com.zrlog.util.ExecutionDeadline.afterMillis(budget));
         }
 
@@ -968,8 +1192,7 @@ public class PluginCoreProcessImplTest {
         }
 
         @Override
-        public void run() {
-        }
+        public void run() {}
 
         @Override
         boolean close() {
@@ -984,26 +1207,40 @@ public class PluginCoreProcessImplTest {
         private final int failedWatcherConnections;
         private final int stopAfterWatcherAttempts;
         private final long watcherRetryElapsedMillis;
-        private final AtomicReference<AbstractPluginCoreProcessHandle> handle = new AtomicReference<>();
+        private final AtomicReference<AbstractPluginCoreProcessHandle> handle =
+                new AtomicReference<>();
         private final AtomicInteger startCount = new AtomicInteger();
         private final AtomicInteger watcherCount = new AtomicInteger();
         private final AtomicBoolean oldProcessAliveAtReplacement = new AtomicBoolean();
         private final AtomicLong clockNanos = new AtomicLong();
         private final List<Long> restartDelays = new ArrayList<>();
 
-        RestartTrackingPluginCoreProcessImpl(ControlledProcess oldProcess, ControlledProcess replacementProcess,
-                                             int failedWatcherConnections) {
+        RestartTrackingPluginCoreProcessImpl(
+                ControlledProcess oldProcess,
+                ControlledProcess replacementProcess,
+                int failedWatcherConnections) {
             this(oldProcess, replacementProcess, failedWatcherConnections, Integer.MAX_VALUE);
         }
 
-        RestartTrackingPluginCoreProcessImpl(ControlledProcess oldProcess, ControlledProcess replacementProcess,
-                                             int failedWatcherConnections, int stopAfterWatcherAttempts) {
-            this(oldProcess, replacementProcess, failedWatcherConnections, stopAfterWatcherAttempts, 0L);
+        RestartTrackingPluginCoreProcessImpl(
+                ControlledProcess oldProcess,
+                ControlledProcess replacementProcess,
+                int failedWatcherConnections,
+                int stopAfterWatcherAttempts) {
+            this(
+                    oldProcess,
+                    replacementProcess,
+                    failedWatcherConnections,
+                    stopAfterWatcherAttempts,
+                    0L);
         }
 
-        RestartTrackingPluginCoreProcessImpl(ControlledProcess oldProcess, ControlledProcess replacementProcess,
-                                             int failedWatcherConnections, int stopAfterWatcherAttempts,
-                                             long watcherRetryElapsedMillis) {
+        RestartTrackingPluginCoreProcessImpl(
+                ControlledProcess oldProcess,
+                ControlledProcess replacementProcess,
+                int failedWatcherConnections,
+                int stopAfterWatcherAttempts,
+                long watcherRetryElapsedMillis) {
             super(null, "/blog", () -> 19084);
             this.oldProcess = oldProcess;
             this.replacementProcess = replacementProcess;
@@ -1013,9 +1250,16 @@ public class PluginCoreProcessImplTest {
         }
 
         @Override
-        Process startPluginCore(File pluginCoreFile, String dbProperties, String pluginJvmArgs, String runtimePath,
-                                String runTimeVersion, String token, int randomServerPort,
-                                int pluginMasterPort, int randomWatcherListenPort) {
+        Process startPluginCore(
+                File pluginCoreFile,
+                String dbProperties,
+                String pluginJvmArgs,
+                String runtimePath,
+                String runTimeVersion,
+                String token,
+                int randomServerPort,
+                int pluginMasterPort,
+                int randomWatcherListenPort) {
             if (startCount.incrementAndGet() == 1) {
                 return oldProcess;
             }
@@ -1073,7 +1317,8 @@ public class PluginCoreProcessImplTest {
     }
 
     private static class InitialLaunchRetryPluginCoreProcessImpl extends PluginCoreProcessImpl {
-        private final AtomicReference<AbstractPluginCoreProcessHandle> handle = new AtomicReference<>();
+        private final AtomicReference<AbstractPluginCoreProcessHandle> handle =
+                new AtomicReference<>();
         private final AtomicInteger startCount = new AtomicInteger();
         private final AtomicInteger watcherCount = new AtomicInteger();
         private final List<Long> restartDelays = new ArrayList<>();
@@ -1087,9 +1332,17 @@ public class PluginCoreProcessImplTest {
         }
 
         @Override
-        Process startPluginCore(File pluginCoreFile, String dbProperties, String pluginJvmArgs, String runtimePath,
-                                String runTimeVersion, String token, int randomServerPort, int pluginMasterPort,
-                                int randomWatcherListenPort) throws IOException {
+        Process startPluginCore(
+                File pluginCoreFile,
+                String dbProperties,
+                String pluginJvmArgs,
+                String runtimePath,
+                String runTimeVersion,
+                String token,
+                int randomServerPort,
+                int pluginMasterPort,
+                int randomWatcherListenPort)
+                throws IOException {
             int attempt = startCount.incrementAndGet();
             serverPorts.add(randomServerPort);
             masterPorts.add(pluginMasterPort);
@@ -1105,7 +1358,9 @@ public class PluginCoreProcessImplTest {
 
         @Override
         int nextPluginMasterPort(int previousPort) {
-            return previousPort < PLUGIN_MASTER_PORT_MIN ? PLUGIN_MASTER_PORT_MIN : previousPort + 1;
+            return previousPort < PLUGIN_MASTER_PORT_MIN
+                    ? PLUGIN_MASTER_PORT_MIN
+                    : previousPort + 1;
         }
 
         @Override
@@ -1121,8 +1376,7 @@ public class PluginCoreProcessImplTest {
         }
 
         @Override
-        void pauseAfterPluginGhostWatcher() {
-        }
+        void pauseAfterPluginGhostWatcher() {}
 
         @Override
         void pauseBeforePluginCoreRestart(long millis) {
@@ -1136,22 +1390,31 @@ public class PluginCoreProcessImplTest {
         }
     }
 
-    private static class RecoverableWatcherFailurePluginCoreProcessImpl extends PluginCoreProcessImpl {
-        private final AtomicReference<AbstractPluginCoreProcessHandle> handle = new AtomicReference<>();
+    private static class RecoverableWatcherFailurePluginCoreProcessImpl
+            extends PluginCoreProcessImpl {
+        private final AtomicReference<AbstractPluginCoreProcessHandle> handle =
+                new AtomicReference<>();
         private final AtomicInteger startCount = new AtomicInteger();
         private final AtomicInteger watcherCount = new AtomicInteger();
         private final List<Long> restartDelays = new ArrayList<>();
-        private final List<ControlledProcess> processes = List.of(
-                new ControlledProcess(true, true), new ControlledProcess(true, true));
+        private final List<ControlledProcess> processes =
+                List.of(new ControlledProcess(true, true), new ControlledProcess(true, true));
 
         private RecoverableWatcherFailurePluginCoreProcessImpl() {
             super(null, "/blog", () -> 19084);
         }
 
         @Override
-        Process startPluginCore(File pluginCoreFile, String dbProperties, String pluginJvmArgs, String runtimePath,
-                                String runTimeVersion, String token, int randomServerPort, int pluginMasterPort,
-                                int randomWatcherListenPort) {
+        Process startPluginCore(
+                File pluginCoreFile,
+                String dbProperties,
+                String pluginJvmArgs,
+                String runtimePath,
+                String runTimeVersion,
+                String token,
+                int randomServerPort,
+                int pluginMasterPort,
+                int randomWatcherListenPort) {
             return processes.get(startCount.getAndIncrement());
         }
 
@@ -1170,8 +1433,7 @@ public class PluginCoreProcessImplTest {
         }
 
         @Override
-        void pauseAfterPluginGhostWatcher() {
-        }
+        void pauseAfterPluginGhostWatcher() {}
 
         @Override
         void pauseBeforePluginCoreRestart(long millis) {
@@ -1261,7 +1523,8 @@ public class PluginCoreProcessImplTest {
         private final long[] runtimesBeforeCrashMillis;
         private final int restartLaunchFailures;
         private final List<ControlledProcess> processes = new ArrayList<>();
-        private final AtomicReference<AbstractPluginCoreProcessHandle> handle = new AtomicReference<>();
+        private final AtomicReference<AbstractPluginCoreProcessHandle> handle =
+                new AtomicReference<>();
         private final AtomicReference<ControlledProcess> currentProcess = new AtomicReference<>();
         private final AtomicInteger startCount = new AtomicInteger();
         private final AtomicInteger watcherCount = new AtomicInteger();
@@ -1277,16 +1540,18 @@ public class PluginCoreProcessImplTest {
             this(false, 0, runtimesBeforeCrashMillis);
         }
 
-        private CrashLoopPluginCoreProcessImpl(boolean runAsync, long... runtimesBeforeCrashMillis) {
+        private CrashLoopPluginCoreProcessImpl(
+                boolean runAsync, long... runtimesBeforeCrashMillis) {
             this(runAsync, 0, runtimesBeforeCrashMillis);
         }
 
-        private CrashLoopPluginCoreProcessImpl(int restartLaunchFailures, long... runtimesBeforeCrashMillis) {
+        private CrashLoopPluginCoreProcessImpl(
+                int restartLaunchFailures, long... runtimesBeforeCrashMillis) {
             this(false, restartLaunchFailures, runtimesBeforeCrashMillis);
         }
 
-        private CrashLoopPluginCoreProcessImpl(boolean runAsync, int restartLaunchFailures,
-                                               long... runtimesBeforeCrashMillis) {
+        private CrashLoopPluginCoreProcessImpl(
+                boolean runAsync, int restartLaunchFailures, long... runtimesBeforeCrashMillis) {
             super(null, "/blog", () -> 19084);
             this.runAsync = runAsync;
             this.restartLaunchFailures = restartLaunchFailures;
@@ -1297,9 +1562,17 @@ public class PluginCoreProcessImplTest {
         }
 
         @Override
-        Process startPluginCore(File pluginCoreFile, String dbProperties, String pluginJvmArgs, String runtimePath,
-                                String runTimeVersion, String token, int randomServerPort,
-                                int pluginMasterPort, int randomWatcherListenPort) throws IOException {
+        Process startPluginCore(
+                File pluginCoreFile,
+                String dbProperties,
+                String pluginJvmArgs,
+                String runtimePath,
+                String runTimeVersion,
+                String token,
+                int randomServerPort,
+                int pluginMasterPort,
+                int randomWatcherListenPort)
+                throws IOException {
             int currentStart = startCount.getAndIncrement();
             masterPorts.add(pluginMasterPort);
             if (currentStart > 0 && currentStart <= restartLaunchFailures) {
@@ -1317,8 +1590,9 @@ public class PluginCoreProcessImplTest {
                 public boolean doWatch() {
                     int currentWatcher = watcherCount.getAndIncrement();
                     if (currentWatcher < runtimesBeforeCrashMillis.length) {
-                        clockNanos.addAndGet(TimeUnit.MILLISECONDS.toNanos(
-                                runtimesBeforeCrashMillis[currentWatcher]));
+                        clockNanos.addAndGet(
+                                TimeUnit.MILLISECONDS.toNanos(
+                                        runtimesBeforeCrashMillis[currentWatcher]));
                         currentProcess.get().markExited();
                         return true;
                     }
@@ -1329,8 +1603,7 @@ public class PluginCoreProcessImplTest {
         }
 
         @Override
-        void pauseAfterPluginGhostWatcher() {
-        }
+        void pauseAfterPluginGhostWatcher() {}
 
         @Override
         long monotonicTimeNanos() {
@@ -1362,21 +1635,39 @@ public class PluginCoreProcessImplTest {
 
     private static class TestablePluginCoreProcessImpl extends PluginCoreProcessImpl {
         private final Path launchMarker;
-        private final AtomicReference<AbstractPluginCoreProcessHandle> handle = new AtomicReference<>();
+        private final AtomicReference<AbstractPluginCoreProcessHandle> handle =
+                new AtomicReference<>();
         private final AtomicInteger handleStartCount = new AtomicInteger();
         private final AtomicInteger watcherCount = new AtomicInteger();
 
-        TestablePluginCoreProcessImpl(Runnable onStopRunnable, String contextPath, Path launchMarker) {
+        TestablePluginCoreProcessImpl(
+                Runnable onStopRunnable, String contextPath, Path launchMarker) {
             super(onStopRunnable, contextPath, () -> 19084);
             this.launchMarker = launchMarker;
         }
 
         @Override
-        Process startPluginCore(File pluginCoreFile, String dbProperties, String pluginJvmArgs, String runtimePath,
-                                String runTimeVersion, String token, int randomServerPort, int pluginMasterPort,
-                                int randomWatcherListenPort) throws IOException {
-            Files.writeString(launchMarker, "launch " + randomServerPort + " " + pluginMasterPort + " "
-                    + randomWatcherListenPort + "\n", StandardCharsets.UTF_8);
+        Process startPluginCore(
+                File pluginCoreFile,
+                String dbProperties,
+                String pluginJvmArgs,
+                String runtimePath,
+                String runTimeVersion,
+                String token,
+                int randomServerPort,
+                int pluginMasterPort,
+                int randomWatcherListenPort)
+                throws IOException {
+            Files.writeString(
+                    launchMarker,
+                    "launch "
+                            + randomServerPort
+                            + " "
+                            + pluginMasterPort
+                            + " "
+                            + randomWatcherListenPort
+                            + "\n",
+                    StandardCharsets.UTF_8);
             return new ControlledProcess(true, true);
         }
 
@@ -1387,7 +1678,9 @@ public class PluginCoreProcessImplTest {
                 public boolean doWatch() {
                     watcherCount.incrementAndGet();
                     try {
-                        assertTrue("plugin-core launch marker was not written", awaitNonEmptyFile(launchMarker));
+                        assertTrue(
+                                "plugin-core launch marker was not written",
+                                awaitNonEmptyFile(launchMarker));
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         return false;
@@ -1399,8 +1692,7 @@ public class PluginCoreProcessImplTest {
         }
 
         @Override
-        void pauseAfterPluginGhostWatcher() {
-        }
+        void pauseAfterPluginGhostWatcher() {}
 
         @Override
         Thread startPluginCoreHandle(AbstractPluginCoreProcessHandle handle) {
@@ -1409,6 +1701,4 @@ public class PluginCoreProcessImplTest {
             return new Thread(handle, "captured-plugin-core-thread");
         }
     }
-
-
 }

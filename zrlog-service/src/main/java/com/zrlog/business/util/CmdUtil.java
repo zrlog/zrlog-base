@@ -4,7 +4,6 @@ import com.hibegin.common.util.IOUtil;
 import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.RuntimeMessage;
 import com.hibegin.common.util.SystemType;
-
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -33,10 +32,11 @@ public class CmdUtil {
             for (int i = 2; i < cons.length; i++) {
                 content = cons[i];
                 StringBuilder nContext = new StringBuilder();
-                //format
+                // format
                 for (int j = 0; j < content.length(); j++) {
                     if (j > 0) {
-                        if (content.charAt(j) == ' ' && content.charAt(j) == content.charAt(j - 1)) {
+                        if (content.charAt(j) == ' '
+                                && content.charAt(j) == content.charAt(j - 1)) {
                             continue;
                         }
                     }
@@ -61,7 +61,9 @@ public class CmdUtil {
                     }
                     if (port == tempPort) {
                         LOGGER.fine(nContext.toString());
-                        if (systemType == SystemType.LINUX && strings.length > 6 && strings[6].contains("/")) {
+                        if (systemType == SystemType.LINUX
+                                && strings.length > 6
+                                && strings[6].contains("/")) {
                             String procMsg = strings[6];
                             return Integer.parseInt(procMsg.substring(0, strings[6].indexOf("/")));
                         }

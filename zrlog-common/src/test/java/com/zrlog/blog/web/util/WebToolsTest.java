@@ -1,15 +1,14 @@
 package com.zrlog.blog.web.util;
 
-import com.hibegin.http.server.api.HttpRequest;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
+import com.hibegin.http.server.api.HttpRequest;
 import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import org.junit.Test;
 
 public class WebToolsTest {
 
@@ -67,42 +66,50 @@ public class WebToolsTest {
     @Test
     public void shouldBuildEncodedUrl() {
         assertEquals("/a%20b", WebTools.buildEncodedUrl(null, "/a b"));
-        assertEquals("/blog/post%201", WebTools.buildEncodedUrl(request(new HashMap<>(), "127.0.0.1", "/blog"), "/post 1"));
-        assertEquals("/blog/post%202", WebTools.buildEncodedUrl(request(new HashMap<>(), "127.0.0.1", "/blog"), "post 2"));
+        assertEquals(
+                "/blog/post%201",
+                WebTools.buildEncodedUrl(
+                        request(new HashMap<>(), "127.0.0.1", "/blog"), "/post 1"));
+        assertEquals(
+                "/blog/post%202",
+                WebTools.buildEncodedUrl(request(new HashMap<>(), "127.0.0.1", "/blog"), "post 2"));
     }
 
     @Test
     public void shouldHtmlEncodeSpecialCharacters() {
         assertEquals("", WebTools.htmlEncode(null));
-        assertEquals("&lt;div title=&quot;a&amp;b&quot;&gt;", WebTools.htmlEncode("<div title=\"a&b\">"));
+        assertEquals(
+                "&lt;div title=&quot;a&amp;b&quot;&gt;",
+                WebTools.htmlEncode("<div title=\"a&b\">"));
     }
 
     private HttpRequest request(Map<String, String> headers, String remoteHost) {
         return request(headers, remoteHost, "/");
     }
 
-    private HttpRequest request(Map<String, String> headers, String remoteHost, String contextPath) {
-        return (HttpRequest) Proxy.newProxyInstance(
-                getClass().getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getHeader".equals(method.getName())) {
-                        return headers.get((String) args[0]);
-                    }
-                    if ("getHeaderMap".equals(method.getName())) {
-                        return headers;
-                    }
-                    if ("getRemoteHost".equals(method.getName())) {
-                        return remoteHost;
-                    }
-                    if ("getContextPath".equals(method.getName())) {
-                        return contextPath;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                }
-        );
+    private HttpRequest request(
+            Map<String, String> headers, String remoteHost, String contextPath) {
+        return (HttpRequest)
+                Proxy.newProxyInstance(
+                        getClass().getClassLoader(),
+                        new Class[] {HttpRequest.class},
+                        (proxy, method, args) -> {
+                            if ("getHeader".equals(method.getName())) {
+                                return headers.get((String) args[0]);
+                            }
+                            if ("getHeaderMap".equals(method.getName())) {
+                                return headers;
+                            }
+                            if ("getRemoteHost".equals(method.getName())) {
+                                return remoteHost;
+                            }
+                            if ("getContextPath".equals(method.getName())) {
+                                return contextPath;
+                            }
+                            if ("toString".equals(method.getName())) {
+                                return "HttpRequestProxy";
+                            }
+                            return null;
+                        });
     }
 }

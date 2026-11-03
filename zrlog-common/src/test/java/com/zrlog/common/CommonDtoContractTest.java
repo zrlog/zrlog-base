@@ -1,5 +1,8 @@
 package com.zrlog.common;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import com.zrlog.business.type.TemplateType;
 import com.zrlog.common.cache.dto.*;
 import com.zrlog.common.cache.vo.Archive;
@@ -11,15 +14,11 @@ import com.zrlog.common.rest.response.ApiStandardResponse;
 import com.zrlog.common.rest.response.StandardResponse;
 import com.zrlog.common.updater.UpgradeProgressEvent;
 import com.zrlog.common.vo.*;
-import org.junit.Test;
-
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import org.junit.Test;
 
 public class CommonDtoContractTest {
 
@@ -123,7 +122,7 @@ public class CommonDtoContractTest {
         return constructor.newInstance();
     }
 
-    //TODO: Add fixture-backed tests for FaaS/Lambda update clients, updater implementations,
+    // TODO: Add fixture-backed tests for FaaS/Lambda update clients, updater implementations,
     // resource loaders, and web interceptors once those paths can avoid real HTTP/process state.
     @Test
     public void shouldExposeDtoBeanProperties() throws Exception {
@@ -186,13 +185,16 @@ public class CommonDtoContractTest {
 
     @Test
     public void shouldBuildUpgradeProgressEventPayloads() {
-        UpgradeProgressEvent.Data running = UpgradeProgressEvent.data(UpgradeProgressEvent.STAGE_DOWNLOAD, "Downloading");
-        UpgradeProgressEvent.Data complete = UpgradeProgressEvent.data(
-                UpgradeProgressEvent.STAGE_COMPLETE,
-                UpgradeProgressEvent.STATUS_COMPLETE,
-                null,
-                "done");
-        UpgradeProgressEvent.Data blankDetail = UpgradeProgressEvent.data("stage", "status", "message", " ");
+        UpgradeProgressEvent.Data running =
+                UpgradeProgressEvent.data(UpgradeProgressEvent.STAGE_DOWNLOAD, "Downloading");
+        UpgradeProgressEvent.Data complete =
+                UpgradeProgressEvent.data(
+                        UpgradeProgressEvent.STAGE_COMPLETE,
+                        UpgradeProgressEvent.STATUS_COMPLETE,
+                        null,
+                        "done");
+        UpgradeProgressEvent.Data blankDetail =
+                UpgradeProgressEvent.data("stage", "status", "message", " ");
 
         assertEquals(UpgradeProgressEvent.EVENT, "upgrade-progress");
         assertEquals(UpgradeProgressEvent.STAGE_DOWNLOAD, running.getStage());

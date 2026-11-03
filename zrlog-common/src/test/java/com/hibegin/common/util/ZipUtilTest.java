@@ -1,6 +1,6 @@
 package com.hibegin.common.util;
 
-import org.junit.Test;
+import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -12,8 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class ZipUtilTest {
 
@@ -28,7 +27,10 @@ public class ZipUtilTest {
         File zip = new File(root, "archive.zip");
         File target = new File(root, "target");
 
-        ZipUtil.inZip(Collections.singletonList(sourceFile), root.getAbsolutePath() + File.separator, zip.getAbsolutePath());
+        ZipUtil.inZip(
+                Collections.singletonList(sourceFile),
+                root.getAbsolutePath() + File.separator,
+                zip.getAbsolutePath());
         ZipUtil.unZip(zip.getAbsolutePath(), target.getAbsolutePath());
 
         assertEquals("content", Files.readString(new File(target, "source/a.txt").toPath()));
@@ -40,7 +42,8 @@ public class ZipUtilTest {
         File sourceDir = new File(root, "source");
         File nested = new File(sourceDir, "nested");
         assertTrue(nested.mkdirs());
-        Files.writeString(new File(nested, "b.txt").toPath(), "nested-content", StandardCharsets.UTF_8);
+        Files.writeString(
+                new File(nested, "b.txt").toPath(), "nested-content", StandardCharsets.UTF_8);
         File zip = new File(root, "archive.zip");
         File target = new File(root, "target");
         List<File> files = new ArrayList<>();
@@ -49,10 +52,13 @@ public class ZipUtilTest {
         ZipUtil.inZip(files, root.getAbsolutePath() + File.separator, zip.getAbsolutePath());
         ZipUtil.unZip(zip.getAbsolutePath(), target.getAbsolutePath());
 
-        assertEquals("nested-content", Files.readString(new File(target, "source/nested/b.txt").toPath()));
+        assertEquals(
+                "nested-content",
+                Files.readString(new File(target, "source/nested/b.txt").toPath()));
 
         File zipWithDirectoryEntry = new File(root, "directory-entry.zip");
-        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipWithDirectoryEntry))) {
+        try (ZipOutputStream zos =
+                new ZipOutputStream(new FileOutputStream(zipWithDirectoryEntry))) {
             zos.putNextEntry(new ZipEntry("empty-dir/"));
             zos.closeEntry();
         }
@@ -70,8 +76,13 @@ public class ZipUtilTest {
             zos.closeEntry();
         }
 
-        IOException exception = assertThrows(IOException.class,
-                () -> ZipUtil.unZip(zip.getAbsolutePath(), new File(root, "target").getAbsolutePath()));
+        IOException exception =
+                assertThrows(
+                        IOException.class,
+                        () ->
+                                ZipUtil.unZip(
+                                        zip.getAbsolutePath(),
+                                        new File(root, "target").getAbsolutePath()));
 
         assertTrue(exception.getMessage().contains("Unsafe zip entry"));
     }

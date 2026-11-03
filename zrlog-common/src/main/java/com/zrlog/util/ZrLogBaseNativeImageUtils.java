@@ -16,20 +16,25 @@ import com.zrlog.common.cache.vo.HotTypeLogInfo;
 import com.zrlog.common.json.JsonObjectMapAdapter;
 import com.zrlog.common.updater.UpgradeProgressEvent;
 import com.zrlog.common.vo.*;
-import org.apache.commons.dbutils.BasicRowProcessor;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.*;
+import org.apache.commons.dbutils.BasicRowProcessor;
 
 public class ZrLogBaseNativeImageUtils {
 
     private static String getWindowsExecutablePath() {
         try {
-            Process process = Runtime.getRuntime().exec("cmd /c wmic process where processid=" + Pid.get() + " get ExecutablePath");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            Process process =
+                    Runtime.getRuntime()
+                            .exec(
+                                    "cmd /c wmic process where processid="
+                                            + Pid.get()
+                                            + " get ExecutablePath");
+            BufferedReader reader =
+                    new BufferedReader(new InputStreamReader(process.getInputStream()));
             reader.readLine(); // Skip the header line
             String executablePath = reader.readLine(); // The second line is the executable path
             if (StringUtils.isEmpty(executablePath)) {
@@ -79,23 +84,37 @@ public class ZrLogBaseNativeImageUtils {
         NativeImageUtils.doResourceLoadByResourceNames(resourceFiles);
         //
         NativeImageUtils.gsonNativeAgentByClazz(gsonClasses());
-        //freemarker
-        regWithGetMethod(TypeDTO.class,
-                LinkDTO.class, LogNavDTO.class, TagDTO.class, PluginDTO.class,
-                BaseDataInitVO.class, BaseDataInitVO.Statistics.class,
-                HotLogBasicInfoEntry.class, PageData.class, HotTypeLogInfo.class,
-                Version.class, Archive.class, Outline.class,
-                PublicWebSiteInfo.class, UserBasicDTO.class, SocialPreviewDTO.class,
+        // freemarker
+        regWithGetMethod(
+                TypeDTO.class,
+                LinkDTO.class,
+                LogNavDTO.class,
+                TagDTO.class,
+                PluginDTO.class,
+                BaseDataInitVO.class,
+                BaseDataInitVO.Statistics.class,
+                HotLogBasicInfoEntry.class,
+                PageData.class,
+                HotTypeLogInfo.class,
+                Version.class,
+                Archive.class,
+                Outline.class,
+                PublicWebSiteInfo.class,
+                UserBasicDTO.class,
+                SocialPreviewDTO.class,
                 UpgradeProgressEvent.Data.class);
 
-        //register version update
+        // register version update
         for (int i = 1; i <= UpgradeVersionHandler.SQL_VERSION; i++) {
             UpgradeVersionHandlerHelpers.getUpgradeVersionHandler(i);
         }
     }
 
     static List<Class<?>> gsonClasses() {
-        return Arrays.asList(LockVO.class, I18nVO.class, Version.DownloadSource.class,
+        return Arrays.asList(
+                LockVO.class,
+                I18nVO.class,
+                Version.DownloadSource.class,
                 com.zrlog.common.updater.docker.DockerUpdaterProtocol.Image.class,
                 com.zrlog.common.updater.docker.DockerUpdaterProtocol.ErrorResponse.class,
                 com.zrlog.common.updater.docker.DockerUpdaterProtocol.Capabilities.class,

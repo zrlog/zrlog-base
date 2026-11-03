@@ -4,13 +4,10 @@ import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.common.cache.dto.LinkDTO;
 import com.zrlog.model.Link;
 import jakarta.inject.Inject;
-
 import java.sql.SQLException;
 import java.util.List;
 
-/**
- * 存放程序的友情链接，对应数据库 link 表
- */
+/** 存放程序的友情链接，对应数据库 link 表 */
 public class LinkRepository extends BaseRepository<Link, Long> {
 
     @Inject
@@ -19,6 +16,10 @@ public class LinkRepository extends BaseRepository<Link, Long> {
     }
 
     public List<LinkDTO> findAll() throws SQLException {
-        return queryList("select linkName,linkId as id,sort,url,alt,icon from " + tableName + " order by sort", LinkDTO.class);
+        return queryList(
+                "select linkName,linkId as id,sort,url,alt,icon from "
+                        + tableName
+                        + " order by sort",
+                LinkDTO.class);
     }
 }

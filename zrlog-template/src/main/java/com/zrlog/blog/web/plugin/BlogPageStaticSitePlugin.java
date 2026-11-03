@@ -14,7 +14,6 @@ import com.zrlog.common.Constants;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.common.vo.TemplateVO;
 import com.zrlog.data.dto.FaviconBase64DTO;
-
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -76,7 +75,10 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
 
     private void refreshFavicon() {
         FaviconBase64DTO faviconBase64DTO = faviconSource.get();
-        faviconHandle(faviconBase64DTO.getFavicon_ico_base64(), favicon, ResultValueConvertUtils.toBoolean(faviconBase64DTO.getGenerator_html_status()));
+        faviconHandle(
+                faviconBase64DTO.getFavicon_ico_base64(),
+                favicon,
+                ResultValueConvertUtils.toBoolean(faviconBase64DTO.getGenerator_html_status()));
     }
 
     private void handleRobotsTxt(PublicWebSiteInfo webSite) {
@@ -115,9 +117,12 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
     }
 
     private void copyAssetsFiles() {
-        BlogResourceUtils.getInstance().searchResources("assets/").forEach(e -> {
-            copyResourceToCacheFolder("/" + e);
-        });
+        BlogResourceUtils.getInstance()
+                .searchResources("assets/")
+                .forEach(
+                        e -> {
+                            copyResourceToCacheFolder("/" + e);
+                        });
     }
 
     private void copyFaviconFile() {
@@ -130,7 +135,7 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
             }
             return;
         }
-        //favicon
+        // favicon
         copyResourceToCacheFolder(favicon);
     }
 
@@ -140,22 +145,45 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
             return;
         }
         if (templateVO.isClasspathTemplate()) {
-            templateVO.getStaticResources().forEach(e -> {
-                List<String> searchResources = BlogResourceUtils.getInstance().searchResources(templatePath.substring(1) + "/" + e).stream().filter(x -> !x.endsWith(".styl")).collect(Collectors.toList());
-                searchResources.forEach(x -> copyResourceToCacheFolder("/" + x));
-            });
+            templateVO
+                    .getStaticResources()
+                    .forEach(
+                            e -> {
+                                List<String> searchResources =
+                                        BlogResourceUtils.getInstance()
+                                                .searchResources(
+                                                        templatePath.substring(1) + "/" + e)
+                                                .stream()
+                                                .filter(x -> !x.endsWith(".styl"))
+                                                .collect(Collectors.toList());
+                                searchResources.forEach(x -> copyResourceToCacheFolder("/" + x));
+                            });
         } else {
-            templateVO.getStaticResources().forEach(e -> {
-                List<File> files = new ArrayList<>();
-                FileUtils.getAllFiles(PathUtil.getStaticFile(templateVO.getTemplate() + "/" + e).toString(), files);
-                for (File file : files) {
-                    try {
-                        saveToCacheFolder(new FileInputStream(file), file.toString().substring(PathUtil.getStaticPath().length()));
-                    } catch (FileNotFoundException ex) {
-                        LOGGER.warning("Handle " + file + " resource error: " + ex.getMessage());
-                    }
-                }
-            });
+            templateVO
+                    .getStaticResources()
+                    .forEach(
+                            e -> {
+                                List<File> files = new ArrayList<>();
+                                FileUtils.getAllFiles(
+                                        PathUtil.getStaticFile(templateVO.getTemplate() + "/" + e)
+                                                .toString(),
+                                        files);
+                                for (File file : files) {
+                                    try {
+                                        saveToCacheFolder(
+                                                new FileInputStream(file),
+                                                file.toString()
+                                                        .substring(
+                                                                PathUtil.getStaticPath().length()));
+                                    } catch (FileNotFoundException ex) {
+                                        LOGGER.warning(
+                                                "Handle "
+                                                        + file
+                                                        + " resource error: "
+                                                        + ex.getMessage());
+                                    }
+                                }
+                            });
         }
     }
 
@@ -180,11 +208,13 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
         copyFaviconFile();
         copyTemplateAssets(webSite.getTemplate());
         handleStatusPageMap.clear();
-        //从首页开始查找
+        // 从首页开始查找
         handleStatusPageMap.put(contextPath + "/", HandleState.NEW);
-        //生成 404 页面，用于配置第三方 cdn，或者云存储的错误页面
+        // 生成 404 页面，用于配置第三方 cdn，或者云存储的错误页面
         handleStatusPageMap.put(notFindFile(), HandleState.NEW);
-        saveToCacheFolder(new ByteArrayInputStream(("/* " + notFindFile() + " 404").getBytes()), "/_redirects");
+        saveToCacheFolder(
+                new ByteArrayInputStream(("/* " + notFindFile() + " 404").getBytes()),
+                "/_redirects");
         doFetch(renderer);
     }
 
@@ -211,8 +241,11 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
             cacheFiles.clear();
             PublicWebSiteInfo webSite = site.get();
             FaviconBase64DTO icon = faviconSource.get();
-            faviconWithinBudget(icon.getFavicon_ico_base64(), favicon,
-                    ResultValueConvertUtils.toBoolean(icon.getGenerator_html_status()), budget);
+            faviconWithinBudget(
+                    icon.getFavicon_ico_base64(),
+                    favicon,
+                    ResultValueConvertUtils.toBoolean(icon.getGenerator_html_status()),
+                    budget);
             String robots = webSite.getRobotRuleContent();
             if (!StringUtils.isEmpty(robots)) {
                 budget.check();
@@ -224,15 +257,20 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
             for (String asset : BlogResourceUtils.getInstance().searchResources("assets/"))
                 copyResourceWithinBudget("/" + asset, budget);
             File iconFile = PathUtil.getStaticFile(favicon);
-            if (iconFile.exists()) saveToCacheFolderWithinBudget(new FileInputStream(iconFile), favicon, budget);
+            if (iconFile.exists())
+                saveToCacheFolderWithinBudget(new FileInputStream(iconFile), favicon, budget);
             else copyResourceWithinBudget(favicon, budget);
             copyTemplateWithinBudget(webSite.getTemplate(), budget);
             budget.check();
             handleStatusPageMap.clear();
             handleStatusPageMap.put(contextPath + "/", HandleState.NEW);
             handleStatusPageMap.put(notFindFile(), HandleState.NEW);
-            saveToCacheFolderWithinBudget(new ByteArrayInputStream(("/* " + notFindFile() + " 404")
-                    .getBytes(java.nio.charset.StandardCharsets.UTF_8)), "/_redirects", budget);
+            saveToCacheFolderWithinBudget(
+                    new ByteArrayInputStream(
+                            ("/* " + notFindFile() + " 404")
+                                    .getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                    "/_redirects",
+                    budget);
             doFetchWithinBudget(renderer, budget);
             return true;
         } finally {
@@ -240,17 +278,21 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
         }
     }
 
-    private void copyTemplateWithinBudget(String templatePath, StaticGenerationBudget budget) throws Exception {
+    private void copyTemplateWithinBudget(String templatePath, StaticGenerationBudget budget)
+            throws Exception {
         budget.check();
         TemplateVO template = TemplateInfoHelper.loadTemplateVO(templatePath);
         if (template == null) throw new IllegalStateException("Static template is unavailable");
         for (String resource : template.getStaticResources()) {
             budget.check();
             if (template.isClasspathTemplate()) {
-                for (String name : BlogResourceUtils.getInstance().searchResources(templatePath.substring(1) + "/" + resource))
+                for (String name :
+                        BlogResourceUtils.getInstance()
+                                .searchResources(templatePath.substring(1) + "/" + resource))
                     if (!name.endsWith(".styl")) copyResourceWithinBudget("/" + name, budget);
             } else {
-                java.nio.file.Path root = PathUtil.getStaticFile(template.getTemplate() + "/" + resource).toPath();
+                java.nio.file.Path root =
+                        PathUtil.getStaticFile(template.getTemplate() + "/" + resource).toPath();
                 if (!java.nio.file.Files.exists(root)) continue;
                 try (var files = java.nio.file.Files.walk(root)) {
                     var iterator = files.iterator();
@@ -258,8 +300,10 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
                         budget.check();
                         java.nio.file.Path file = iterator.next();
                         if (java.nio.file.Files.isRegularFile(file))
-                            saveToCacheFolderWithinBudget(new FileInputStream(file.toFile()),
-                                    file.toString().substring(PathUtil.getStaticPath().length()), budget);
+                            saveToCacheFolderWithinBudget(
+                                    new FileInputStream(file.toFile()),
+                                    file.toString().substring(PathUtil.getStaticPath().length()),
+                                    budget);
                     }
                 }
             }

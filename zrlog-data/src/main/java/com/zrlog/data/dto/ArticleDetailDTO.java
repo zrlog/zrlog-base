@@ -1,7 +1,6 @@
 package com.zrlog.data.dto;
 
 import com.zrlog.common.vo.Outline;
-
 import java.util.List;
 
 public class ArticleDetailDTO extends ArticleBasicDTO {

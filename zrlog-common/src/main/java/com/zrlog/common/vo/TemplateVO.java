@@ -25,9 +25,7 @@ public class TemplateVO extends BaseTemplateVO {
         this.staticResources = staticResources;
     }
 
-    public static class TemplateConfigMap extends LinkedHashMap<String, TemplateConfigVO> {
-
-    }
+    public static class TemplateConfigMap extends LinkedHashMap<String, TemplateConfigVO> {}
 
     public static class TemplateConfigVO {
 
@@ -95,5 +93,4 @@ public class TemplateVO extends BaseTemplateVO {
             this.previewValue = previewValue;
         }
     }
-
 }

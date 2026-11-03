@@ -6,18 +6,16 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.Comparator;
 
-/**
- * Filesystem and command-line support for local memory applications, never an installer.
- */
+/** Filesystem and command-line support for local memory applications, never an installer. */
 public final class MemoryRuntime {
 
-    private MemoryRuntime() {
-    }
+    private MemoryRuntime() {}
 
     public static Path projectRoot() {
         Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
-        for (Path candidate : new Path[]{current, current.getParent()}) {
-            if (candidate != null && Files.isRegularFile(candidate.resolve("conf/memory-install.json"))) {
+        for (Path candidate : new Path[] {current, current.getParent()}) {
+            if (candidate != null
+                    && Files.isRegularFile(candidate.resolve("conf/memory-install.json"))) {
                 return candidate;
             }
         }
@@ -32,9 +30,7 @@ public final class MemoryRuntime {
         return properties;
     }
 
-    /**
-     * Only the reserved child directory is cleared; symbolic links are never traversed.
-     */
+    /** Only the reserved child directory is cleared; symbolic links are never traversed. */
     public static Path reset(Path projectRoot) throws IOException {
         Path root = projectRoot.toRealPath().resolve(".zrlog-memory");
         if (Files.isSymbolicLink(root)) {
@@ -42,7 +38,9 @@ public final class MemoryRuntime {
         }
         if (Files.exists(root, LinkOption.NOFOLLOW_LINKS)) {
             try (var paths = Files.walk(root)) {
-                for (Path path : paths.sorted(Comparator.reverseOrder()).collect(java.util.stream.Collectors.toList())) {
+                for (Path path :
+                        paths.sorted(Comparator.reverseOrder())
+                                .collect(java.util.stream.Collectors.toList())) {
                     Files.delete(path);
                 }
             }
@@ -61,7 +59,8 @@ public final class MemoryRuntime {
                 }
             }
         }
-        if (port < 1 || port > 65535) throw new IllegalArgumentException("Port must be between 1 and 65535");
+        if (port < 1 || port > 65535)
+            throw new IllegalArgumentException("Port must be between 1 and 65535");
         return port;
     }
 }

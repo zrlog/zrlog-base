@@ -1,15 +1,12 @@
 package com.zrlog.business.rest.response;
 
-
 import com.zrlog.common.vo.Version;
-
 import java.io.Serializable;
 
 public class CheckVersionResponse implements Serializable {
 
     private Boolean upgrade;
     private Version version;
-
 
     public Boolean getUpgrade() {
         return upgrade;

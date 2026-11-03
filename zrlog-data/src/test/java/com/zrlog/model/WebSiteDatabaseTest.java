@@ -1,18 +1,17 @@
 package com.zrlog.model;
 
+import static org.junit.Assert.*;
+
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.dto.FaviconBase64DTO;
 import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
+import java.util.List;
+import java.util.Map;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-
-import java.util.List;
-import java.util.Map;
-
-import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class WebSiteDatabaseTest {
@@ -37,7 +36,8 @@ public class WebSiteDatabaseTest {
             assertTrue(webSite.updateByKV("rows", "20"));
             assertTrue(webSite.updateByKV("title", "ZrLog Updated"));
 
-            Map<String, Object> values = webSite.getWebSiteByNameIn(List.of("title", "rows", "missing"));
+            Map<String, Object> values =
+                    webSite.getWebSiteByNameIn(List.of("title", "rows", "missing"));
 
             assertEquals("ZrLog Updated", values.get("title"));
             assertEquals("20", values.get("rows"));
@@ -60,8 +60,9 @@ public class WebSiteDatabaseTest {
             webSite.updateByKV("favicon_png_pwa_192_base64", "png192");
             webSite.updateByKV("favicon_png_pwa_512_base64", "png512");
 
-            Map<String, Object> config = webSite.updateTemplateConfigMap("default",
-                    Map.of("color", "blue", "nested", Map.of("enabled", true)));
+            Map<String, Object> config =
+                    webSite.updateTemplateConfigMap(
+                            "default", Map.of("color", "blue", "nested", Map.of("enabled", true)));
             PublicWebSiteInfo publicInfo = webSite.getPublicWebSite();
             FaviconBase64DTO favicon = webSite.faviconBase64DTO();
             Map<String, Object> storedConfig = webSite.getTemplateConfigMap("default");
@@ -74,7 +75,9 @@ public class WebSiteDatabaseTest {
             assertEquals("png192", favicon.getFavicon_png_pwa_192_base64());
             assertEquals("png512", favicon.getFavicon_png_pwa_512_base64());
             assertEquals("blue", storedConfig.get("color"));
-            assertEquals(Boolean.TRUE, ((Map<String, Object>) storedConfig.get("nested")).get("enabled"));
+            assertEquals(
+                    Boolean.TRUE,
+                    ((Map<String, Object>) storedConfig.get("nested")).get("enabled"));
         }
     }
 }

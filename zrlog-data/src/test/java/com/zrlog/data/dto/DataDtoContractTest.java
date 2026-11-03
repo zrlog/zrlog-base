@@ -1,13 +1,12 @@
 package com.zrlog.data.dto;
 
+import static org.junit.Assert.*;
+
 import com.zrlog.common.vo.Outline;
 import com.zrlog.data.exception.DAOException;
-import org.junit.Test;
-
 import java.sql.SQLException;
 import java.util.List;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class DataDtoContractTest {
 

@@ -12,9 +12,6 @@ import com.zrlog.common.exception.AbstractBusinessException;
 import com.zrlog.common.exception.NotFindDbEntryException;
 import com.zrlog.common.rest.response.ApiStandardResponse;
 import com.zrlog.util.I18nUtil;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,10 +20,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 
-/**
- * 全局异常处理
- */
+/** 全局异常处理 */
 public class ZrLogErrorHandle implements HttpErrorHandle {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(ZrLogErrorHandle.class);
@@ -73,10 +70,16 @@ public class ZrLogErrorHandle implements HttpErrorHandle {
             String message = URLEncoder.encode(getResponseMessage(e), StandardCharsets.UTF_8);
             String destination;
             if (e instanceof NotFindResourceException || e instanceof NotFindDbEntryException) {
-                destination = Constants.ADMIN_URI_BASE_PATH + "/404?queryString="
-                        + URLEncoder.encode(Objects.requireNonNullElse(request.getQueryStr(), ""), StandardCharsets.UTF_8)
-                        + "&uriPath=" + URLEncoder.encode(request.getUri(), StandardCharsets.UTF_8)
-                        + "&message=" + message;
+                destination =
+                        Constants.ADMIN_URI_BASE_PATH
+                                + "/404?queryString="
+                                + URLEncoder.encode(
+                                        Objects.requireNonNullElse(request.getQueryStr(), ""),
+                                        StandardCharsets.UTF_8)
+                                + "&uriPath="
+                                + URLEncoder.encode(request.getUri(), StandardCharsets.UTF_8)
+                                + "&message="
+                                + message;
             } else {
                 destination = Constants.ADMIN_URI_BASE_PATH + "/500?message=" + message;
             }
@@ -108,11 +111,15 @@ public class ZrLogErrorHandle implements HttpErrorHandle {
     private InputStream getErrorInputStream(Throwable e, int httpStatueCode) {
         if (Constants.debugLoggerPrintAble()) {
             try {
-                InputStream htmlInputStream = PathUtil.getConfInputStream("/error/" + httpStatueCode + ".html");
+                InputStream htmlInputStream =
+                        PathUtil.getConfInputStream("/error/" + httpStatueCode + ".html");
                 if (Objects.isNull(htmlInputStream)) {
                     htmlInputStream = PathUtil.getConfInputStream("/error/" + 500 + ".html");
                 }
-                String body = "<pre style='color:red;white-space:pre-wrap'>" + WebTools.htmlEncode(LoggerUtil.recordStackTraceMsg(e)) + "</pre>";
+                String body =
+                        "<pre style='color:red;white-space:pre-wrap'>"
+                                + WebTools.htmlEncode(LoggerUtil.recordStackTraceMsg(e))
+                                + "</pre>";
                 Document document = Jsoup.parse(htmlInputStream, "utf-8", "/");
                 document.body().append(body);
                 return new ByteArrayInputStream(document.html().getBytes());

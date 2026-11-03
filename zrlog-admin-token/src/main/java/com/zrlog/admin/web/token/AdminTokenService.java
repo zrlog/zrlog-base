@@ -22,11 +22,6 @@ import com.zrlog.util.ParseUtil;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
-
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -37,6 +32,10 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 import java.util.logging.Logger;
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 @Singleton
 public class AdminTokenService implements TokenService {
@@ -64,9 +63,9 @@ public class AdminTokenService implements TokenService {
         this.preferences = Objects.requireNonNull(preferences);
         this.installed = Objects.requireNonNull(installed);
         this.staticHtml = Objects.requireNonNull(staticHtml);
-        //字符长度必须要大于16个字符
+        // 字符长度必须要大于16个字符
         this.iv = new IvParameterSpec("_BLOG_BLOG_BLOG_".getBytes(StandardCharsets.UTF_8));
-        //*60000， Cookie过期时间单位为分钟
+        // *60000， Cookie过期时间单位为分钟
         this.sessionTimeout = sessionTimeoutInMinutes * 60 * 1000L;
     }
 
@@ -89,18 +88,20 @@ public class AdminTokenService implements TokenService {
 
     private byte[] encrypt(String secretKey, byte[] value) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
-        //必须要16位
+        // 必须要16位
         String newSecretKey = SecurityUtils.md5(secretKey).substring(8, 24);
-        SecretKeySpec secretKeySpec = new SecretKeySpec(newSecretKey.getBytes(StandardCharsets.UTF_8), "AES");
+        SecretKeySpec secretKeySpec =
+                new SecretKeySpec(newSecretKey.getBytes(StandardCharsets.UTF_8), "AES");
         cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, iv);
         return cipher.doFinal(value);
     }
 
     private byte[] decrypt(String secretKey, byte[] encrypted) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
-        //必须要16位
+        // 必须要16位
         String newSecretKey = SecurityUtils.md5(secretKey).substring(8, 24);
-        SecretKeySpec secretKeySpec = new SecretKeySpec(newSecretKey.getBytes(StandardCharsets.UTF_8), "AES");
+        SecretKeySpec secretKeySpec =
+                new SecretKeySpec(newSecretKey.getBytes(StandardCharsets.UTF_8), "AES");
         cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, iv);
         return cipher.doFinal(encrypted);
     }
@@ -110,7 +111,7 @@ public class AdminTokenService implements TokenService {
         if (!installed.getAsBoolean()) {
             return null;
         }
-        //header first, seconds parse cookie
+        // header first, seconds parse cookie
         String tokenInHeader = request.getHeader(ADMIN_TOKEN_KEY_IN_REQUEST_HEADER);
         if (StringUtils.isNotEmpty(tokenInHeader)) {
             AdminFullTokenVO adminTokenVO = parseAdminTokenByStr(tokenInHeader);
@@ -149,7 +150,12 @@ public class AdminTokenService implements TokenService {
             if (!account.isEnabled()) return null;
             String sk = userSecretKeyCacheMap.get(userId);
             if (Objects.isNull(sk)) {
-                sk = (String) users.get().queryFirstObj("SELECT secretKey FROM user WHERE userId=?", userId);
+                sk =
+                        (String)
+                                users.get()
+                                        .queryFirstObj(
+                                                "SELECT secretKey FROM user WHERE userId=?",
+                                                userId);
                 if (Objects.isNull(sk)) {
                     return null;
                 }
@@ -158,19 +164,25 @@ public class AdminTokenService implements TokenService {
                 }
             }
             userSecretKeyCacheMap.put(userId, sk);
-            byte[] adminTokenEncryptAfter = ByteUtils.hexString2Bytes(tokenString.substring(tokenString.indexOf(TOKEN_SPLIT_CHAR) + 1));
-            String base64Encode = new String(decrypt(sk, Base64.getDecoder().decode(adminTokenEncryptAfter)));
-            AdminFullTokenVO adminTokenVO = new Gson().fromJson(base64Encode, AdminFullTokenVO.class);
-            if (adminTokenVO.getUserId() != userId || adminTokenVO.getAuthVersion() != account.getAuthVersion())
-                return null;
+            byte[] adminTokenEncryptAfter =
+                    ByteUtils.hexString2Bytes(
+                            tokenString.substring(tokenString.indexOf(TOKEN_SPLIT_CHAR) + 1));
+            String base64Encode =
+                    new String(decrypt(sk, Base64.getDecoder().decode(adminTokenEncryptAfter)));
+            AdminFullTokenVO adminTokenVO =
+                    new Gson().fromJson(base64Encode, AdminFullTokenVO.class);
+            if (adminTokenVO.getUserId() != userId
+                    || adminTokenVO.getAuthVersion() != account.getAuthVersion()) return null;
             adminTokenVO.setSecretKey(sk);
-            long expiresAt = adminTokenVO.getExpiresAt() == null
-                    ? Math.addExact(adminTokenVO.getCreatedDate(), sessionTimeout) : adminTokenVO.getExpiresAt();
+            long expiresAt =
+                    adminTokenVO.getExpiresAt() == null
+                            ? Math.addExact(adminTokenVO.getCreatedDate(), sessionTimeout)
+                            : adminTokenVO.getExpiresAt();
             if (expiresAt > adminTokenVO.getCreatedDate() && expiresAt > currentTimeMillis()) {
                 return adminTokenVO;
             }
         } catch (BadPaddingException e) {
-            //ignore 发生数据库 secretKey 无法解析 token 的情况下
+            // ignore 发生数据库 secretKey 无法解析 token 的情况下
             userSecretKeyCacheMap.remove(userId);
         } catch (Exception e) {
             LOGGER.warning("Invalid admin token");
@@ -201,25 +213,58 @@ public class AdminTokenService implements TokenService {
             return;
         }
         String ext = Objects.equals(request.getParaToStr("sp"), "true") ? ".html" : "";
-        response.redirect(uri.getScheme() + "://" + uri.getRawAuthority() + WebTools.buildEncodedUrl(request, ADMIN_LOGIN_URI_PATH + ext));
-
+        response.redirect(
+                uri.getScheme()
+                        + "://"
+                        + uri.getRawAuthority()
+                        + WebTools.buildEncodedUrl(request, ADMIN_LOGIN_URI_PATH + ext));
     }
 
     @Override
-    public void setAdminToken(Integer userId, String secretKey, String sessionId, String protocol, HttpRequest request, HttpResponse response) throws Exception {
-        issueAdminToken(userId, secretKey, sessionId, protocol, request, response,
+    public void setAdminToken(
+            Integer userId,
+            String secretKey,
+            String sessionId,
+            String protocol,
+            HttpRequest request,
+            HttpResponse response)
+            throws Exception {
+        issueAdminToken(
+                userId,
+                secretKey,
+                sessionId,
+                protocol,
+                request,
+                response,
                 Math.multiplyExact(sessionTimeoutMinutes(userId), 60000L));
     }
 
     @Override
-    public void refreshAdminToken(AdminFullTokenVO token, HttpRequest request, HttpResponse response) throws Exception {
-        long duration = token.getExpiresAt() == null ? sessionTimeout
-                : Math.subtractExact(token.getExpiresAt(), token.getCreatedDate());
-        issueAdminToken(token.getUserId(), token.getSecretKey(), token.getSessionId(), token.getProtocol(), request, response, duration);
+    public void refreshAdminToken(
+            AdminFullTokenVO token, HttpRequest request, HttpResponse response) throws Exception {
+        long duration =
+                token.getExpiresAt() == null
+                        ? sessionTimeout
+                        : Math.subtractExact(token.getExpiresAt(), token.getCreatedDate());
+        issueAdminToken(
+                token.getUserId(),
+                token.getSecretKey(),
+                token.getSessionId(),
+                token.getProtocol(),
+                request,
+                response,
+                duration);
     }
 
-    private void issueAdminToken(Integer userId, String secretKey, String sessionId, String protocol,
-                                 HttpRequest request, HttpResponse response, long duration) throws Exception {
+    private void issueAdminToken(
+            Integer userId,
+            String secretKey,
+            String sessionId,
+            String protocol,
+            HttpRequest request,
+            HttpResponse response,
+            long duration)
+            throws Exception {
         AccountAccess account = loadAccount(userId);
         if (!account.isEnabled()) throw new IllegalStateException("Account disabled");
         if (duration <= 0) throw new IllegalArgumentException("Invalid session lifetime");
@@ -233,7 +278,8 @@ public class AdminTokenService implements TokenService {
         adminTokenVO.setExpiresAt(Math.addExact(loginTime, duration));
         AdminTokenThreadLocal.setAdminToken(adminTokenVO);
         String encryptBeforeString = new Gson().toJson(adminTokenVO);
-        byte[] base64Bytes = Base64.getEncoder().encode(encrypt(secretKey, encryptBeforeString.getBytes()));
+        byte[] base64Bytes =
+                Base64.getEncoder().encode(encrypt(secretKey, encryptBeforeString.getBytes()));
         String encryptAfterString = ByteUtils.bytesToHexString(base64Bytes);
         String tokenString = adminTokenVO.getUserId() + TOKEN_SPLIT_CHAR + encryptAfterString;
         Cookie cookie = new Cookie();
@@ -241,7 +287,8 @@ public class AdminTokenService implements TokenService {
         cookie.setValue(tokenString);
         cookie.setExpireDate(new Date(adminTokenVO.getExpiresAt()));
         if (Objects.equals(protocol, "https")) {
-            if (CrossUtils.isEnableOrigin(request, staticHtml.getAsBoolean()) && !EnvKit.isDevMode()) {
+            if (CrossUtils.isEnableOrigin(request, staticHtml.getAsBoolean())
+                    && !EnvKit.isDevMode()) {
                 cookie.setSameSite("None");
             }
             cookie.setSecure(true);
@@ -249,7 +296,5 @@ public class AdminTokenService implements TokenService {
         cookie.setHttpOnly(true);
         cookie.setPath(WebTools.getHomeUrl(request));
         response.addCookie(cookie);
-
     }
-
 }

@@ -14,7 +14,6 @@ import com.zrlog.plugin.IPlugin;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.I18nUtil;
 import com.zrlog.util.ThreadUtils;
-
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Map;
@@ -26,9 +25,7 @@ import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * 基于插件的实现，使用定时器，定时检查是否有新的版本发布。
- */
+/** 基于插件的实现，使用定时器，定时检查是否有新的版本发布。 */
 public class UpdateVersionInfoPlugin implements IPlugin {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(UpdateVersionInfoPlugin.class);
@@ -53,7 +50,8 @@ public class UpdateVersionInfoPlugin implements IPlugin {
     }
 
     private static boolean isPreviewVersion(Version version) {
-        return Objects.nonNull(version) && StringUtils.isNotEmpty(version.getVersion())
+        return Objects.nonNull(version)
+                && StringUtils.isNotEmpty(version.getVersion())
                 && version.getVersion().contains("-SNAPSHOT");
     }
 
@@ -62,8 +60,11 @@ public class UpdateVersionInfoPlugin implements IPlugin {
             return null;
         }
         Version copyVersion = BeanUtil.convert(version, Version.class);
-        copyVersion.setType(I18nUtil.getBackendStringFromRes(
-                isPreviewVersion(version) ? "version.type.preview" : "version.type.release"));
+        copyVersion.setType(
+                I18nUtil.getBackendStringFromRes(
+                        isPreviewVersion(version)
+                                ? "version.type.preview"
+                                : "version.type.release"));
         // Preserve the manifest identity, including -SNAPSHOT, in every consumer.
         return copyVersion;
     }
@@ -77,7 +78,8 @@ public class UpdateVersionInfoPlugin implements IPlugin {
         String buildId = BlogBuildInfoUtil.getBuildId();
         try {
             String changeLogMd = fetcher.fetch(version, buildId, I18nUtil.getCurrentLocale());
-            if (StringUtils.isNotEmpty(changeLogMd) && !UpdateVersionTimerTask.isHtml(changeLogMd)) {
+            if (StringUtils.isNotEmpty(changeLogMd)
+                    && !UpdateVersionTimerTask.isHtml(changeLogMd)) {
                 return changeLogMd;
             }
         } catch (IOException | InterruptedException | URISyntaxException e) {
@@ -85,13 +87,22 @@ public class UpdateVersionInfoPlugin implements IPlugin {
         }
         String uriPath = "94fzb/zrlog/commits/" + buildId;
         String changeUrl = "https://github.com/" + uriPath;
-        return (res.get("upgrade.result.noChangeLog") + "\n[" + uriPath + "](" + changeUrl + ")").replace("diff", "commit");
+        return (res.get("upgrade.result.noChangeLog") + "\n[" + uriPath + "](" + changeUrl + ")")
+                .replace("diff", "commit");
     }
 
     private static String fetchCurrentChangeLog(String version, String buildId, String locale)
             throws IOException, InterruptedException, URISyntaxException {
-        return HttpUtil.getInstance().getSuccessTextByUrl("https://www.zrlog.com/changelog/" +
-                version + "-" + buildId + ".md?lang=" + locale + "&v=" + buildId);
+        return HttpUtil.getInstance()
+                .getSuccessTextByUrl(
+                        "https://www.zrlog.com/changelog/"
+                                + version
+                                + "-"
+                                + buildId
+                                + ".md?lang="
+                                + locale
+                                + "&v="
+                                + buildId);
     }
 
     @Override
@@ -100,16 +111,22 @@ public class UpdateVersionInfoPlugin implements IPlugin {
     }
 
     private void initExecutorService() {
-        scheduledExecutorService = new ScheduledThreadPoolExecutor(1, r -> {
-            Thread thread = ThreadUtils.unstarted(r);
-            thread.setName("update-version-plugin-thread");
-            return thread;
-        });
+        scheduledExecutorService =
+                new ScheduledThreadPoolExecutor(
+                        1,
+                        r -> {
+                            Thread thread = ThreadUtils.unstarted(r);
+                            thread.setName("update-version-plugin-thread");
+                            return thread;
+                        });
     }
 
     UpdateVersionTimerTask newUpdateVersionTimerTask(UpgradeWebSiteInfo upgradeWebSiteInfo) {
-        return new UpdateVersionTimerTask(upgradeWebSiteInfo.getUpgradePreview(), language.get(),
-                notices::sync, commandLineNotice::notifyUpdate);
+        return new UpdateVersionTimerTask(
+                upgradeWebSiteInfo.getUpgradePreview(),
+                language.get(),
+                notices::sync,
+                commandLineNotice::notifyUpdate);
     }
 
     @Override
@@ -119,15 +136,17 @@ public class UpdateVersionInfoPlugin implements IPlugin {
             return true;
         }
         UpgradeWebSiteInfo upgradeWebSiteInfo = websiteKv.upgradeWebSiteInfo();
-        AutoUpgradeVersionType autoUpgradeVersionType = AutoUpgradeVersionType.cycle(upgradeWebSiteInfo.getAutoUpgradeVersion());
+        AutoUpgradeVersionType autoUpgradeVersionType =
+                AutoUpgradeVersionType.cycle(upgradeWebSiteInfo.getAutoUpgradeVersion());
         if (scheduledExecutorService != null) {
             scheduledExecutorService.shutdown();
         }
-        //开启了定时检查，定时器开始工作
+        // 开启了定时检查，定时器开始工作
         if (autoUpgradeVersionType != AutoUpgradeVersionType.NEVER) {
             initExecutorService();
             updateVersionTimerTask = newUpdateVersionTimerTask(upgradeWebSiteInfo);
-            scheduledExecutorService.scheduleAtFixedRate(updateVersionTimerTask, 0, autoUpgradeVersionType.getCycle(), TimeUnit.SECONDS);
+            scheduledExecutorService.scheduleAtFixedRate(
+                    updateVersionTimerTask, 0, autoUpgradeVersionType.getCycle(), TimeUnit.SECONDS);
         }
         LOGGER.info("UpdateVersionPlugin start autoUpgradeVersionType " + autoUpgradeVersionType);
         return true;
@@ -137,9 +156,7 @@ public class UpdateVersionInfoPlugin implements IPlugin {
         return externallyScheduled;
     }
 
-    /**
-     * Keep on-demand version checks available when scheduling belongs to the host.
-     */
+    /** Keep on-demand version checks available when scheduling belongs to the host. */
     public synchronized void setExternallyScheduled(boolean value) {
         if (value) stop();
         externallyScheduled = value;

@@ -8,8 +8,9 @@ public class UserAgentUtilsTest {
 
     @Test
     public void shouldParseArbitraryCallerProductsWithoutReplacingTheCli() {
-        for (String name : new String[]{"dot", "muse", "custom-agent_42", "my-bot"}) {
-            UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse("zrlogctl/0.1.42-beta.1 " + name + "/2.0-rc.1 (Linux)");
+        for (String name : new String[] {"dot", "muse", "custom-agent_42", "my-bot"}) {
+            UserAgentUtils.UserAgentInfo info =
+                    UserAgentUtils.parse("zrlogctl/0.1.42-beta.1 " + name + "/2.0-rc.1 (Linux)");
             Assert.assertEquals("ZrLogCtl 0.1.42-beta.1", info.getFullBrowser());
             Assert.assertEquals(name, info.getAgentName());
             Assert.assertEquals("2.0-rc.1", info.getAgentVersion());
@@ -22,9 +23,19 @@ public class UserAgentUtilsTest {
 
     @Test
     public void shouldNotInventCallerIdentityFromCommentsLegacyOrMalformedProducts() {
-        for (String value : new String[]{"zrlogctl/0.1.42", "zrlogctl/0.1.42 (Linux; dot/1.0)",
-                "zrlogctl/0.1.42 dot/", "zrlogctl/0.1.42 dot/1/extra", "zrlogctl/0.1.42 " + "a".repeat(129),
-                "zrlogctl/0.1.42 dot\r\nInjected", "dot/1.0", "Mozilla/5.0 Chrome/146.0.0.0", "", null}) {
+        for (String value :
+                new String[] {
+                    "zrlogctl/0.1.42",
+                    "zrlogctl/0.1.42 (Linux; dot/1.0)",
+                    "zrlogctl/0.1.42 dot/",
+                    "zrlogctl/0.1.42 dot/1/extra",
+                    "zrlogctl/0.1.42 " + "a".repeat(129),
+                    "zrlogctl/0.1.42 dot\r\nInjected",
+                    "dot/1.0",
+                    "Mozilla/5.0 Chrome/146.0.0.0",
+                    "",
+                    null
+                }) {
             UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(value);
             Assert.assertNull(value, info.getAgentName());
             Assert.assertNull(value, info.getAgentVersion());
@@ -33,7 +44,8 @@ public class UserAgentUtilsTest {
 
     @Test
     public void shouldParseNonBrowserClientProductsAndVersions() {
-        for (String product : new String[]{"codex/0.42.0-beta.1", "openai-mcp/1.0.0", "python-httpx/0.28.1"}) {
+        for (String product :
+                new String[] {"codex/0.42.0-beta.1", "openai-mcp/1.0.0", "python-httpx/0.28.1"}) {
             String[] parts = product.split("/", 2);
             UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(product + " (Linux; x86_64)");
 
@@ -55,7 +67,10 @@ public class UserAgentUtilsTest {
 
     @Test
     public void shouldNotInventClientDetailsFromMalformedOrCompatibilityTokens() {
-        for (String value : new String[]{" ", "client/", "client/1.0/extra", "/1.0", "(client/1.0)", "Mozilla/5.0"}) {
+        for (String value :
+                new String[] {
+                    " ", "client/", "client/1.0/extra", "/1.0", "(client/1.0)", "Mozilla/5.0"
+                }) {
             UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(value);
 
             Assert.assertEquals(value, "Unknown", info.getBrowser());
@@ -76,8 +91,9 @@ public class UserAgentUtilsTest {
 
     @Test
     public void shouldParseChromeVersion() {
-        UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36");
+        UserAgentUtils.UserAgentInfo info =
+                UserAgentUtils.parse(
+                        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36");
 
         Assert.assertEquals("Linux", info.getOs());
         Assert.assertEquals("Chrome", info.getBrowser());
@@ -88,8 +104,9 @@ public class UserAgentUtilsTest {
 
     @Test
     public void shouldParseSafariVersionFromVersionToken() {
-        UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15");
+        UserAgentUtils.UserAgentInfo info =
+                UserAgentUtils.parse(
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15");
 
         Assert.assertEquals("Mac OS X", info.getOs());
         Assert.assertEquals("Safari", info.getBrowser());
@@ -99,8 +116,9 @@ public class UserAgentUtilsTest {
 
     @Test
     public void shouldParseWeChatVersion() {
-        UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(
-                "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.49");
+        UserAgentUtils.UserAgentInfo info =
+                UserAgentUtils.parse(
+                        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.49");
 
         Assert.assertEquals("iPhone (iOS)", info.getOs());
         Assert.assertEquals("WeChat", info.getBrowser());
@@ -110,8 +128,9 @@ public class UserAgentUtilsTest {
 
     @Test
     public void shouldRecognizeCrawlerUserAgent() {
-        UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(
-                "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)");
+        UserAgentUtils.UserAgentInfo info =
+                UserAgentUtils.parse(
+                        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)");
 
         Assert.assertEquals("Unknown", info.getOs());
         Assert.assertEquals("Unknown", info.getBrowser());
@@ -142,8 +161,9 @@ public class UserAgentUtilsTest {
 
     @Test
     public void shouldParseWindowsEdge() {
-        UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0");
+        UserAgentUtils.UserAgentInfo info =
+                UserAgentUtils.parse(
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0");
 
         Assert.assertEquals("Windows 10/11", info.getOs());
         Assert.assertEquals("Edge", info.getBrowser());
@@ -153,8 +173,9 @@ public class UserAgentUtilsTest {
 
     @Test
     public void shouldParseWindowsFirefox() {
-        UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(
-                "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0");
+        UserAgentUtils.UserAgentInfo info =
+                UserAgentUtils.parse(
+                        "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0");
 
         Assert.assertEquals("Windows 7", info.getOs());
         Assert.assertEquals("Firefox", info.getBrowser());
@@ -163,8 +184,9 @@ public class UserAgentUtilsTest {
 
     @Test
     public void shouldParseInternetExplorerVersion() {
-        UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(
-                "Mozilla/5.0 (Windows NT 6.2; Trident/7.0; rv:11.0) like Gecko");
+        UserAgentUtils.UserAgentInfo info =
+                UserAgentUtils.parse(
+                        "Mozilla/5.0 (Windows NT 6.2; Trident/7.0; rv:11.0) like Gecko");
 
         Assert.assertEquals("Windows 8", info.getOs());
         Assert.assertEquals("Internet Explorer", info.getBrowser());
@@ -174,8 +196,9 @@ public class UserAgentUtilsTest {
 
     @Test
     public void shouldParseSafariVersionFromSafariTokenWhenVersionMissing() {
-        UserAgentUtils.UserAgentInfo info = UserAgentUtils.parse(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Safari/605.1.15");
+        UserAgentUtils.UserAgentInfo info =
+                UserAgentUtils.parse(
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Safari/605.1.15");
 
         Assert.assertEquals("Mac OS X", info.getOs());
         Assert.assertEquals("Safari", info.getBrowser());
@@ -184,10 +207,12 @@ public class UserAgentUtilsTest {
 
     @Test
     public void shouldParseMobileOperatingSystems() {
-        UserAgentUtils.UserAgentInfo ipad = UserAgentUtils.parse(
-                "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1");
-        UserAgentUtils.UserAgentInfo android = UserAgentUtils.parse(
-                "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36");
+        UserAgentUtils.UserAgentInfo ipad =
+                UserAgentUtils.parse(
+                        "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1");
+        UserAgentUtils.UserAgentInfo android =
+                UserAgentUtils.parse(
+                        "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36");
 
         Assert.assertEquals("iPad (iOS)", ipad.getOs());
         Assert.assertEquals("Safari", ipad.getBrowser());

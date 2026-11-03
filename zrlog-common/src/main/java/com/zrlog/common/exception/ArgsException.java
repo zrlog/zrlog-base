@@ -14,7 +14,6 @@ public class ArgsException extends AbstractBusinessException {
         this.args = args;
     }
 
-
     @Override
     public int getError() {
         return 9012;

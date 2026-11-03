@@ -12,7 +12,8 @@ public final class PluginAdminAppearance {
     private final String colorPrimary;
     private final boolean compactMode;
 
-    public PluginAdminAppearance(String theme, boolean darkMode, String colorPrimary, boolean compactMode) {
+    public PluginAdminAppearance(
+            String theme, boolean darkMode, String colorPrimary, boolean compactMode) {
         this.theme = theme;
         this.darkMode = darkMode;
         this.colorPrimary = colorPrimary;

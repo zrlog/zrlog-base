@@ -1,5 +1,7 @@
 package com.zrlog.data.web;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.http.server.ApplicationContext;
 import com.hibegin.http.server.di.SwsBindings;
@@ -9,21 +11,18 @@ import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.test.support.ZrLogTestDatabase;
+import java.util.Collections;
+import java.util.List;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.util.Collections;
-import java.util.List;
-
-import static org.junit.Assert.*;
-
 public class DataWebSetupTest {
-    @Rule
-    public TemporaryFolder temporaryFolder = new TemporaryFolder();
+    @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     @Test
-    public void cacheCanBeResolvedAfterDatabaseBecomesReadyWithoutRegisteringAgain() throws Exception {
+    public void cacheCanBeResolvedAfterDatabaseBecomesReadyWithoutRegisteringAgain()
+            throws Exception {
         String previousRoot = System.getProperty("sws.root.path");
         System.setProperty("sws.root.path", temporaryFolder.getRoot().getAbsolutePath());
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open()) {
@@ -33,8 +32,10 @@ public class DataWebSetupTest {
             new ApplicationContext(config.getServerConfig()).init();
             SwsBindings.Container container = config.getServerConfig().getBindings().build();
             assertEquals(Constants.DEFAULT_LANGUAGE, setup.getPublicWebSiteInfo().getLanguage());
-            SwsBindings.CreationException error = assertThrows(SwsBindings.CreationException.class,
-                    () -> container.get(CacheService.class));
+            SwsBindings.CreationException error =
+                    assertThrows(
+                            SwsBindings.CreationException.class,
+                            () -> container.get(CacheService.class));
             assertEquals("Application database is not ready", error.getCause().getMessage());
 
             db.putWebsite("title", "Shared cache site");
@@ -46,7 +47,9 @@ public class DataWebSetupTest {
             assertSame(cache, container.get(CacheService.class));
             db.putWebsite("title", "Updated site");
             cache.refreshInitData();
-            assertEquals("Updated site", container.get(CacheService.class).getPublicWebSiteInfo().getTitle());
+            assertEquals(
+                    "Updated site",
+                    container.get(CacheService.class).getPublicWebSiteInfo().getTitle());
         } finally {
             if (previousRoot == null) System.clearProperty("sws.root.path");
             else System.setProperty("sws.root.path", previousRoot);
@@ -84,7 +87,6 @@ public class DataWebSetupTest {
 
         // The database fixture owns and restores its data source.
         @Override
-        public void stop() {
-        }
+        public void stop() {}
     }
 }

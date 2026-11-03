@@ -25,8 +25,7 @@ public class VersionComparator implements Comparator<String> {
                         // Version one is longer than number two, and non-zero
                         return 1;
                     }
-                }
-                while (tokenizer1.MoveNext());
+                } while (tokenizer1.MoveNext());
 
                 // Version one is longer than version two, but zero
                 return 0;
@@ -56,7 +55,6 @@ public class VersionComparator implements Comparator<String> {
             // Lexical comparison of suffixes
             int result = suffix1.compareTo(suffix2);
             if (result != 0) return result;
-
         }
         if (tokenizer2.MoveNext()) {
             do {
@@ -66,8 +64,7 @@ public class VersionComparator implements Comparator<String> {
                     // Version one is longer than version two, and non-zero
                     return -1;
                 }
-            }
-            while (tokenizer2.MoveNext());
+            } while (tokenizer2.MoveNext());
 
             // Version two is longer than version one, but zero
             return 0;
@@ -75,4 +72,3 @@ public class VersionComparator implements Comparator<String> {
         return 0;
     }
 }
-

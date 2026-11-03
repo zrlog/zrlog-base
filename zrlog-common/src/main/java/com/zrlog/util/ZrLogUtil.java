@@ -8,20 +8,16 @@ import com.hibegin.http.server.api.HttpResponse;
 import com.zrlog.blog.web.util.WebTools;
 import com.zrlog.common.Updater;
 import com.zrlog.common.UpdaterTypeEnum;
-
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
 
-/**
- * ZrLog特有的一些工具方法
- */
+/** ZrLog特有的一些工具方法 */
 public class ZrLogUtil {
 
     public static final String DB_PROPERTIES_KEY_IN_ENV = "DB_PROPERTIES";
 
-    private ZrLogUtil() {
-    }
+    private ZrLogUtil() {}
 
     public static <T> T convertRequestParam(Map<String, String[]> requestParam, Class<T> clazz) {
         Map<String, Object> tempMap = new HashMap<>();
@@ -67,11 +63,14 @@ public class ZrLogUtil {
         return "//" + host + (uri.startsWith("/") ? uri : "/" + uri);
     }
 
-    public static boolean greatThenCurrentVersion(String buildId, Date releaseDate, String fetchedVersion) {
-        if (buildId.equals(BlogBuildInfoUtil.getBuildId()) || releaseDate.before(BlogBuildInfoUtil.getTime())) {
+    public static boolean greatThenCurrentVersion(
+            String buildId, Date releaseDate, String fetchedVersion) {
+        if (buildId.equals(BlogBuildInfoUtil.getBuildId())
+                || releaseDate.before(BlogBuildInfoUtil.getTime())) {
             return false;
         }
-        int result = new VersionComparator().compare(fetchedVersion, BlogBuildInfoUtil.getVersion());
+        int result =
+                new VersionComparator().compare(fetchedVersion, BlogBuildInfoUtil.getVersion());
         if (result == 0) {
             return releaseDate.after(BlogBuildInfoUtil.getTime());
         } else {
@@ -104,7 +103,7 @@ public class ZrLogUtil {
             address = InetAddress.getByName(name);
             return address.isSiteLocalAddress() || address.isLoopbackAddress();
         } catch (UnknownHostException e) {
-            //ignore 可能没有网络. 认为不是内网地址
+            // ignore 可能没有网络. 认为不是内网地址
             return false;
         }
     }
@@ -116,7 +115,6 @@ public class ZrLogUtil {
             return ".jsp";
         }
     }
-
 
     public static boolean isSystemServiceMode() {
         String value = System.getenv("SYSTEM_SERVICE_MODE");
@@ -141,12 +139,11 @@ public class ZrLogUtil {
         if (EnvKit.isLambda()) {
             return System.getenv("LAMBDA_TASK_ROOT");
         }
-        //Not implement
+        // Not implement
         return "/app";
     }
 
     public static boolean isShellDockerMode() {
         return Objects.equals(System.getenv().get("DOCKER_MODE_START_BY"), "shell");
     }
-
 }

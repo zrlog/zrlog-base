@@ -1,5 +1,7 @@
 package com.zrlog.business;
 
+import static org.junit.Assert.*;
+
 import com.zrlog.business.dto.StoredUpgradeNotice;
 import com.zrlog.business.exception.DownloadUpgradeFileException;
 import com.zrlog.business.exception.MissingInstallException;
@@ -10,16 +12,13 @@ import com.zrlog.business.rest.response.*;
 import com.zrlog.common.exception.AbstractBusinessException;
 import com.zrlog.common.exception.ArgsException;
 import com.zrlog.common.vo.Version;
-import org.junit.Test;
-
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class ServiceDtoContractTest {
 
@@ -114,7 +113,8 @@ public class ServiceDtoContractTest {
         return constructor.newInstance();
     }
 
-    //TODO: Add fixture-backed tests for plugin runtime, upgrade services, and DAO-backed KV writes.
+    // TODO: Add fixture-backed tests for plugin runtime, upgrade services, and DAO-backed KV
+    // writes.
     // Those paths depend on DAO state, subprocesses, plugin runtime, or network/update artifacts.
     @Test
     public void shouldExposeBeanStyleServiceDtos() throws Exception {
@@ -140,14 +140,15 @@ public class ServiceDtoContractTest {
 
     @Test
     public void shouldExposeConstructorOnlyResponses() {
-        PublicInfoVO publicInfo = new PublicInfoVO(
-                "3.6.0",
-                "ZrLog",
-                "https://example.com",
-                true,
-                "#1677ff",
-                "#ffffff",
-                "app-id");
+        PublicInfoVO publicInfo =
+                new PublicInfoVO(
+                        "3.6.0",
+                        "ZrLog",
+                        "https://example.com",
+                        true,
+                        "#1677ff",
+                        "#ffffff",
+                        "app-id");
         UpgradeProcessResponse upgradeProcess = new UpgradeProcessResponse(false, "running");
 
         assertEquals("3.6.0", publicInfo.getCurrentVersion());

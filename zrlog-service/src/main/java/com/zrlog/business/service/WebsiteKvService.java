@@ -9,7 +9,6 @@ import com.zrlog.data.repository.WebSiteRepository;
 import jakarta.inject.Inject;
 import jakarta.inject.Provider;
 import jakarta.inject.Singleton;
-
 import java.sql.SQLException;
 import java.util.*;
 import java.util.logging.Level;
@@ -28,9 +27,7 @@ public class WebsiteKvService {
         this.websites = Objects.requireNonNull(websites, "websites");
     }
 
-    /**
-     * Keep all operations on this application's database, including after another app starts.
-     */
+    /** Keep all operations on this application's database, including after another app starts. */
     public WebsiteKvService(DataSourceWrapper dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");
         this.websites = () -> new WebSiteRepository(dataSource);
@@ -59,7 +56,8 @@ public class WebsiteKvService {
             return websites.get()
                     .queryList(
                             "SELECT `name`, `value`, length(`value`) AS `size` FROM `website` WHERE `name` LIKE ? ORDER BY `name`",
-                            Entry.class, prefix + "%");
+                            Entry.class,
+                            prefix + "%");
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "List website KV by prefix failed, prefix=" + prefix, e);
             return Collections.emptyList();
@@ -93,14 +91,19 @@ public class WebsiteKvService {
     }
 
     public UpgradeWebSiteInfo upgradeWebSiteInfo() {
-        UpgradeWebSiteInfo upgrade = ResultBeanUtils.convert(
-                getByNames(Arrays.asList(UPGRADE_PREVIEW_KEY, AUTO_UPGRADE_VERSION_KEY, "upgradePackageSource")),
-                UpgradeWebSiteInfo.class
-        );
+        UpgradeWebSiteInfo upgrade =
+                ResultBeanUtils.convert(
+                        getByNames(
+                                Arrays.asList(
+                                        UPGRADE_PREVIEW_KEY,
+                                        AUTO_UPGRADE_VERSION_KEY,
+                                        "upgradePackageSource")),
+                        UpgradeWebSiteInfo.class);
         if (Objects.isNull(upgrade.getAutoUpgradeVersion())) {
             upgrade.setAutoUpgradeVersion(AutoUpgradeVersionType.ONE_DAY.getCycle());
         }
-        if (upgrade.getUpgradePackageSource() == null || upgrade.getUpgradePackageSource().isBlank()) {
+        if (upgrade.getUpgradePackageSource() == null
+                || upgrade.getUpgradePackageSource().isBlank()) {
             upgrade.setUpgradePackageSource("dl");
         }
         upgrade.setUpgradePreview(Objects.equals(upgrade.getUpgradePreview(), true));

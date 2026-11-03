@@ -4,18 +4,14 @@ import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.util.StringUtils;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.util.ParseUtil;
-
 import java.util.List;
 
-/**
- * 与文章相关的业务代码
- */
+/** 与文章相关的业务代码 */
 public class ArticleHelpers {
 
-    /**
-     * 高亮用户检索的关键字
-     */
-    public static void wrapperSearchKeyword(PageData<ArticleBasicDTO> data, String keywords, long digestLength) {
+    /** 高亮用户检索的关键字 */
+    public static void wrapperSearchKeyword(
+            PageData<ArticleBasicDTO> data, String keywords, long digestLength) {
         if (StringUtils.isEmpty(keywords)) {
             return;
         }
@@ -32,7 +28,9 @@ public class ArticleHelpers {
             if (tryWrapperDigest != null && tryWrapperDigest.length() != digest.length()) {
                 log.setDigest(tryWrapperDigest);
             } else {
-                log.setDigest(ParseUtil.wrapperKeyword(ParseUtil.removeHtmlElement(content), keywords, digestLength));
+                log.setDigest(
+                        ParseUtil.wrapperKeyword(
+                                ParseUtil.removeHtmlElement(content), keywords, digestLength));
             }
         }
     }

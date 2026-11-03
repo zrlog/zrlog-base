@@ -3,7 +3,6 @@ package com.zrlog.util;
 import com.hibegin.common.dao.DataSourceWrapperImpl;
 import com.hibegin.common.util.EnvKit;
 import com.zrlog.common.Constants;
-
 import java.util.Properties;
 
 public class DataSourceUtil {
@@ -17,8 +16,11 @@ public class DataSourceUtil {
                     dbProperties.getProperty("user"),
                     dbProperties.getProperty("password"));
         } else {*/
-        DataSourceWrapperImpl dataSource = new DataSourceWrapperImpl(dbProperties, Constants.debugLoggerPrintAble(),
-                NetworkProxy.initialize().proxySelector());
+        DataSourceWrapperImpl dataSource =
+                new DataSourceWrapperImpl(
+                        dbProperties,
+                        Constants.debugLoggerPrintAble(),
+                        NetworkProxy.initialize().proxySelector());
         if (!dataSource.isWebApi()) {
             dataSource.setDriverClassName(dbProperties.getProperty("driverClass"));
             dataSource.setJdbcUrl(dbProperties.getProperty("jdbcUrl"));

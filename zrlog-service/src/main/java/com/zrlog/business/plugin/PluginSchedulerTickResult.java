@@ -3,9 +3,7 @@ package com.zrlog.business.plugin;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Narrow host protocol: only the results of this tick, never plugin task configuration.
- */
+/** Narrow host protocol: only the results of this tick, never plugin task configuration. */
 public final class PluginSchedulerTickResult {
     public String triggerId;
     public int executedCount;

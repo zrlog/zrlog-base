@@ -1,14 +1,12 @@
 package com.zrlog.data.security;
 
 import com.zrlog.model.User;
-
 import java.util.*;
 
-/**
- * Current database permissions; never trust roles supplied by a client or an old token.
- */
+/** Current database permissions; never trust roles supplied by a client or an old token. */
 public final class AccountAccess {
-    public static final Set<String> ROLES = Set.of("owner", "admin", "editor", "author", "contributor");
+    public static final Set<String> ROLES =
+            Set.of("owner", "admin", "editor", "author", "contributor");
     private final int userId;
     private final String role;
     private final boolean enabled;
@@ -19,7 +17,8 @@ public final class AccountAccess {
         this(userId, role, enabled, authVersion, null);
     }
 
-    private AccountAccess(int userId, String role, boolean enabled, int authVersion, Set<String> actions) {
+    private AccountAccess(
+            int userId, String role, boolean enabled, int authVersion, Set<String> actions) {
         this.actions = actions;
         this.userId = userId;
         this.role = role;
@@ -29,33 +28,42 @@ public final class AccountAccess {
 
     public static AccountAccess from(User user) {
         if (user == null || user.getId() == null) return new AccountAccess(-1, "", false, -1);
-        return new AccountAccess(Math.toIntExact(user.getId()), Objects.toString(user.getRole(), ""),
-                Boolean.TRUE.equals(user.getEnabled()), user.getAuthVersion() == null ? -1 : user.getAuthVersion());
+        return new AccountAccess(
+                Math.toIntExact(user.getId()),
+                Objects.toString(user.getRole(), ""),
+                Boolean.TRUE.equals(user.getEnabled()),
+                user.getAuthVersion() == null ? -1 : user.getAuthVersion());
     }
 
     public static AccountAccess fromSnapshot(Snapshot row) {
         if (row == null || row.userId == null) return new AccountAccess(-1, "", false, -1);
-        return new AccountAccess(row.userId, Objects.toString(row.role, ""), Boolean.TRUE.equals(row.enabled),
+        return new AccountAccess(
+                row.userId,
+                Objects.toString(row.role, ""),
+                Boolean.TRUE.equals(row.enabled),
                 row.authVersion == null ? -1 : row.authVersion);
     }
 
     public static AccountAccess fromRow(Map<String, Object> row) {
         if (row == null || row.isEmpty()) return new AccountAccess(-1, "", false, -1);
-        return new AccountAccess(((Number) row.get("userId")).intValue(),
-                Objects.toString(row.get("role"), ""), truth(row.get("enabled")),
-                row.get("authVersion") instanceof Number ? ((Number) row.get("authVersion")).intValue() : -1);
+        return new AccountAccess(
+                ((Number) row.get("userId")).intValue(),
+                Objects.toString(row.get("role"), ""),
+                truth(row.get("enabled")),
+                row.get("authVersion") instanceof Number
+                        ? ((Number) row.get("authVersion")).intValue()
+                        : -1);
     }
 
     public static boolean truth(Object value) {
         if (value instanceof Boolean) return (Boolean) value;
         if (value instanceof Number) return ((Number) value).intValue() != 0;
         if (value instanceof byte[]) return ((byte[]) value).length > 0 && ((byte[]) value)[0] != 0;
-        return "true".equalsIgnoreCase(Objects.toString(value, "")) || "1".equals(Objects.toString(value, ""));
+        return "true".equalsIgnoreCase(Objects.toString(value, ""))
+                || "1".equals(Objects.toString(value, ""));
     }
 
-    /**
-     * Immutable delegation bound: restrictions can only narrow existing permissions.
-     */
+    /** Immutable delegation bound: restrictions can only narrow existing permissions. */
     public AccountAccess restrictActions(Collection<String> selected) {
         Set<String> restricted = new LinkedHashSet<>(selected);
         if (actions != null) restricted.retainAll(actions);
@@ -103,7 +111,8 @@ public final class AccountAccess {
     }
 
     public boolean canAccessArticle(int authorId, boolean privateArticle) {
-        return canAccessArticle(authorId) && (!privateArticle || isAdministrator() || authorId == userId);
+        return canAccessArticle(authorId)
+                && (!privateArticle || isAdministrator() || authorId == userId);
     }
 
     public Set<String> scopes() {
@@ -118,9 +127,7 @@ public final class AccountAccess {
         return Collections.unmodifiableSet(scopes);
     }
 
-    /**
-     * Narrow authorization projection for joins and permission-only lookups.
-     */
+    /** Narrow authorization projection for joins and permission-only lookups. */
     public static class Snapshot {
         public Integer userId;
         public String role;

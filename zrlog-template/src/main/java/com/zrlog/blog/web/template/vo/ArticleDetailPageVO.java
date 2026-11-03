@@ -3,9 +3,7 @@ package com.zrlog.blog.web.template.vo;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.data.dto.ArticleDetailDTO;
 
-/**
- * 文章详情页数据
- */
+/** 文章详情页数据 */
 public class ArticleDetailPageVO extends BasePageInfo {
 
     private ArticleDetailDTO log;
@@ -15,8 +13,7 @@ public class ArticleDetailPageVO extends BasePageInfo {
         this.init = init;
     }
 
-    public ArticleDetailPageVO() {
-    }
+    public ArticleDetailPageVO() {}
 
     public ArticleDetailDTO getLog() {
         return log;

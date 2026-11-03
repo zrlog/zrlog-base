@@ -2,7 +2,6 @@ package com.zrlog.data.dto;
 
 import com.google.gson.annotations.JsonAdapter;
 import com.zrlog.common.json.JsonObjectMapAdapter;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -46,9 +45,9 @@ public class ArticleBasicDTO {
     private String noSchemeUrl;
     private String commentUrl;
     private List<ArticleDetailDTO.TagsDTO> tags;
+
     @JsonAdapter(JsonObjectMapAdapter.class)
     private Map<String, Object> extensions;
-
 
     public Long getLogId() {
         return logId;

@@ -6,7 +6,6 @@ import com.hibegin.common.util.LoggerUtil;
 import com.zrlog.business.service.TemplateInfoHelper;
 import com.zrlog.business.template.util.TemplateDownloadUtils;
 import com.zrlog.plugin.IPlugin;
-
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Objects;

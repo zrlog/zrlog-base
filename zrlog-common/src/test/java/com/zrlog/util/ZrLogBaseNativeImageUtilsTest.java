@@ -1,16 +1,15 @@
 package com.zrlog.util;
 
-import com.hibegin.http.server.util.NativeImageUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.Assert.*;
 
+import com.hibegin.http.server.util.NativeImageUtils;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static org.junit.Assert.*;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 public class ZrLogBaseNativeImageUtilsTest {
 

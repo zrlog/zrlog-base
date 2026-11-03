@@ -10,7 +10,14 @@ public class PublicInfoVO {
     private final String pwaThemeColor;
     private final String appId;
 
-    public PublicInfoVO(String currentVersion, String websiteTitle, String homeUrl, Boolean adminDarkMode, String adminColorPrimary, String pwaThemeColor, String appId) {
+    public PublicInfoVO(
+            String currentVersion,
+            String websiteTitle,
+            String homeUrl,
+            Boolean adminDarkMode,
+            String adminColorPrimary,
+            String pwaThemeColor,
+            String appId) {
         this.currentVersion = currentVersion;
         this.websiteTitle = websiteTitle;
         this.homeUrl = homeUrl;

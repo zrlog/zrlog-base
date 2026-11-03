@@ -3,15 +3,12 @@ package com.zrlog.business.plugin;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.config.ResponseConfig;
 import com.hibegin.http.server.impl.SimpleHttpResponse;
-
 import java.io.*;
 import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-/**
- * 静态化核心逻辑，拦截 httpResponse 的 body 写入到文件
- */
+/** 静态化核心逻辑，拦截 httpResponse 的 body 写入到文件 */
 public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseable {
 
     private final File cacheFile;
@@ -23,18 +20,36 @@ public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseabl
     private int statusCode;
     private RuntimeException generationFailure;
 
-    public BodySaveResponse(HttpRequest request, ResponseConfig responseConfig, boolean requiredStatusCodeSuccess,
-                            StaticSitePlugin staticSitePlugin) {
+    public BodySaveResponse(
+            HttpRequest request,
+            ResponseConfig responseConfig,
+            boolean requiredStatusCodeSuccess,
+            StaticSitePlugin staticSitePlugin) {
         this(request, responseConfig, requiredStatusCodeSuccess, 200, staticSitePlugin);
     }
 
-    BodySaveResponse(HttpRequest request, ResponseConfig responseConfig, boolean requiredStatusCodeSuccess,
-                     int additionalAcceptedStatusCode, StaticSitePlugin staticSitePlugin) {
-        this(request, responseConfig, requiredStatusCodeSuccess, additionalAcceptedStatusCode, staticSitePlugin, null);
+    BodySaveResponse(
+            HttpRequest request,
+            ResponseConfig responseConfig,
+            boolean requiredStatusCodeSuccess,
+            int additionalAcceptedStatusCode,
+            StaticSitePlugin staticSitePlugin) {
+        this(
+                request,
+                responseConfig,
+                requiredStatusCodeSuccess,
+                additionalAcceptedStatusCode,
+                staticSitePlugin,
+                null);
     }
 
-    BodySaveResponse(HttpRequest request, ResponseConfig responseConfig, boolean requiredStatusCodeSuccess,
-                     int additionalAcceptedStatusCode, StaticSitePlugin staticSitePlugin, StaticGenerationBudget budget) {
+    BodySaveResponse(
+            HttpRequest request,
+            ResponseConfig responseConfig,
+            boolean requiredStatusCodeSuccess,
+            int additionalAcceptedStatusCode,
+            StaticSitePlugin staticSitePlugin,
+            StaticGenerationBudget budget) {
         super(request, responseConfig);
         this.budget = budget;
         if (budget != null) budget.check();
@@ -60,7 +75,7 @@ public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseabl
         if (!request.getUri().startsWith("/admin")) {
             return cacheFile;
         }
-        //如果没有文件后缀的情况下，默认为需要服务端的渲染，添加文件后缀，便于 cdn 服务，通过后缀自动渲染为网页
+        // 如果没有文件后缀的情况下，默认为需要服务端的渲染，添加文件后缀，便于 cdn 服务，通过后缀自动渲染为网页
         return new File(cacheFile + ".html");
     }
 
@@ -69,13 +84,11 @@ public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseabl
         return false;
     }
 
-
     @Override
     protected byte[] wrapperBaseResponseHeader(int statusCode) {
         this.statusCode = statusCode;
         return super.wrapperBaseResponseHeader(statusCode);
     }
-
 
     @Override
     protected void send(byte[] bytes, boolean body, boolean close) {
@@ -103,17 +116,22 @@ public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseabl
         if (!body) {
             return;
         }
-        if (statusCode != 200 && statusCode != additionalAcceptedStatusCode && requiredStatusCodeSuccess) {
+        if (statusCode != 200
+                && statusCode != additionalAcceptedStatusCode
+                && requiredStatusCodeSuccess) {
             return;
         }
         if (budget == null) initLock.lock();
         else {
             try {
-                if (!initLock.tryLock(budget.remainingMillis(), java.util.concurrent.TimeUnit.MILLISECONDS))
-                    throw new IllegalStateException("Static response initialization time budget exhausted");
+                if (!initLock.tryLock(
+                        budget.remainingMillis(), java.util.concurrent.TimeUnit.MILLISECONDS))
+                    throw new IllegalStateException(
+                            "Static response initialization time budget exhausted");
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
-                throw new IllegalStateException("Static response initialization interrupted", interrupted);
+                throw new IllegalStateException(
+                        "Static response initialization interrupted", interrupted);
             }
         }
         try {

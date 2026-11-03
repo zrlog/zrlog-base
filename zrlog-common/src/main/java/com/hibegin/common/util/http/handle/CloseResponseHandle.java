@@ -1,6 +1,5 @@
 package com.hibegin.common.util.http.handle;
 
-
 import java.io.InputStream;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;

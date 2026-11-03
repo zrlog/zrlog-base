@@ -5,9 +5,7 @@ import com.zrlog.blog.web.template.PagerVO;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.data.dto.ArticleBasicDTO;
 
-/**
- * 文章列表页
- */
+/** 文章列表页 */
 public class ArticleListPageVO extends BasePageInfo {
 
     private PageData<ArticleBasicDTO> data;
@@ -16,8 +14,7 @@ public class ArticleListPageVO extends BasePageInfo {
     private String tipsName;
     private String yurl;
 
-    public ArticleListPageVO() {
-    }
+    public ArticleListPageVO() {}
 
     public ArticleListPageVO(PageData<ArticleBasicDTO> data, BaseDataInitVO init) {
         this.data = data;

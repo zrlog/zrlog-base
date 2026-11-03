@@ -31,7 +31,6 @@ import com.zrlog.plugin.BaseStaticSitePlugin;
 import com.zrlog.util.I18nUtil;
 import com.zrlog.util.TemplateHelper;
 import com.zrlog.util.ZrLogUtil;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -51,11 +50,12 @@ public class TemplateRenderUtils {
      * @param url
      * @return
      */
-    public static String getNavUrl(HttpRequest request, String suffix, String url, String siteHost) {
+    public static String getNavUrl(
+            HttpRequest request, String suffix, String url, String siteHost) {
         if ("/".equals(url)) {
             return ZrLogUtil.getHomeUrlWithHost(request, siteHost);
         }
-        //文章页
+        // 文章页
         if (url.startsWith("/")) {
             String nUrl = ZrLogUtil.getHomeUrlWithHost(request, siteHost) + url.substring(1);
             if (Objects.nonNull(suffix) && !suffix.trim().isEmpty() && nUrl.endsWith(suffix)) {
@@ -71,7 +71,8 @@ public class TemplateRenderUtils {
 
     private static BasePageInfo buildBasePageInfo(HttpRequest request, CacheService cacheService) {
         ArticleDetailDTO log = (ArticleDetailDTO) request.getAttr().get("log");
-        BaseDataInitVO baseDataInitVO = BeanUtil.convert(cacheService.getInitData(), BaseDataInitVO.class);
+        BaseDataInitVO baseDataInitVO =
+                BeanUtil.convert(cacheService.getInitData(), BaseDataInitVO.class);
         if (Objects.nonNull(log)) {
             return new ArticleDetailPageVO(log, baseDataInitVO);
         }
@@ -82,9 +83,18 @@ public class TemplateRenderUtils {
         return new NotFindPageVO(baseDataInitVO);
     }
 
-    public static BasePageInfo fullTemplateInfo(HttpRequest request, CacheService cacheService, TemplateDownloadPlugin templateDownloadPlugin) {
-        String templatePath = TemplateHelper.getTemplatePath(request, cacheService.getPublicWebSiteInfo().getTemplate(), templateDownloadPlugin);
-        I18nVO i18nInfo = I18nUtil.addToRequestWithTemplatePath(templatePath, request, cacheService.getPublicWebSiteInfo().getLanguage());
+    public static BasePageInfo fullTemplateInfo(
+            HttpRequest request,
+            CacheService cacheService,
+            TemplateDownloadPlugin templateDownloadPlugin) {
+        String templatePath =
+                TemplateHelper.getTemplatePath(
+                        request,
+                        cacheService.getPublicWebSiteInfo().getTemplate(),
+                        templateDownloadPlugin);
+        I18nVO i18nInfo =
+                I18nUtil.addToRequestWithTemplatePath(
+                        templatePath, request, cacheService.getPublicWebSiteInfo().getLanguage());
         BasePageInfo basePageInfo = buildBasePageInfo(request, cacheService);
         basePageInfo.setTemplate(templatePath);
         basePageInfo.setLang(i18nInfo.getLang());
@@ -100,7 +110,10 @@ public class TemplateRenderUtils {
 
     private static void fillInfo(HttpRequest request, BasePageInfo basePageInfo) {
         boolean staticBlog = BaseStaticSitePlugin.isStaticPluginRequest(request);
-        String suffix = StaticSitePlugin.getSuffix(request, Boolean.TRUE.equals(basePageInfo.getWebs().getGenerator_html_status()));
+        String suffix =
+                StaticSitePlugin.getSuffix(
+                        request,
+                        Boolean.TRUE.equals(basePageInfo.getWebs().getGenerator_html_status()));
         basePageInfo.setStaticBlog(staticBlog);
         basePageInfo.setSuffix(suffix);
         basePageInfo.setKey((String) request.getAttr().get("key"));
@@ -110,19 +123,29 @@ public class TemplateRenderUtils {
         fillTags(suffix, request, basePageInfo.getInit().getTags());
         fillType(suffix, basePageInfo.getInit().getTypes(), request, basePageInfo);
         fullNavBar(request, suffix, basePageInfo.getInit());
-        basePageInfo.getInit().setArchiveList(getConvertedArchives(suffix, request, basePageInfo.getInit().getArchives()));
-        //set comment info
+        basePageInfo
+                .getInit()
+                .setArchiveList(
+                        getConvertedArchives(
+                                suffix, request, basePageInfo.getInit().getArchives()));
+        // set comment info
         basePageInfo.setRequrl(ZrLogUtil.getFullUrl(request, webSite.getHost()));
         basePageInfo.setReqUriPath(request.getUri());
         basePageInfo.setReqQueryString(request.getQueryStr());
         basePageInfo.setBasePath(WebTools.getHomeUrl(request));
         basePageInfo.setContextPath(request.getContextPath());
-        basePageInfo.setBaseWithHostPath(ZrLogUtil.getHomeUrlWithHostNotProtocol(request, webSite.getHost()));
+        basePageInfo.setBaseWithHostPath(
+                ZrLogUtil.getHomeUrlWithHostNotProtocol(request, webSite.getHost()));
     }
 
     private static boolean isHomePage(HttpRequest request) {
         String uri = request.getUri().replace(".html", "");
-        return uri.isEmpty() || "/".equals(uri) || "/all-1".equals(uri) || "/all".equals(uri) || ("/" + Constants.getArticleUri() + "all").equals(uri) || ("/" + Constants.getArticleUri() + "all-1").equals(uri);
+        return uri.isEmpty()
+                || "/".equals(uri)
+                || "/all-1".equals(uri)
+                || "/all".equals(uri)
+                || ("/" + Constants.getArticleUri() + "all").equals(uri)
+                || ("/" + Constants.getArticleUri() + "all-1").equals(uri);
     }
 
     private static String ignoreScheme(String url, String suffix) {
@@ -137,7 +160,11 @@ public class TemplateRenderUtils {
         return url;
     }
 
-    private static void setUrlInfo(HttpRequest request, boolean staticBlog, PublicWebSiteInfo webSite, BasePageInfo basePageInfo) {
+    private static void setUrlInfo(
+            HttpRequest request,
+            boolean staticBlog,
+            PublicWebSiteInfo webSite,
+            BasePageInfo basePageInfo) {
         String templateUrl;
         String templatePath = basePageInfo.getTemplate();
         if (staticBlog) {
@@ -156,7 +183,8 @@ public class TemplateRenderUtils {
         basePageInfo.setRurl(baseUrl);
         basePageInfo.setBaseUrl(baseUrl);
         basePageInfo.setHost(ZrLogUtil.getBlogHost(request, webSite.getHost()));
-        basePageInfo.setSearchUrl(WebTools.buildEncodedUrl(request, Constants.getArticleUri() + "search"));
+        basePageInfo.setSearchUrl(
+                WebTools.buildEncodedUrl(request, Constants.getArticleUri() + "search"));
     }
 
     private static boolean isCdnResourceAble(PublicWebSiteInfo webSite, String templatePath) {
@@ -171,7 +199,8 @@ public class TemplateRenderUtils {
         try (FileInputStream fileInputStream = new FileInputStream(file)) {
             properties.load(fileInputStream);
             if (properties.getProperty("staticResource") != null) {
-                return webSite.getStaticResourceHost() != null && !"".equals(webSite.getStaticResourceHost());
+                return webSite.getStaticResourceHost() != null
+                        && !"".equals(webSite.getStaticResourceHost());
             }
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "load properties error", e);
@@ -198,7 +227,9 @@ public class TemplateRenderUtils {
             ((ArticleListPageVO) pageInfo).setYurl((String) request.getAttr().get("yurl"));
         } else if (pageInfo instanceof ArticleDetailPageVO) {
             ArticleDetailDTO objectMap = ((ArticleDetailPageVO) pageInfo).getLog();
-            objectMap.setContentProtectorHtml(ContentProtectorUtils.render(webSite, objectMap, ZrLogUtil.getFullUrl(request, webSite.getHost())));
+            objectMap.setContentProtectorHtml(
+                    ContentProtectorUtils.render(
+                            webSite, objectMap, ZrLogUtil.getFullUrl(request, webSite.getHost())));
             tryEnableArrangePlugin(objectMap.getArrange_plugin(), pageInfo);
             String articleTitle = objectMap.getTitle();
             if (StringUtils.isNotEmpty(articleTitle)) {
@@ -232,14 +263,19 @@ public class TemplateRenderUtils {
         return I18nUtil.getBackendStringFromRes("notFound");
     }
 
-    private static void fillSocialPreview(HttpRequest request, BasePageInfo pageInfo, PublicWebSiteInfo webSite) {
+    private static void fillSocialPreview(
+            HttpRequest request, BasePageInfo pageInfo, PublicWebSiteInfo webSite) {
         SocialPreviewDTO socialPreview;
         String fullUrl = ZrLogUtil.getFullUrl(request, webSite.getHost());
         if (pageInfo instanceof ArticleDetailPageVO) {
             ArticleDetailDTO log = ((ArticleDetailPageVO) pageInfo).getLog();
-            socialPreview = SocialPreviewUtils.article(webSite, log, pageInfo.getTitle(), fullUrl, log.getThumbnail());
+            socialPreview =
+                    SocialPreviewUtils.article(
+                            webSite, log, pageInfo.getTitle(), fullUrl, log.getThumbnail());
         } else {
-            socialPreview = SocialPreviewUtils.website(webSite, pageInfo.getTitle(), pageInfo.getDescription(), fullUrl, "");
+            socialPreview =
+                    SocialPreviewUtils.website(
+                            webSite, pageInfo.getTitle(), pageInfo.getDescription(), fullUrl, "");
         }
         pageInfo.setSocialPreview(socialPreview);
         pageInfo.setSocialPreviewHtml(socialPreview.getMetaHtml());
@@ -260,7 +296,9 @@ public class TemplateRenderUtils {
                 url = getNavUrl(request, suffix, url, baseDataInitVO.getWebSite().getHost());
                 logNav.setUrl(url);
                 if (!current) {
-                    current = ignoreScheme(request.getUrl(), suffix).equals(ignoreScheme(url, suffix));
+                    current =
+                            ignoreScheme(request.getUrl(), suffix)
+                                    .equals(ignoreScheme(url, suffix));
                 }
             } else if (!current) {
                 current = ignoreScheme(request.getUrl(), suffix).equals(ignoreScheme(url, suffix));
@@ -269,13 +307,17 @@ public class TemplateRenderUtils {
         }
     }
 
-    private static List<Archive> getConvertedArchives(String suffix, HttpRequest request, Map<String, Long> archiveMap) {
+    private static List<Archive> getConvertedArchives(
+            String suffix, HttpRequest request, Map<String, Long> archiveMap) {
         List<Archive> archives = new ArrayList<>();
         for (Map.Entry<String, Long> entry : archiveMap.entrySet()) {
             Archive archive = new Archive();
             archive.setCount(entry.getValue());
             archive.setText(entry.getKey());
-            String tagUri = WebTools.buildEncodedUrl(request, Constants.getArticleUri() + "record/" + entry.getKey() + suffix);
+            String tagUri =
+                    WebTools.buildEncodedUrl(
+                            request,
+                            Constants.getArticleUri() + "record/" + entry.getKey() + suffix);
             archive.setUrl(tagUri);
             archives.add(archive);
         }
@@ -284,11 +326,14 @@ public class TemplateRenderUtils {
 
     private static void fillTags(String suffix, HttpRequest request, List<TagDTO> tags) {
         for (TagDTO tag : tags) {
-            tag.setUrl(WebTools.buildEncodedUrl(request, Constants.getArticleUri() + "tag/" + tag.getText() + suffix));
+            tag.setUrl(
+                    WebTools.buildEncodedUrl(
+                            request, Constants.getArticleUri() + "tag/" + tag.getText() + suffix));
         }
     }
 
-    private static void fillType(String suffix, List<TypeDTO> types, HttpRequest request, BasePageInfo pageInfo) {
+    private static void fillType(
+            String suffix, List<TypeDTO> types, HttpRequest request, BasePageInfo pageInfo) {
         for (TypeDTO type : types) {
             String typeUri = "/" + Constants.getArticleUri() + "sort/" + type.getAlias();
             if (request.getUri().startsWith(typeUri)) {
@@ -297,5 +342,4 @@ public class TemplateRenderUtils {
             type.setUrl(WebTools.buildEncodedUrl(request, typeUri + suffix));
         }
     }
-
 }

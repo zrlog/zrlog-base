@@ -17,7 +17,6 @@ import com.zrlog.data.util.DistributedLockManager;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
-
 import java.io.InputStream;
 import java.net.URI;
 import java.util.*;
@@ -25,11 +24,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * 程序升级设计到数据表结构变更，数据的更新
- */
+/** 程序升级设计到数据表结构变更，数据的更新 */
 public class DbUpgradeService implements AutoCloseable {
-
 
     private static final Logger LOGGER = LoggerUtil.getLogger(DbUpgradeService.class);
 
@@ -43,19 +39,26 @@ public class DbUpgradeService implements AutoCloseable {
     private Thread migrationThread;
     private DistributedLock acquiredLock;
 
-    public DbUpgradeService(DataSourceWrapper dataSource,
-                            long currentSqlVersion) {
+    public DbUpgradeService(DataSourceWrapper dataSource, long currentSqlVersion) {
         this(dataSource, new DAO(dataSource), currentSqlVersion);
     }
 
     public DbUpgradeService(DataSourceWrapper dataSource, DAO dao, long currentSqlVersion) {
-        this(dataSource, dao, new DistributedLockManager(() -> new WebSiteRepository(dataSource),
-                key -> new DistributedLock(() -> new WebSiteRepository(dataSource), key)), currentSqlVersion);
+        this(
+                dataSource,
+                dao,
+                new DistributedLockManager(
+                        () -> new WebSiteRepository(dataSource),
+                        key -> new DistributedLock(() -> new WebSiteRepository(dataSource), key)),
+                currentSqlVersion);
     }
 
     @AssistedInject
-    public DbUpgradeService(DataSourceWrapper dataSource, DAO dao, DistributedLockManager locks,
-                            @Assisted long currentSqlVersion) {
+    public DbUpgradeService(
+            DataSourceWrapper dataSource,
+            DAO dao,
+            DistributedLockManager locks,
+            @Assisted long currentSqlVersion) {
         this.dataSource = dataSource;
         this.dao = dao;
         this.dbName = resolveDbName(dataSource.getDataSourceProperties().getProperty("jdbcUrl"));
@@ -100,7 +103,6 @@ public class DbUpgradeService implements AutoCloseable {
             if (Objects.nonNull(sqlStream)) {
                 fileList.put(i, IOUtil.getStringInputStream(sqlStream));
             }
-
         }
         return fileList;
     }
@@ -112,7 +114,8 @@ public class DbUpgradeService implements AutoCloseable {
             int fileVersion = f.getKey();
             if (fileVersion > dbVersion) {
                 List<String> executableSql;
-                if (f.getValue().stripLeading().startsWith("-- dialect: mysql") && !usesMysqlDialect()) {
+                if (f.getValue().stripLeading().startsWith("-- dialect: mysql")
+                        && !usesMysqlDialect()) {
                     // Keep the version step on every backend, without executing MySQL-only DDL.
                     executableSql = Collections.emptyList();
                 } else if (usesSqliteDialect()) {
@@ -120,8 +123,14 @@ public class DbUpgradeService implements AutoCloseable {
                 } else {
                     executableSql = SqlConvertUtils.extractExecutableSql(f.getValue());
                 }
-                Map.Entry<Integer, List<String>> entry = new AbstractMap.SimpleEntry<>(fileVersion, executableSql);
-                LOGGER.info("Need update sql " + fileVersion + ".sql \n" + String.join(";\n", entry.getValue()) + ";");
+                Map.Entry<Integer, List<String>> entry =
+                        new AbstractMap.SimpleEntry<>(fileVersion, executableSql);
+                LOGGER.info(
+                        "Need update sql "
+                                + fileVersion
+                                + ".sql \n"
+                                + String.join(";\n", entry.getValue())
+                                + ";");
                 sqlList.add(entry);
             }
         }
@@ -129,8 +138,7 @@ public class DbUpgradeService implements AutoCloseable {
     }
 
     /**
-     * 检查数据文件是否需要更新
-     * 为了处理由于数据库表的更新，导致系统无法正常使用的情况，通过执行/conf/update-sql/目录下面的*.sql文件来变更数据库的表格式，
+     * 检查数据文件是否需要更新 为了处理由于数据库表的更新，导致系统无法正常使用的情况，通过执行/conf/update-sql/目录下面的*.sql文件来变更数据库的表格式，
      * 来达到系统无需手动执行数据库脚本文件。
      */
     public void tryDoUpgrade() {
@@ -165,8 +173,12 @@ public class DbUpgradeService implements AutoCloseable {
             if (getExecSqlList(storedSqlVersion()).isEmpty()) {
                 return;
             }
-            try (DistributedLock lock = locks.acquire(
-                    DistributedLock.SCHEMA_UPGRADE_KEY, 30, TimeUnit.SECONDS, () -> cancelled)) {
+            try (DistributedLock lock =
+                    locks.acquire(
+                            DistributedLock.SCHEMA_UPGRADE_KEY,
+                            30,
+                            TimeUnit.SECONDS,
+                            () -> cancelled)) {
                 acquiredLock = lock;
                 // Another instance may have completed migration since this instance read the cache.
                 long version = storedSqlVersion();
@@ -190,30 +202,44 @@ public class DbUpgradeService implements AutoCloseable {
                         new V31EntityMetadataUpgrade(dataSource, () -> cancelled).run();
                     }
                     checkRunning();
-                    UpgradeVersionHandler handler = UpgradeVersionHandlerHelpers.getUpgradeVersionHandler(entry.getKey());
+                    UpgradeVersionHandler handler =
+                            UpgradeVersionHandlerHelpers.getUpgradeVersionHandler(entry.getKey());
                     if (handler != null) {
                         handler.doUpgrade(dao);
                     }
                     // Bootstrap SQL must work before the Entity metadata columns exist.
                     checkRunning();
-                    Object versionRow = dao.queryFirstObj("SELECT siteId FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY);
+                    Object versionRow =
+                            dao.queryFirstObj(
+                                    "SELECT siteId FROM website WHERE name=?",
+                                    CacheService.ZRLOG_SQL_VERSION_KEY);
                     checkRunning();
                     if (versionRow == null) {
-                        dao.execute("INSERT INTO website(name,value) VALUES(?,?)", CacheService.ZRLOG_SQL_VERSION_KEY, entry.getKey().toString());
+                        dao.execute(
+                                "INSERT INTO website(name,value) VALUES(?,?)",
+                                CacheService.ZRLOG_SQL_VERSION_KEY,
+                                entry.getKey().toString());
                     } else {
-                        dao.execute("UPDATE website SET value=? WHERE name=?", entry.getKey().toString(), CacheService.ZRLOG_SQL_VERSION_KEY);
+                        dao.execute(
+                                "UPDATE website SET value=? WHERE name=?",
+                                entry.getKey().toString(),
+                                CacheService.ZRLOG_SQL_VERSION_KEY);
                     }
                 }
             }
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Database migration failed; application startup stopped", e);
-            throw new IllegalStateException("Database migration failed; application startup stopped", e);
+            throw new IllegalStateException(
+                    "Database migration failed; application startup stopped", e);
         }
     }
 
     private long storedSqlVersion() throws java.sql.SQLException {
         checkRunning();
-        Object stored = dao.queryFirstObj("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY);
+        Object stored =
+                dao.queryFirstObj(
+                        "SELECT value FROM website WHERE name=?",
+                        CacheService.ZRLOG_SQL_VERSION_KEY);
         return stored == null ? currentSqlVersion : Long.parseLong(stored.toString());
     }
 
@@ -224,9 +250,11 @@ public class DbUpgradeService implements AutoCloseable {
         try {
             synchronized (migrationMonitor) {
                 if (migrationThread == Thread.currentThread()) {
-                    throw new IllegalStateException("Cannot close the datasource from inside a running schema migration");
+                    throw new IllegalStateException(
+                            "Cannot close the datasource from inside a running schema migration");
                 }
-                // Let the current SQL finish; interrupting HTTP can leave its remote outcome unknown.
+                // Let the current SQL finish; interrupting HTTP can leave its remote outcome
+                // unknown.
                 while (migrationThread != null) {
                     try {
                         migrationMonitor.wait();
@@ -234,7 +262,8 @@ public class DbUpgradeService implements AutoCloseable {
                         interrupted = true;
                     }
                 }
-                // Retry a failed release from the migration's try-with-resources before datasource shutdown.
+                // Retry a failed release from the migration's try-with-resources before datasource
+                // shutdown.
                 if (acquiredLock != null) {
                     acquiredLock.close();
                 }
@@ -248,7 +277,8 @@ public class DbUpgradeService implements AutoCloseable {
 
     private void checkRunning() throws java.sql.SQLException {
         if (cancelled) {
-            throw new java.sql.SQLException("Schema migration cancelled because the application is stopping");
+            throw new java.sql.SQLException(
+                    "Schema migration cancelled because the application is stopping");
         }
     }
 
@@ -266,7 +296,8 @@ public class DbUpgradeService implements AutoCloseable {
             return true;
         }
         String jdbcUrl = dataSource.getDataSourceProperties().getProperty("jdbcUrl");
-        return jdbcUrl != null && jdbcUrl.regionMatches(true, 0, "jdbc:sqlite:", 0, "jdbc:sqlite:".length());
+        return jdbcUrl != null
+                && jdbcUrl.regionMatches(true, 0, "jdbc:sqlite:", 0, "jdbc:sqlite:".length());
     }
 
     private boolean isAlreadyAppliedSqliteSchemaChange(String sql, Exception exception) {
@@ -274,9 +305,11 @@ public class DbUpgradeService implements AutoCloseable {
             return false;
         }
         String normalizedSql = sql.trim().toLowerCase(Locale.ROOT);
-        boolean addColumn = normalizedSql.startsWith("alter table ") && normalizedSql.contains(" add column ");
-        boolean createIndex = normalizedSql.startsWith("create index ")
-                || normalizedSql.startsWith("create unique index ");
+        boolean addColumn =
+                normalizedSql.startsWith("alter table ") && normalizedSql.contains(" add column ");
+        boolean createIndex =
+                normalizedSql.startsWith("create index ")
+                        || normalizedSql.startsWith("create unique index ");
         if (!addColumn && !createIndex) {
             return false;
         }

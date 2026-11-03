@@ -1,16 +1,14 @@
 package com.zrlog.business.util;
 
-import com.hibegin.common.dao.dto.PageData;
-import com.zrlog.data.dto.ArticleBasicDTO;
-import org.junit.Test;
-
-import java.util.Arrays;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
-public class ArticleHelpersTest {
+import com.hibegin.common.dao.dto.PageData;
+import com.zrlog.data.dto.ArticleBasicDTO;
+import java.util.Arrays;
+import org.junit.Test;
 
+public class ArticleHelpersTest {
 
     private static ArticleBasicDTO article(String title, String digest, String content) {
         ArticleBasicDTO article = new ArticleBasicDTO();
@@ -44,7 +42,8 @@ public class ArticleHelpersTest {
     public void shouldHighlightTitleAndDigestWhenDigestContainsKeyword() throws Exception {
         ArticleBasicDTO article = article("About ZrLog", "ZrLog digest", "<p>body</p>");
 
-        ArticleHelpers.wrapperSearchKeyword(new PageData<>(1L, Arrays.asList(article)), "ZrLog", 120);
+        ArticleHelpers.wrapperSearchKeyword(
+                new PageData<>(1L, Arrays.asList(article)), "ZrLog", 120);
 
         assertEquals("About <font color=\"#CC0000\">ZrLog</font>", article.getTitle());
         assertEquals("<font color=\"#CC0000\">ZrLog</font> digest", article.getDigest());
@@ -52,12 +51,13 @@ public class ArticleHelpersTest {
 
     @Test
     public void shouldFallbackToPlainContentWhenDigestDoesNotContainKeyword() throws Exception {
-        ArticleBasicDTO article = article("Plain title", "short digest", "<p>Hello <strong>ZrLog</strong></p>");
+        ArticleBasicDTO article =
+                article("Plain title", "short digest", "<p>Hello <strong>ZrLog</strong></p>");
 
-        ArticleHelpers.wrapperSearchKeyword(new PageData<>(1L, Arrays.asList(article)), "ZrLog", 120);
+        ArticleHelpers.wrapperSearchKeyword(
+                new PageData<>(1L, Arrays.asList(article)), "ZrLog", 120);
 
         assertEquals("Plain title", article.getTitle());
         assertEquals("Hello <font color=\"#CC0000\">ZrLog</font>", article.getDigest());
     }
-
 }

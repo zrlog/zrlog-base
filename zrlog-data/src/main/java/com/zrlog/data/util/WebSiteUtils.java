@@ -4,7 +4,6 @@ import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.hibegin.common.util.StringUtils;
 import com.zrlog.common.Constants;
 import com.zrlog.common.vo.PublicWebSiteInfo;
-
 import java.util.Objects;
 
 public class WebSiteUtils {
@@ -12,11 +11,12 @@ public class WebSiteUtils {
     public static final String DEFAULT_COLOR_PRIMARY_COLOR = "#1677ff";
     public static final long DEFAULT_ARTICLE_DIGEST_LENGTH = 200;
     public static final String DEFAULT_CONTENT_PROTECTOR_LICENSE_TYPE = "ALL_RIGHTS_RESERVED";
-    public static final String DEFAULT_CONTENT_PROTECTOR_TEMPLATE = "<div class=\"zrlog-content-protector\" data-license=\"{licenseType}\">\n"
-            + "  <p>本文作者：{author}</p>\n"
-            + "  <p>原文链接：<a href=\"{url}\">{url}</a></p>\n"
-            + "  <p>版权声明：{licenseName}，转载请注明出处。</p>\n"
-            + "</div>";
+    public static final String DEFAULT_CONTENT_PROTECTOR_TEMPLATE =
+            "<div class=\"zrlog-content-protector\" data-license=\"{licenseType}\">\n"
+                    + "  <p>本文作者：{author}</p>\n"
+                    + "  <p>原文链接：<a href=\"{url}\">{url}</a></p>\n"
+                    + "  <p>版权声明：{licenseName}，转载请注明出处。</p>\n"
+                    + "</div>";
     public static long DEFAULT_SESSION_TIMEOUT = 1000 * 60 * 60 * 24L;
 
     public static PublicWebSiteInfo fillDefaultInfo(PublicWebSiteInfo info) {
@@ -34,7 +34,8 @@ public class WebSiteUtils {
         info.setGenerator_html_status(Objects.equals(info.getGenerator_html_status(), true));
         info.setArticle_thumbnail_status(Objects.equals(info.getArticle_thumbnail_status(), true));
         info.setAdmin_compactMode(Objects.equals(info.getAdmin_compactMode(), true));
-        info.setContent_protector_enabled(Objects.equals(info.getContent_protector_enabled(), true));
+        info.setContent_protector_enabled(
+                Objects.equals(info.getContent_protector_enabled(), true));
         if (StringUtils.isEmpty(info.getContent_protector_license_type())) {
             info.setContent_protector_license_type(DEFAULT_CONTENT_PROTECTOR_LICENSE_TYPE);
         }

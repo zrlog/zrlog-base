@@ -2,7 +2,6 @@ package com.zrlog.business.plugin;
 
 import com.hibegin.common.util.LoggerUtil;
 import com.zrlog.util.ExecutionDeadline;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
@@ -11,9 +10,7 @@ import java.net.SocketTimeoutException;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
-/**
- * 处理由于未知原因插件异常停止后，还可以通过命令重新加载，保证插件的高可用。
- */
+/** 处理由于未知原因插件异常停止后，还可以通过命令重新加载，保证插件的高可用。 */
 class PluginGhostWatcher implements AutoCloseable {
 
     static final int READ_BUFFER_SIZE = 8 * 1024;
@@ -46,24 +43,33 @@ class PluginGhostWatcher implements AutoCloseable {
     }
 
     boolean doWatch(Supplier<ExecutionDeadline> startupDeadline) {
-        //使用Socket的方式进行监听，如果插件服务停止后，那么SocketServer也会被关闭，标记插件服务停止。
+        // 使用Socket的方式进行监听，如果插件服务停止后，那么SocketServer也会被关闭，标记插件服务停止。
         boolean connected = false;
         try {
-            //待插件启动
+            // 待插件启动
             ExecutionDeadline deadline = startupDeadline.get();
-            Thread.sleep(deadline == null ? waitMillis : Math.min(waitMillis, deadline.requireRemainingMillis()));
+            Thread.sleep(
+                    deadline == null
+                            ? waitMillis
+                            : Math.min(waitMillis, deadline.requireRemainingMillis()));
             if (closed) return false;
             try (Socket socket = new Socket()) {
                 activeSocket = socket;
                 if (closed) return false;
                 deadline = startupDeadline.get();
-                int connectMillis = deadline == null ? 3000 : (int) Math.min(3000, deadline.requireRemainingMillis());
+                int connectMillis =
+                        deadline == null
+                                ? 3000
+                                : (int) Math.min(3000, deadline.requireRemainingMillis());
                 socket.connect(new InetSocketAddress(host, port), connectMillis);
                 connected = true;
                 byte[] buffer = new byte[READ_BUFFER_SIZE];
                 while (!closed) {
                     deadline = startupDeadline.get();
-                    socket.setSoTimeout(deadline == null ? 250 : (int) Math.min(250, deadline.requireRemainingMillis()));
+                    socket.setSoTimeout(
+                            deadline == null
+                                    ? 250
+                                    : (int) Math.min(250, deadline.requireRemainingMillis()));
                     try {
                         if (socket.getInputStream().read(buffer) < 0) break;
                     } catch (SocketTimeoutException pending) {
@@ -91,7 +97,9 @@ class PluginGhostWatcher implements AutoCloseable {
         if (socket != null) {
             try {
                 socket.close();
-            } catch (IOException ignored) { /* Closing again is harmless. */ }
+            } catch (IOException ignored) {
+                /* Closing again is harmless. */
+            }
         }
     }
 }

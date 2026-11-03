@@ -2,7 +2,6 @@ package com.zrlog.business.template.util;
 
 import com.hibegin.common.util.IOUtil;
 import com.zrlog.theme.spi.BundledThemes;
-
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,7 +18,9 @@ public class BlogResourceUtils {
     private BlogResourceUtils() {
         InputStream resourceAsStream = BlogResourceUtils.class.getResourceAsStream("/resource.txt");
         if (Objects.nonNull(resourceAsStream)) {
-            this.resources = Arrays.stream(IOUtil.getStringInputStream(resourceAsStream).split("\n")).collect(Collectors.toList());
+            this.resources =
+                    Arrays.stream(IOUtil.getStringInputStream(resourceAsStream).split("\n"))
+                            .collect(Collectors.toList());
         } else {
             this.resources = new ArrayList<>();
         }

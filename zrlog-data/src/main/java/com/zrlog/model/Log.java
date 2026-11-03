@@ -3,7 +3,6 @@ package com.zrlog.model;
 import com.hibegin.common.dao.entity.BaseEntity;
 import com.hibegin.common.dao.entity.Column;
 import com.hibegin.common.dao.entity.Entity;
-
 import java.sql.Timestamp;
 
 // Article IDs are assigned under the existing creation lock so the initial alias uses the same ID.
@@ -13,8 +12,10 @@ public class Log extends BaseEntity<Long> {
     private Boolean canComment = true;
     private Integer click = 0;
     private String content;
+
     @Column("plain_content")
     private String plainContent;
+
     private String markdown;
     private String digest;
     private String keywords;
@@ -28,10 +29,13 @@ public class Log extends BaseEntity<Long> {
     private Boolean hot;
     private Boolean rubbish;
     private Boolean privacy;
+
     @Column("editor_type")
     private String editorType;
+
     @Column("arrange_plugin")
     private String arrangePlugin;
+
     private String extensions;
 
     public String getAlias() {

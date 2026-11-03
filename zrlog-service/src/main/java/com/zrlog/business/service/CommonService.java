@@ -7,7 +7,6 @@ import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.ZrLogUtil;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -31,7 +30,13 @@ public class CommonService {
             themeColor = adminColor;
         }
         String appId = publicWebSiteInfo.getAppId();
-        return new PublicInfoVO(BlogBuildInfoUtil.getVersion(), publicWebSiteInfo.getTitle(), ZrLogUtil.getHomeUrlWithHost(request, publicWebSiteInfo.getHost()), darkMode, adminColor, themeColor, appId);
+        return new PublicInfoVO(
+                BlogBuildInfoUtil.getVersion(),
+                publicWebSiteInfo.getTitle(),
+                ZrLogUtil.getHomeUrlWithHost(request, publicWebSiteInfo.getHost()),
+                darkMode,
+                adminColor,
+                themeColor,
+                appId);
     }
-
 }

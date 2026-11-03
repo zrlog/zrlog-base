@@ -2,7 +2,6 @@ package com.zrlog.business.util;
 
 import com.hibegin.common.dao.dto.*;
 import com.hibegin.http.server.web.Controller;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -10,9 +9,7 @@ import java.util.Objects;
 
 public class ControllerUtil {
 
-    /**
-     * 分页参数
-     */
+    /** 分页参数 */
     public static PageRequest getPageRequest(Controller controller) {
         return toPageRequest(controller, 10);
     }
@@ -34,7 +31,7 @@ public class ControllerUtil {
     private static List<OrderBy> getOrderByListByParamMap(Map<String, String[]> paramMap) {
         String[] sorts = paramMap.get("sort");
         if (Objects.isNull(sorts) || sorts.length == 0) {
-            //兼容旧的 key
+            // 兼容旧的 key
             sorts = paramMap.get("sidx");
         }
         if (Objects.isNull(sorts) || sorts.length == 0) {
@@ -46,7 +43,8 @@ public class ControllerUtil {
             String key = args[0].trim();
             if (args.length > 1) {
                 // 兼容路由查询串被拼到排序方向上的旧请求。
-                orders.add(new OrderBy(key, Direction.valueOf(args[1].split("\\?")[0].toUpperCase())));
+                orders.add(
+                        new OrderBy(key, Direction.valueOf(args[1].split("\\?")[0].toUpperCase())));
             } else {
                 orders.add(new OrderBy(key, Direction.DESC));
             }

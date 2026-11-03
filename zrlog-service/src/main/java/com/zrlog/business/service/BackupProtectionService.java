@@ -4,7 +4,6 @@ import com.hibegin.common.util.StringUtils;
 import com.zrlog.business.rest.response.BackupProtectionStatus;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-
 import java.util.*;
 import java.util.function.LongSupplier;
 import java.util.regex.Pattern;
@@ -24,16 +23,16 @@ public class BackupProtectionService {
     static final String LAST_VERIFICATION_MESSAGE = "backupProtectionLastVerificationMessage";
     private static final long MAX_CLOCK_SKEW_MILLIS = 5L * 60 * 1000;
     private static final Pattern SHA256 = Pattern.compile("^[0-9a-fA-F]{64}$");
-    private static final List<String> EVIDENCE_KEYS = Arrays.asList(
-            LAST_BACKUP_AT,
-            LAST_BACKUP_FILE,
-            LAST_BACKUP_SHA256,
-            LAST_VERIFIED_AT,
-            LAST_VERIFIED_FILE,
-            LAST_VERIFIED_SHA256,
-            LAST_VERIFICATION_SUCCESS,
-            LAST_VERIFICATION_MESSAGE
-    );
+    private static final List<String> EVIDENCE_KEYS =
+            Arrays.asList(
+                    LAST_BACKUP_AT,
+                    LAST_BACKUP_FILE,
+                    LAST_BACKUP_SHA256,
+                    LAST_VERIFIED_AT,
+                    LAST_VERIFIED_FILE,
+                    LAST_VERIFIED_SHA256,
+                    LAST_VERIFICATION_SUCCESS,
+                    LAST_VERIFICATION_MESSAGE);
 
     private final WebsiteKvService websiteKvService;
     private final LongSupplier currentTimeMillis;
@@ -79,7 +78,8 @@ public class BackupProtectionService {
     }
 
     private static boolean validEvidence(BackupProtectionStatus status, long now) {
-        if (status.getLastBackupAt() < 0 || status.getLastBackupAt() > now + MAX_CLOCK_SKEW_MILLIS) {
+        if (status.getLastBackupAt() < 0
+                || status.getLastBackupAt() > now + MAX_CLOCK_SKEW_MILLIS) {
             return false;
         }
         if (!SHA256.matcher(status.getLastBackupSha256()).matches()) {
@@ -91,7 +91,7 @@ public class BackupProtectionService {
         return status.getLastVerifiedAt() >= 0
                 && status.getLastVerifiedAt() <= now + MAX_CLOCK_SKEW_MILLIS
                 && (StringUtils.isEmpty(status.getLastVerifiedSha256())
-                || SHA256.matcher(status.getLastVerifiedSha256()).matches());
+                        || SHA256.matcher(status.getLastVerifiedSha256()).matches());
     }
 
     private static Long toLong(Object value) {

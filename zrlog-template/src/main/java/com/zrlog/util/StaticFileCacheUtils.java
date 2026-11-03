@@ -5,7 +5,6 @@ import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.SecurityUtils;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.template.util.BlogResourceUtils;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -37,14 +36,16 @@ public class StaticFileCacheUtils {
         String staticPath = PathUtil.getStaticPath();
         FileUtils.getAllFiles(staticPath, staticFiles);
         Map<String, String> cacheMap = new HashMap<>();
-        List<String> cacheableFileExts = Arrays.asList(".css", ".js", ".png", ".jpg", ".png", ".webp", ".ico");
+        List<String> cacheableFileExts =
+                Arrays.asList(".css", ".js", ".png", ".jpg", ".png", ".webp", ".ico");
         Path staticRoot = Path.of(staticPath).toAbsolutePath().normalize();
         for (File file : staticFiles) {
             Path filePath = file.toPath().toAbsolutePath().normalize();
             if (!filePath.startsWith(staticRoot) || file.isDirectory()) {
                 continue;
             }
-            String uri = staticRoot.relativize(filePath).toString().replace(File.separatorChar, '/');
+            String uri =
+                    staticRoot.relativize(filePath).toString().replace(File.separatorChar, '/');
             if (cacheableFileExts.stream().noneMatch(e -> uri.toLowerCase().endsWith(e))) {
                 continue;
             }
@@ -57,7 +58,6 @@ public class StaticFileCacheUtils {
         return cacheMap;
     }
 
-
     public void refreshCacheFileMap() {
         Map<String, String> tempMap = getCacheFileMap();
         cacheFileMap.clear();
@@ -65,20 +65,19 @@ public class StaticFileCacheUtils {
     }
 
     public boolean isCacheableByRequest(String uriPath) {
-        //disable html client cache
+        // disable html client cache
         if (uriPath.endsWith(".html")) {
             return false;
         }
         return cacheFileMap.containsKey(uriPath.substring(1));
     }
 
-
     public String getStreamTag(InputStream inputStream) {
         return Math.abs(SecurityUtils.md5(inputStream).hashCode()) + "";
     }
 
     public String getFileFlagFirstByCache(String uri) {
-        //外部链接，不查询缓存 id
+        // 外部链接，不查询缓存 id
         if (uri.startsWith("https://") || uri.startsWith("http://")) {
             return null;
         }

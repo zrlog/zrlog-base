@@ -5,18 +5,20 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.common.vo.SocialPreviewDTO;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.util.ParseUtil;
-
 import java.util.StringJoiner;
 
 public class SocialPreviewUtils {
 
     private static final int DESCRIPTION_MAX_LENGTH = 110;
 
-    private SocialPreviewUtils() {
-    }
+    private SocialPreviewUtils() {}
 
-    public static SocialPreviewDTO article(PublicWebSiteInfo webSite, ArticleBasicDTO article, String title,
-                                           String url, String image) {
+    public static SocialPreviewDTO article(
+            PublicWebSiteInfo webSite,
+            ArticleBasicDTO article,
+            String title,
+            String url,
+            String image) {
         SocialPreviewDTO preview = new SocialPreviewDTO();
         preview.setType("article");
         preview.setTitle(cleanText(title));
@@ -24,7 +26,8 @@ public class SocialPreviewUtils {
         preview.setUrl(cleanText(url));
         preview.setSiteName(cleanText(webSite == null ? "" : webSite.getTitle()));
         preview.setImage(cleanText(image));
-        preview.setTwitterCard(StringUtils.isEmpty(preview.getImage()) ? "summary" : "summary_large_image");
+        preview.setTwitterCard(
+                StringUtils.isEmpty(preview.getImage()) ? "summary" : "summary_large_image");
         preview.setAuthor(cleanText(resolveAuthor(webSite, article)));
         preview.setPublishedTime(cleanText(article == null ? "" : article.getFullReleaseTime()));
         preview.setModifiedTime(cleanText(article == null ? "" : article.getFullLastUpdateDate()));
@@ -32,8 +35,8 @@ public class SocialPreviewUtils {
         return preview;
     }
 
-    public static SocialPreviewDTO website(PublicWebSiteInfo webSite, String title, String description, String url,
-                                           String image) {
+    public static SocialPreviewDTO website(
+            PublicWebSiteInfo webSite, String title, String description, String url, String image) {
         SocialPreviewDTO preview = new SocialPreviewDTO();
         preview.setType("website");
         preview.setTitle(cleanText(title));
@@ -41,7 +44,8 @@ public class SocialPreviewUtils {
         preview.setUrl(cleanText(url));
         preview.setSiteName(cleanText(webSite == null ? "" : webSite.getTitle()));
         preview.setImage(cleanText(image));
-        preview.setTwitterCard(StringUtils.isEmpty(preview.getImage()) ? "summary" : "summary_large_image");
+        preview.setTwitterCard(
+                StringUtils.isEmpty(preview.getImage()) ? "summary" : "summary_large_image");
         preview.setAuthor(cleanText(webSite == null ? "" : webSite.getAuthor()));
         preview.setMetaHtml(renderMetaHtml(preview));
         return preview;
@@ -69,13 +73,23 @@ public class SocialPreviewUtils {
 
     private static void addProperty(StringJoiner joiner, String property, String content) {
         if (StringUtils.isNotEmpty(content)) {
-            joiner.add("<meta property=\"" + escapeAttribute(property) + "\" content=\"" + escapeAttribute(content) + "\"/>");
+            joiner.add(
+                    "<meta property=\""
+                            + escapeAttribute(property)
+                            + "\" content=\""
+                            + escapeAttribute(content)
+                            + "\"/>");
         }
     }
 
     private static void addName(StringJoiner joiner, String name, String content) {
         if (StringUtils.isNotEmpty(content)) {
-            joiner.add("<meta name=\"" + escapeAttribute(name) + "\" content=\"" + escapeAttribute(content) + "\"/>");
+            joiner.add(
+                    "<meta name=\""
+                            + escapeAttribute(name)
+                            + "\" content=\""
+                            + escapeAttribute(content)
+                            + "\"/>");
         }
     }
 

@@ -2,7 +2,6 @@ package com.zrlog.common.cache.vo;
 
 import com.zrlog.common.cache.dto.*;
 import com.zrlog.common.vo.PublicWebSiteInfo;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -10,9 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 程序初始化的数据（及全局的数据），存放了标签，分类，网站设置等信息。
- */
+/** 程序初始化的数据（及全局的数据），存放了标签，分类，网站设置等信息。 */
 public class BaseDataInitVO implements Serializable {
 
     private Long version;
@@ -31,8 +28,7 @@ public class BaseDataInitVO implements Serializable {
     private List<UserBasicDTO> users = new ArrayList<>();
     private Map<String, Map<String, Object>> templateConfigCacheMap = new ConcurrentHashMap<>();
 
-    public BaseDataInitVO() {
-    }
+    public BaseDataInitVO() {}
 
     public Map<String, Long> getArchives() {
         return archives;
@@ -160,8 +156,7 @@ public class BaseDataInitVO implements Serializable {
         private Long totalTagSize;
         private Long totalTypeSize;
 
-        public Statistics() {
-        }
+        public Statistics() {}
 
         public Long getTotalArticleSize() {
             return totalArticleSize;

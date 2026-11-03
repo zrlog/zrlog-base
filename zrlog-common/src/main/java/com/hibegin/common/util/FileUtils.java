@@ -1,6 +1,5 @@
 package com.hibegin.common.util;
 
-
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -60,7 +59,10 @@ public class FileUtils {
                     if (fl.isDirectory()) {
                         moveOrCopyFolder(fl.toString(), targetFolder, isMove);
                     } else {
-                        moveOrCopyFile(fl.toString(), targetFolder + File.separator + fl.getName(), isMove);
+                        moveOrCopyFile(
+                                fl.toString(),
+                                targetFolder + File.separator + fl.getName(),
+                                isMove);
                     }
                 }
             }
@@ -69,12 +71,12 @@ public class FileUtils {
         }
     }
 
-
     public static void moveOrCopyFile(String destFile, String targetFile, boolean isMove) {
         Path source = Path.of(destFile).toAbsolutePath().normalize();
         Path target = Path.of(targetFile).toAbsolutePath().normalize();
         try {
-            if (source.equals(target) || (Files.exists(target) && Files.isSameFile(source, target))) {
+            if (source.equals(target)
+                    || (Files.exists(target) && Files.isSameFile(source, target))) {
                 return;
             }
             Path parent = target.getParent();
@@ -91,8 +93,9 @@ public class FileUtils {
             }
             copyThenDelete(source, target);
         } catch (IOException e) {
-            throw new UncheckedIOException("Unable to " + (isMove ? "move" : "copy") + " file "
-                    + source + " to " + target, e);
+            throw new UncheckedIOException(
+                    "Unable to " + (isMove ? "move" : "copy") + " file " + source + " to " + target,
+                    e);
         }
     }
 
@@ -103,7 +106,10 @@ public class FileUtils {
         }
         Path temporary = Files.createTempFile(parent, "." + target.getFileName() + "-", ".tmp");
         try {
-            Files.copy(source, temporary, StandardCopyOption.REPLACE_EXISTING,
+            Files.copy(
+                    source,
+                    temporary,
+                    StandardCopyOption.REPLACE_EXISTING,
                     StandardCopyOption.COPY_ATTRIBUTES);
             moveReplacing(temporary, target);
             Files.delete(source);
@@ -114,7 +120,11 @@ public class FileUtils {
 
     private static void moveReplacing(Path source, Path target) throws IOException {
         try {
-            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            Files.move(
+                    source,
+                    target,
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
         } catch (AtomicMoveNotSupportedException e) {
             Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
         }
@@ -147,7 +157,6 @@ public class FileUtils {
         f.delete();
     }
 
-
     public static void tryResizeDiskSpace(String path, long currentLength, long maxLength) {
         List<File> fileList = new ArrayList<>();
         FileUtils.getAllFiles(path, fileList);
@@ -156,12 +165,14 @@ public class FileUtils {
             totalSize += tFile.length();
         }
         if (totalSize >= maxLength) {
-            Collections.sort(fileList, new Comparator<File>() {
-                @Override
-                public int compare(File o1, File o2) {
-                    return Long.compare(o1.lastModified(), o2.lastModified());
-                }
-            });
+            Collections.sort(
+                    fileList,
+                    new Comparator<File>() {
+                        @Override
+                        public int compare(File o1, File o2) {
+                            return Long.compare(o1.lastModified(), o2.lastModified());
+                        }
+                    });
             long needRemoveSize = totalSize - maxLength;
             for (File tFile : fileList) {
                 needRemoveSize -= tFile.length();
@@ -180,5 +191,4 @@ public class FileUtils {
         }
         return name.substring(name.lastIndexOf(".") + 1);
     }
-
 }

@@ -1,18 +1,17 @@
 package com.zrlog.business.version;
 
+import static org.junit.Assert.assertEquals;
+
 import com.hibegin.common.dao.DAO;
 import com.hibegin.common.dao.DataSourceWrapper;
-import org.apache.commons.dbutils.QueryRunner;
-import org.junit.Test;
-
 import java.lang.reflect.Proxy;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.Assert.assertEquals;
+import org.apache.commons.dbutils.QueryRunner;
+import org.junit.Test;
 
 public class UpgradeVersionHandlersTest {
 
@@ -60,28 +59,29 @@ public class UpgradeVersionHandlersTest {
         }
 
         private static DataSourceWrapper dataSource() {
-            return (DataSourceWrapper) Proxy.newProxyInstance(
-                    UpgradeVersionHandlersTest.class.getClassLoader(),
-                    new Class[]{DataSourceWrapper.class},
-                    (proxy, method, args) -> {
-                        if ("getQueryRunner".equals(method.getName())) {
-                            return new QueryRunner();
-                        }
-                        if ("toString".equals(method.getName())) {
-                            return "DataSourceWrapperProxy";
-                        }
-                        Class<?> returnType = method.getReturnType();
-                        if (returnType == boolean.class) {
-                            return false;
-                        }
-                        if (returnType == int.class) {
-                            return 0;
-                        }
-                        if (returnType == long.class) {
-                            return 0L;
-                        }
-                        return null;
-                    });
+            return (DataSourceWrapper)
+                    Proxy.newProxyInstance(
+                            UpgradeVersionHandlersTest.class.getClassLoader(),
+                            new Class[] {DataSourceWrapper.class},
+                            (proxy, method, args) -> {
+                                if ("getQueryRunner".equals(method.getName())) {
+                                    return new QueryRunner();
+                                }
+                                if ("toString".equals(method.getName())) {
+                                    return "DataSourceWrapperProxy";
+                                }
+                                Class<?> returnType = method.getReturnType();
+                                if (returnType == boolean.class) {
+                                    return false;
+                                }
+                                if (returnType == int.class) {
+                                    return 0;
+                                }
+                                if (returnType == long.class) {
+                                    return 0L;
+                                }
+                                return null;
+                            });
         }
 
         @Override
@@ -101,14 +101,12 @@ public class UpgradeVersionHandlersTest {
     private static class FastV5UpgradeVersionHandler extends V5UpgradeVersionHandler {
 
         @Override
-        protected void beforeUpgrade() {
-        }
+        protected void beforeUpgrade() {}
     }
 
     private static class FastV6UpgradeVersionHandler extends V6UpgradeVersionHandler {
 
         @Override
-        protected void beforeUpgrade() {
-        }
+        protected void beforeUpgrade() {}
     }
 }

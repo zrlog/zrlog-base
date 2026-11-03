@@ -5,8 +5,7 @@ import com.zrlog.util.I18nUtil;
 
 public class DownloadUpgradeFileException extends AbstractBusinessException {
 
-    public DownloadUpgradeFileException() {
-    }
+    public DownloadUpgradeFileException() {}
 
     public DownloadUpgradeFileException(Throwable cause) {
         super(cause);

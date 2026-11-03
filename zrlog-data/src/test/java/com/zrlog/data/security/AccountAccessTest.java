@@ -1,16 +1,16 @@
 package com.zrlog.data.security;
 
-import org.junit.Test;
-
-import java.util.Map;
-import java.util.Set;
-
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Map;
+import java.util.Set;
+import org.junit.Test;
+
 public class AccountAccessTest {
     private AccountAccess account(String role) {
-        return AccountAccess.fromRow(Map.of("userId", 1, "role", role, "enabled", true, "authVersion", 0));
+        return AccountAccess.fromRow(
+                Map.of("userId", 1, "role", role, "enabled", true, "authVersion", 0));
     }
 
     @Test
@@ -20,9 +20,12 @@ public class AccountAccessTest {
         assertTrue(AccountAction.ARTICLE_READ.allowed(reader));
         assertFalse(reader.canPublish());
         assertFalse(AccountAction.ADMIN_APPOINT.allowed(reader));
-        assertFalse(AccountAction.ARTICLE_PUBLISH.allowed(reader.restrictActions(Set.of("article.publish"))));
+        assertFalse(
+                AccountAction.ARTICLE_PUBLISH.allowed(
+                        reader.restrictActions(Set.of("article.publish"))));
         assertTrue(owner.canPublish());
-        AccountAccess author = account("author").restrictActions(Set.of("site.configure", "article.publish"));
+        AccountAccess author =
+                account("author").restrictActions(Set.of("site.configure", "article.publish"));
         assertFalse(AccountAction.SITE_CONFIGURE.allowed(author));
         assertTrue(author.canPublish());
         assertFalse(author.canAccessArticle(2));
@@ -31,7 +34,10 @@ public class AccountAccessTest {
     @Test
     public void scopeAdapterReflectsDelegationAndPreservesAccountContentBoundaries() {
         AccountAccess editor = account("editor").restrictActions(Set.of("article.read"));
-        assertTrue(editor.scopes().containsAll(Set.of("articles:read", "articles:read_drafts", "articles:all")));
+        assertTrue(
+                editor.scopes()
+                        .containsAll(
+                                Set.of("articles:read", "articles:read_drafts", "articles:all")));
         assertFalse(editor.scopes().contains("articles:write"));
         assertFalse(editor.canAccessArticle(2, true));
         assertFalse(AccountAction.NOTIFICATION_CREATE.allowed(editor));

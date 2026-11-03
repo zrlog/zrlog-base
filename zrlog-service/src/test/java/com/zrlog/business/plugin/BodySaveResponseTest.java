@@ -1,12 +1,12 @@
 package com.zrlog.business.plugin;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.http.HttpVersion;
 import com.hibegin.http.server.api.HttpRequest;
 import com.hibegin.http.server.config.ResponseConfig;
 import com.hibegin.http.server.config.ServerConfig;
 import com.zrlog.business.plugin.type.StaticSiteType;
-import org.junit.Test;
-
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.lang.reflect.Proxy;
@@ -19,11 +19,9 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class BodySaveResponseTest {
-
 
     private static File tempFile(String name) throws Exception {
         File dir = Files.createTempDirectory("zrlog-body-save").toFile();
@@ -33,50 +31,55 @@ public class BodySaveResponseTest {
     }
 
     private static HttpRequest request(String uri) {
-        ServerConfig serverConfig = new ServerConfig()
-                .setApplicationName("zrlog-test")
-                .setApplicationVersion("test");
+        ServerConfig serverConfig =
+                new ServerConfig().setApplicationName("zrlog-test").setApplicationVersion("test");
         serverConfig.setContextPath("");
-        return (HttpRequest) Proxy.newProxyInstance(
-                BodySaveResponseTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    if ("getUri".equals(method.getName())) {
-                        return uri;
-                    }
-                    if ("getContextPath".equals(method.getName())) {
-                        return "";
-                    }
-                    if ("getScheme".equals(method.getName())) {
-                        return "https";
-                    }
-                    if ("getServerConfig".equals(method.getName())) {
-                        return serverConfig;
-                    }
-                    if ("getHttpVersion".equals(method.getName())) {
-                        return HttpVersion.HTTP_1_1;
-                    }
-                    if ("getHeader".equals(method.getName())) {
-                        return null;
-                    }
-                    if ("getCookies".equals(method.getName())) {
-                        return null;
-                    }
-                    if ("getHandler".equals(method.getName())) {
-                        return null;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "HttpRequestProxy";
-                    }
-                    return null;
-                });
+        return (HttpRequest)
+                Proxy.newProxyInstance(
+                        BodySaveResponseTest.class.getClassLoader(),
+                        new Class[] {HttpRequest.class},
+                        (proxy, method, args) -> {
+                            if ("getUri".equals(method.getName())) {
+                                return uri;
+                            }
+                            if ("getContextPath".equals(method.getName())) {
+                                return "";
+                            }
+                            if ("getScheme".equals(method.getName())) {
+                                return "https";
+                            }
+                            if ("getServerConfig".equals(method.getName())) {
+                                return serverConfig;
+                            }
+                            if ("getHttpVersion".equals(method.getName())) {
+                                return HttpVersion.HTTP_1_1;
+                            }
+                            if ("getHeader".equals(method.getName())) {
+                                return null;
+                            }
+                            if ("getCookies".equals(method.getName())) {
+                                return null;
+                            }
+                            if ("getHandler".equals(method.getName())) {
+                                return null;
+                            }
+                            if ("toString".equals(method.getName())) {
+                                return "HttpRequestProxy";
+                            }
+                            return null;
+                        });
     }
 
     @Test
     public void shouldPersistSuccessfulTextBodyToStaticCacheFile() throws Exception {
         File cacheFile = tempFile("article.html");
 
-        try (BodySaveResponse response = new BodySaveResponse(request("/article.html"), new ResponseConfig(), true, new TestStaticSitePlugin(cacheFile))) {
+        try (BodySaveResponse response =
+                new BodySaveResponse(
+                        request("/article.html"),
+                        new ResponseConfig(),
+                        true,
+                        new TestStaticSitePlugin(cacheFile))) {
             response.renderText("zrlog");
 
             assertEquals(cacheFile.getCanonicalFile(), response.getCacheFile().getCanonicalFile());
@@ -88,7 +91,12 @@ public class BodySaveResponseTest {
     public void shouldAppendHtmlSuffixForAdminExtensionlessUri() throws Exception {
         File cacheFile = tempFile("admin-page");
 
-        try (BodySaveResponse response = new BodySaveResponse(request("/admin/dashboard"), new ResponseConfig(), true, new TestStaticSitePlugin(cacheFile))) {
+        try (BodySaveResponse response =
+                new BodySaveResponse(
+                        request("/admin/dashboard"),
+                        new ResponseConfig(),
+                        true,
+                        new TestStaticSitePlugin(cacheFile))) {
             response.renderText("admin");
 
             assertTrue(response.getCacheFile().getName().endsWith(".html"));
@@ -100,8 +108,14 @@ public class BodySaveResponseTest {
     public void shouldSkipNonSuccessBodiesWhenSuccessStatusIsRequired() throws Exception {
         File cacheFile = tempFile("missing.html");
 
-        try (BodySaveResponse response = new BodySaveResponse(request("/missing.html"), new ResponseConfig(), true, new TestStaticSitePlugin(cacheFile))) {
-            response.write(new ByteArrayInputStream("missing".getBytes(StandardCharsets.UTF_8)), 404);
+        try (BodySaveResponse response =
+                new BodySaveResponse(
+                        request("/missing.html"),
+                        new ResponseConfig(),
+                        true,
+                        new TestStaticSitePlugin(cacheFile))) {
+            response.write(
+                    new ByteArrayInputStream("missing".getBytes(StandardCharsets.UTF_8)), 404);
 
             assertNull(response.getCacheFile());
         }
@@ -112,7 +126,12 @@ public class BodySaveResponseTest {
     public void shouldAllowErrorBodyWhenSuccessStatusIsNotRequired() throws Exception {
         File cacheFile = tempFile("error.html");
 
-        try (BodySaveResponse response = new BodySaveResponse(request("/error.html"), new ResponseConfig(), false, new TestStaticSitePlugin(cacheFile))) {
+        try (BodySaveResponse response =
+                new BodySaveResponse(
+                        request("/error.html"),
+                        new ResponseConfig(),
+                        false,
+                        new TestStaticSitePlugin(cacheFile))) {
             response.write(new ByteArrayInputStream("error".getBytes(StandardCharsets.UTF_8)), 500);
 
             assertNull(response.getCacheFile());
@@ -122,30 +141,48 @@ public class BodySaveResponseTest {
 
     @Test
     public void shouldExportNotFoundAndLegacySuccessButRejectOtherErrors() throws Exception {
-        for (int status : new int[]{404, 200, 500, 302}) {
+        for (int status : new int[] {404, 200, 500, 302}) {
             File cacheFile = tempFile("error-" + status + ".html");
-            try (BodySaveResponse response = new BodySaveResponse(request("/error/404.html"),
-                    new ResponseConfig(), true, 404, new TestStaticSitePlugin(cacheFile))) {
-                response.write(new ByteArrayInputStream("missing page".getBytes(StandardCharsets.UTF_8)), status);
-                if (status == 404 || status == 200) assertEquals(cacheFile, response.getCacheFile());
+            try (BodySaveResponse response =
+                    new BodySaveResponse(
+                            request("/error/404.html"),
+                            new ResponseConfig(),
+                            true,
+                            404,
+                            new TestStaticSitePlugin(cacheFile))) {
+                response.write(
+                        new ByteArrayInputStream("missing page".getBytes(StandardCharsets.UTF_8)),
+                        status);
+                if (status == 404 || status == 200)
+                    assertEquals(cacheFile, response.getCacheFile());
                 else assertNull(response.getCacheFile());
             }
             assertEquals(status == 404 || status == 200, cacheFile.exists());
-            if (status == 404 || status == 200) assertEquals("missing page", Files.readString(cacheFile.toPath()));
+            if (status == 404 || status == 200)
+                assertEquals("missing page", Files.readString(cacheFile.toPath()));
         }
     }
 
     @Test
     public void rememberedWriteFailureCannotBeReportedAsCompleted() throws Exception {
         File cacheFile = tempFile("article.html");
-        StaticGenerationBudget budget = new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(5000), () -> {
-        });
-        try (BodySaveResponse response = new BodySaveResponse(request("/article.html"), new ResponseConfig(), true,
-                200, new TestStaticSitePlugin(cacheFile), budget)) {
+        StaticGenerationBudget budget =
+                new StaticGenerationBudget(
+                        com.zrlog.util.ExecutionDeadline.afterMillis(5000), () -> {});
+        try (BodySaveResponse response =
+                new BodySaveResponse(
+                        request("/article.html"),
+                        new ResponseConfig(),
+                        true,
+                        200,
+                        new TestStaticSitePlugin(cacheFile),
+                        budget)) {
             response.wrapperBaseResponseHeader(200);
             response.send("first".getBytes(StandardCharsets.UTF_8), true, false);
             response.close();
-            assertThrows(RuntimeException.class, () -> response.send("second".getBytes(StandardCharsets.UTF_8), true, true));
+            assertThrows(
+                    RuntimeException.class,
+                    () -> response.send("second".getBytes(StandardCharsets.UTF_8), true, true));
             assertThrows(RuntimeException.class, response::checkGenerationCompleted);
         }
         assertEquals("first", Files.readString(cacheFile.toPath()));
@@ -154,15 +191,25 @@ public class BodySaveResponseTest {
     @Test
     public void expiredBudgetDoesNotDeleteExistingFile() throws Exception {
         File cacheFile = tempFile("article.html");
-        StaticGenerationBudget budget = new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(0), () -> {
-        });
-        assertThrows(IllegalStateException.class, () -> new BodySaveResponse(request("/article.html"), new ResponseConfig(),
-                true, 200, new TestStaticSitePlugin(cacheFile), budget));
+        StaticGenerationBudget budget =
+                new StaticGenerationBudget(
+                        com.zrlog.util.ExecutionDeadline.afterMillis(0), () -> {});
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        new BodySaveResponse(
+                                request("/article.html"),
+                                new ResponseConfig(),
+                                true,
+                                200,
+                                new TestStaticSitePlugin(cacheFile),
+                                budget));
         assertEquals("stale", Files.readString(cacheFile.toPath()));
     }
 
     private static class TestStaticSitePlugin implements StaticSitePlugin {
-        private final com.zrlog.common.vo.PublicWebSiteInfo site = new com.zrlog.common.vo.PublicWebSiteInfo();
+        private final com.zrlog.common.vo.PublicWebSiteInfo site =
+                new com.zrlog.common.vo.PublicWebSiteInfo();
         private final File cacheFile;
         private final Map<String, HandleState> handleStatusPageMap = new HashMap<>();
         private final Lock parseLock = new ReentrantLock();
@@ -243,7 +290,6 @@ public class BodySaveResponseTest {
         }
 
         @Override
-        public void doFetch(StaticSiteRenderer renderer) {
-        }
+        public void doFetch(StaticSiteRenderer renderer) {}
     }
 }

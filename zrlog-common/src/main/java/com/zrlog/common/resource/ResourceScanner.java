@@ -1,7 +1,6 @@
 package com.zrlog.common.resource;
 
 import com.zrlog.business.template.util.BlogResourceUtils;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +17,13 @@ public class ResourceScanner {
     public List<String> listFiles(String childPath) {
         List<String> scriptFiles = new ArrayList<>();
         if (rootPath.startsWith("classpath:")) {
-            scriptFiles.addAll(BlogResourceUtils.getInstance().searchResources(rootPath.replaceAll("classpath:/", "") + "/" + childPath).stream().map(e -> "classpath:/" + e).collect(Collectors.toList()));
+            scriptFiles.addAll(
+                    BlogResourceUtils.getInstance()
+                            .searchResources(
+                                    rootPath.replaceAll("classpath:/", "") + "/" + childPath)
+                            .stream()
+                            .map(e -> "classpath:/" + e)
+                            .collect(Collectors.toList()));
         } else {
             // IDE 环境：直接操作文件系统
             File scriptsDir = new File(rootPath, childPath);
@@ -45,6 +50,4 @@ public class ResourceScanner {
             }
         }
     }
-
-
 }

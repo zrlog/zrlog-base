@@ -21,7 +21,6 @@ import com.zrlog.data.service.DistributedLock;
 import com.zrlog.data.util.WebSiteUtils;
 import com.zrlog.util.ThreadUtils;
 import jakarta.inject.Inject;
-
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -33,9 +32,7 @@ import java.util.function.BooleanSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * 对缓存数据的操作
- */
+/** 对缓存数据的操作 */
 public class CacheServiceImpl implements CacheService {
     private static final Logger LOGGER = LoggerUtil.getLogger(CacheServiceImpl.class);
 
@@ -67,7 +64,8 @@ public class CacheServiceImpl implements CacheService {
         this.baseData = Objects.requireNonNull(baseData);
         this.lock = locks.create("base-data-init-cache");
         this.installed = Objects.requireNonNull(installed, "installed");
-        long versionStart = Long.parseLong(new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()) + "00000");
+        long versionStart =
+                Long.parseLong(new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()) + "00000");
         this.version = new AtomicLong(versionStart);
         Map<String, Object> baseInfo =
                 websites.get().getWebSiteByNameIn(Arrays.asList(CACHE_KEY, ZRLOG_SQL_VERSION_KEY));
@@ -152,7 +150,12 @@ public class CacheServiceImpl implements CacheService {
             } finally {
                 executor.shutdown();
                 if (Constants.debugLoggerPrintAble()) {
-                    LOGGER.info("RefreshInitDataCache [" + version + "] used time " + (System.currentTimeMillis() - start) + "ms");
+                    LOGGER.info(
+                            "RefreshInitDataCache ["
+                                    + version
+                                    + "] used time "
+                                    + (System.currentTimeMillis() - start)
+                                    + "ms");
                 }
             }
         } finally {
@@ -188,7 +191,11 @@ public class CacheServiceImpl implements CacheService {
     @Override
     public UserBasicDTO getUserInfoById(Long userId) {
         if (Objects.nonNull(cacheInit)) {
-            UserBasicDTO userBasicDTO = cacheInit.getUsers().stream().filter(e -> Objects.equals(e.getUserId(), userId)).findFirst().orElse(null);
+            UserBasicDTO userBasicDTO =
+                    cacheInit.getUsers().stream()
+                            .filter(e -> Objects.equals(e.getUserId(), userId))
+                            .findFirst()
+                            .orElse(null);
             if (Objects.nonNull(userBasicDTO)) {
                 return userBasicDTO;
             }
@@ -203,7 +210,8 @@ public class CacheServiceImpl implements CacheService {
     @Override
     public Map<String, Object> getTemplateConfigMapWithCache(String template) {
         if (Objects.nonNull(cacheInit)) {
-            Map<String, Map<String, Object>> templateConfigCacheMap = cacheInit.getTemplateConfigCacheMap();
+            Map<String, Map<String, Object>> templateConfigCacheMap =
+                    cacheInit.getTemplateConfigCacheMap();
             if (Objects.nonNull(templateConfigCacheMap)) {
                 Map<String, Object> configMap = templateConfigCacheMap.get(template);
                 if (Objects.nonNull(configMap)) {
@@ -217,8 +225,9 @@ public class CacheServiceImpl implements CacheService {
     @Override
     public PublicWebSiteInfo getPublicWebSiteInfo() {
         if (!installed.getAsBoolean()) {
-            PublicWebSiteInfo publicWebSiteInfo = WebSiteUtils.fillDefaultInfo(new PublicWebSiteInfo());
-            //blog
+            PublicWebSiteInfo publicWebSiteInfo =
+                    WebSiteUtils.fillDefaultInfo(new PublicWebSiteInfo());
+            // blog
             publicWebSiteInfo.setAppId("");
             publicWebSiteInfo.setTitle("");
             publicWebSiteInfo.setSecond_title("");
@@ -226,11 +235,11 @@ public class CacheServiceImpl implements CacheService {
             publicWebSiteInfo.setDescription("");
             publicWebSiteInfo.setStaticResourceHost("");
 
-            //other
+            // other
             publicWebSiteInfo.setWebCm("");
             publicWebSiteInfo.setIcp("");
             publicWebSiteInfo.setRobotRuleContent("");
-            //plugin
+            // plugin
             publicWebSiteInfo.setComment_plugin_name("");
             publicWebSiteInfo.setHost("");
             publicWebSiteInfo.setSystem_notification("");
@@ -245,5 +254,4 @@ public class CacheServiceImpl implements CacheService {
         }
         return websites.get().getPublicWebSite();
     }
-
 }

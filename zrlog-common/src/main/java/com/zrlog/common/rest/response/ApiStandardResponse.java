@@ -8,7 +8,6 @@ public class ApiStandardResponse<T> extends StandardResponse {
         this(null);
     }
 
-
     public ApiStandardResponse(T data) {
         this(data, "");
     }
@@ -16,7 +15,6 @@ public class ApiStandardResponse<T> extends StandardResponse {
     public ApiStandardResponse(T data, String message) {
         this.data = data;
         super.setMessage(message);
-
     }
 
     public T getData() {

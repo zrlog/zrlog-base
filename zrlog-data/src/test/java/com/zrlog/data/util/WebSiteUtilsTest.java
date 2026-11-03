@@ -1,10 +1,10 @@
 package com.zrlog.data.util;
 
+import static org.junit.Assert.*;
+
 import com.zrlog.common.Constants;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import org.junit.Test;
-
-import static org.junit.Assert.*;
 
 public class WebSiteUtilsTest {
 
@@ -13,10 +13,12 @@ public class WebSiteUtilsTest {
         PublicWebSiteInfo info = WebSiteUtils.fillDefaultInfo(new PublicWebSiteInfo());
 
         assertEquals(Long.valueOf(10), info.getRows());
-        assertEquals(Long.valueOf(WebSiteUtils.DEFAULT_ARTICLE_DIGEST_LENGTH),
+        assertEquals(
+                Long.valueOf(WebSiteUtils.DEFAULT_ARTICLE_DIGEST_LENGTH),
                 info.getArticle_auto_digest_length());
         assertEquals(Long.valueOf(24 * 60), info.getSession_timeout());
-        assertEquals(WebSiteUtils.DEFAULT_CONTENT_PROTECTOR_LICENSE_TYPE,
+        assertEquals(
+                WebSiteUtils.DEFAULT_CONTENT_PROTECTOR_LICENSE_TYPE,
                 info.getContent_protector_license_type());
         assertEquals(WebSiteUtils.DEFAULT_COLOR_PRIMARY_COLOR, info.getAdmin_color_primary());
         assertEquals("default", info.getAdmin_theme());

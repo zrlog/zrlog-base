@@ -8,9 +8,12 @@ import com.hibegin.common.dao.entity.Entity;
 public class LogExtensionIndex extends BaseEntity<Long> {
     @Column("log_id")
     private Integer logId;
+
     private String namespace;
+
     @Column("extension_path")
     private String extensionPath;
+
     @Column("extension_value")
     private String extensionValue;
 

@@ -2,7 +2,6 @@ package com.zrlog.common;
 
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.common.vo.Version;
-
 import java.io.File;
 
 public interface Updater extends com.zrlog.updater.spi.ApplicationUpdater {

@@ -1,5 +1,7 @@
 package com.zrlog.data.service;
 
+import static org.junit.Assert.*;
+
 import com.zrlog.common.CacheService;
 import com.zrlog.common.cache.dto.TagDTO;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
@@ -7,16 +9,13 @@ import com.zrlog.data.cache.CacheServiceImpl;
 import com.zrlog.data.di.DaggerDataComponent;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 @RunWith(Parameterized.class)
 public class BaseDataDbServiceDatabaseTest {
@@ -33,47 +32,121 @@ public class BaseDataDbServiceDatabaseTest {
     }
 
     private static void seedContent(ZrLogTestDatabase db) throws Exception {
-        db.update("insert into user(userId, email, password, userName, header) values(?, ?, ?, ?, ?)",
-                1, "admin@example.com", "password", "admin", "/avatar.png");
-        db.update("insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
-                1, "tech", "Tech", "Tech posts");
-        db.update("insert into link(linkId, linkName, url, sort, alt, icon, status) values(?, ?, ?, ?, ?, ?, ?)",
-                1, "ZrLog", "https://www.zrlog.com", 1, "ZrLog", "link", true);
-        db.update("insert into lognav(navId, navName, url, sort, icon) values(?, ?, ?, ?, ?)",
-                1, "Home", "/", 1, "home");
+        db.update(
+                "insert into user(userId, email, password, userName, header) values(?, ?, ?, ?, ?)",
+                1,
+                "admin@example.com",
+                "password",
+                "admin",
+                "/avatar.png");
+        db.update(
+                "insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
+                1,
+                "tech",
+                "Tech",
+                "Tech posts");
+        db.update(
+                "insert into link(linkId, linkName, url, sort, alt, icon, status) values(?, ?, ?, ?, ?, ?, ?)",
+                1,
+                "ZrLog",
+                "https://www.zrlog.com",
+                1,
+                "ZrLog",
+                "link",
+                true);
+        db.update(
+                "insert into lognav(navId, navName, url, sort, icon) values(?, ?, ?, ?, ?)",
+                1,
+                "Home",
+                "/",
+                1,
+                "home");
         insertPlugin(db, 1, "Plugin");
-        insertArticle(db, 1, "first", "First", "First content", "java,zrlog",
-                "2026-01-15 10:00:00", 5);
-        insertArticle(db, 2, "second", "Second", "Second content", "java",
-                "2026-01-20 11:00:00", 7);
-        db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                "title", "ZrLog Test", "title");
-        db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                "description", "A test site", "description");
-        db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                "template", "default", "template");
-        db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                "author", "Site Author", "author");
-        db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                "default_setting", "{\"foo\":\"bar\"}", "template config");
-        db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                CacheService.ZRLOG_SQL_VERSION_KEY, "42", "sql version");
+        insertArticle(
+                db, 1, "first", "First", "First content", "java,zrlog", "2026-01-15 10:00:00", 5);
+        insertArticle(
+                db, 2, "second", "Second", "Second content", "java", "2026-01-20 11:00:00", 7);
+        db.update(
+                "insert into website(name, value, remark) values(?, ?, ?)",
+                "title",
+                "ZrLog Test",
+                "title");
+        db.update(
+                "insert into website(name, value, remark) values(?, ?, ?)",
+                "description",
+                "A test site",
+                "description");
+        db.update(
+                "insert into website(name, value, remark) values(?, ?, ?)",
+                "template",
+                "default",
+                "template");
+        db.update(
+                "insert into website(name, value, remark) values(?, ?, ?)",
+                "author",
+                "Site Author",
+                "author");
+        db.update(
+                "insert into website(name, value, remark) values(?, ?, ?)",
+                "default_setting",
+                "{\"foo\":\"bar\"}",
+                "template config");
+        db.update(
+                "insert into website(name, value, remark) values(?, ?, ?)",
+                CacheService.ZRLOG_SQL_VERSION_KEY,
+                "42",
+                "sql version");
     }
 
-    private static void insertPlugin(ZrLogTestDatabase db, int id, String pluginName) throws Exception {
-        db.update("insert into plugin(pluginId, content, isSystem, pTitle, sort, pluginName, level)"
+    private static void insertPlugin(ZrLogTestDatabase db, int id, String pluginName)
+            throws Exception {
+        db.update(
+                "insert into plugin(pluginId, content, isSystem, pTitle, sort, pluginName, level)"
                         + " values(?, ?, ?, ?, ?, ?, ?)",
-                id, "{}", false, pluginName, id, pluginName, 1);
+                id,
+                "{}",
+                false,
+                pluginName,
+                id,
+                pluginName,
+                1);
     }
 
-    private static void insertArticle(ZrLogTestDatabase db, int id, String alias, String title, String content,
-                                      String keywords, String releaseTime, int click) throws Exception {
-        db.update("insert into log(logId, alias, canComment, click, version, content, plain_content, markdown,"
+    private static void insertArticle(
+            ZrLogTestDatabase db,
+            int id,
+            String alias,
+            String title,
+            String content,
+            String keywords,
+            String releaseTime,
+            int click)
+            throws Exception {
+        db.update(
+                "insert into log(logId, alias, canComment, click, version, content, plain_content, markdown,"
                         + " digest, keywords, recommended, releaseTime, last_update_date, title, typeId, userId,"
                         + " hot, rubbish, privacy, editor_type) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
                         + " ?, ?, ?, ?, ?, ?)",
-                id, alias, true, click, 1, content, content, content, "Digest", keywords, false,
-                releaseTime, releaseTime, title, 1, 1, false, false, false, "markdown");
+                id,
+                alias,
+                true,
+                click,
+                1,
+                content,
+                content,
+                content,
+                "Digest",
+                keywords,
+                false,
+                releaseTime,
+                releaseTime,
+                title,
+                1,
+                1,
+                false,
+                false,
+                false,
+                "markdown");
     }
 
     @Test
@@ -81,7 +154,11 @@ public class BaseDataDbServiceDatabaseTest {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
 
-            BaseDataInitVO init = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).baseData().queryCacheInit(Runnable::run);
+            BaseDataInitVO init =
+                    DaggerDataComponent.factory()
+                            .create(() -> db.dataSource(), () -> true)
+                            .baseData()
+                            .queryCacheInit(Runnable::run);
 
             assertEquals("ZrLog Test", init.getWebSite().getTitle());
             assertEquals(Long.valueOf(2), init.getStatistics().getTotalArticleSize());
@@ -104,8 +181,12 @@ public class BaseDataDbServiceDatabaseTest {
     public void shouldWaitForCategoryArticlesBeforeReturningSharedCache() throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
-            db.update("insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
-                    2, "empty", "Empty category", "No articles");
+            db.update(
+                    "insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
+                    2,
+                    "empty",
+                    "Empty category",
+                    "No articles");
             var data = DaggerDataComponent.factory().create(db::dataSource, () -> true);
             ExecutorService caller = Executors.newSingleThreadExecutor();
             ExecutorService workers = Executors.newFixedThreadPool(4);
@@ -114,30 +195,35 @@ public class BaseDataDbServiceDatabaseTest {
             CountDownLatch categoryLoadsQueued = new CountDownLatch(2);
             BlockingQueue<Runnable> deferredLoads = new LinkedBlockingQueue<>();
             AtomicReference<Thread> loadingThread = new AtomicReference<>();
-            Executor executor = task -> {
-                if (Thread.currentThread() == loadingThread.get()) {
-                    initialLoadQueued.countDown();
-                    workers.execute(() -> {
-                        try {
-                            if (!releaseInitialLoads.await(5, TimeUnit.SECONDS)) {
-                                throw new AssertionError("Initial cache loads were not released");
-                            }
-                            task.run();
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            throw new AssertionError(e);
+            Executor executor =
+                    task -> {
+                        if (Thread.currentThread() == loadingThread.get()) {
+                            initialLoadQueued.countDown();
+                            workers.execute(
+                                    () -> {
+                                        try {
+                                            if (!releaseInitialLoads.await(5, TimeUnit.SECONDS)) {
+                                                throw new AssertionError(
+                                                        "Initial cache loads were not released");
+                                            }
+                                            task.run();
+                                        } catch (InterruptedException e) {
+                                            Thread.currentThread().interrupt();
+                                            throw new AssertionError(e);
+                                        }
+                                    });
+                        } else {
+                            deferredLoads.add(task);
+                            categoryLoadsQueued.countDown();
                         }
-                    });
-                } else {
-                    deferredLoads.add(task);
-                    categoryLoadsQueued.countDown();
-                }
-            };
+                    };
             try {
-                Future<BaseDataInitVO> refresh = caller.submit(() -> {
-                    loadingThread.set(Thread.currentThread());
-                    return data.baseData().queryCacheInit(executor);
-                });
+                Future<BaseDataInitVO> refresh =
+                        caller.submit(
+                                () -> {
+                                    loadingThread.set(Thread.currentThread());
+                                    return data.baseData().queryCacheInit(executor);
+                                });
                 assertTrue(initialLoadQueued.await(5, TimeUnit.SECONDS));
                 assertThrows(TimeoutException.class, () -> refresh.get(200, TimeUnit.MILLISECONDS));
                 releaseInitialLoads.countDown();
@@ -169,17 +255,23 @@ public class BaseDataDbServiceDatabaseTest {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
 
-            CacheServiceImpl cacheService = ((CacheServiceImpl) DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).cache());
+            CacheServiceImpl cacheService =
+                    ((CacheServiceImpl)
+                            DaggerDataComponent.factory()
+                                    .create(() -> db.dataSource(), () -> true)
+                                    .cache());
             BaseDataInitVO init = cacheService.getInitData();
             Long firstVersion = init.getVersion();
             BaseDataInitVO refreshed = cacheService.refreshInitData();
-            Map<String, Object> savedCache = db.queryOne("select value from website where name=?",
-                    "base_data_init_cache_v3");
+            Map<String, Object> savedCache =
+                    db.queryOne(
+                            "select value from website where name=?", "base_data_init_cache_v3");
 
             assertEquals(42L, cacheService.getCurrentSqlVersion());
             assertTrue(cacheService.getWebSiteVersion() != 0);
             assertEquals("Tech", cacheService.getArticleTypes().get(0).getTypeName());
-            assertTrue(cacheService.getTags().stream().map(TagDTO::getText).anyMatch("java"::equals));
+            assertTrue(
+                    cacheService.getTags().stream().map(TagDTO::getText).anyMatch("java"::equals));
             assertEquals("admin", cacheService.getUserInfoById(1L).getUserName());
             assertEquals("bar", cacheService.getTemplateConfigMapWithCache("default").get("foo"));
             assertNotNull(savedCache);
@@ -193,22 +285,29 @@ public class BaseDataDbServiceDatabaseTest {
     public void shouldMergeTagCaseVariantsAndCountEachPublicArticleOnce() throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
-            db.update("update log set keywords=? where logId=?", "Silent Hill,SILENT HILL,silent hill", 1);
+            db.update(
+                    "update log set keywords=? where logId=?",
+                    "Silent Hill,SILENT HILL,silent hill",
+                    1);
             db.update("update log set keywords=? where logId=?", "SILENT HILL", 2);
-            CacheService cache = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).cache();
+            CacheService cache =
+                    DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).cache();
 
             BaseDataInitVO refreshed = cache.refreshInitData();
 
             assertEquals(1, refreshed.getTags().size());
             TagDTO tag = refreshed.getTags().get(0);
             assertTrue("Silent Hill".equalsIgnoreCase(tag.getText()));
-            assertTrue(List.of("Silent Hill", "SILENT HILL", "silent hill").contains(tag.getText()));
+            assertTrue(
+                    List.of("Silent Hill", "SILENT HILL", "silent hill").contains(tag.getText()));
             assertEquals(Long.valueOf(2), tag.getCount());
             assertEquals(Long.valueOf(tag.getText().hashCode()), tag.getKeycode());
             assertEquals(1L, refreshed.getStatistics().getTotalTagSize().longValue());
             assertEquals(1, db.queryList("select text,count from tag").size());
-            assertEquals(2, ((Number) db.queryOne("select count from tag").get("count")).intValue());
-            CacheService reloaded = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).cache();
+            assertEquals(
+                    2, ((Number) db.queryOne("select count from tag").get("count")).intValue());
+            CacheService reloaded =
+                    DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).cache();
             assertEquals(1, reloaded.getTags().size());
             assertEquals(tag.getText(), reloaded.getTags().get(0).getText());
             assertEquals(Long.valueOf(2), reloaded.getTags().get(0).getCount());
@@ -224,7 +323,11 @@ public class BaseDataDbServiceDatabaseTest {
             insertPlugin(db, 4, "links");
             insertPlugin(db, 5, "other");
 
-            BaseDataInitVO init = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).baseData().queryCacheInit(Runnable::run);
+            BaseDataInitVO init =
+                    DaggerDataComponent.factory()
+                            .create(() -> db.dataSource(), () -> true)
+                            .baseData()
+                            .queryCacheInit(Runnable::run);
 
             assertEquals(1, init.getPlugins().size());
             assertEquals("other", init.getPlugins().get(0).getPluginName());
@@ -241,7 +344,11 @@ public class BaseDataDbServiceDatabaseTest {
             try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 db.update("drop table " + table);
 
-                BaseDataInitVO init = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).baseData().queryCacheInit(Runnable::run);
+                BaseDataInitVO init =
+                        DaggerDataComponent.factory()
+                                .create(() -> db.dataSource(), () -> true)
+                                .baseData()
+                                .queryCacheInit(Runnable::run);
 
                 assertNotNull(init);
                 assertNotNull(init.getWebSite());

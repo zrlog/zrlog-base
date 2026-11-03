@@ -1,5 +1,7 @@
 package com.zrlog.business.updater;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.util.EnvKit;
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
@@ -9,12 +11,6 @@ import com.zrlog.common.vo.Version;
 import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
-import org.junit.Test;
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.Theories;
-import org.junit.experimental.theories.Theory;
-import org.junit.runner.RunWith;
-
 import java.io.IOException;
 import java.util.Date;
 import java.util.HashMap;
@@ -22,14 +18,16 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
+import org.junit.runner.RunWith;
 
 @RunWith(Theories.class)
 public class UpdateVersionInfoPluginTest {
 
-    @DataPoints
-    public static final DatabaseType[] DATABASES = DatabaseType.values();
+    @DataPoints public static final DatabaseType[] DATABASES = DatabaseType.values();
 
     private static Map<String, Object> noChangeLogRes() {
         Map<String, Object> res = new HashMap<>();
@@ -68,15 +66,20 @@ public class UpdateVersionInfoPluginTest {
     }
 
     @Theory
-    public void storedUpgradeNoticeKeepsTheCompletePreviewVersion(DatabaseType databaseType) throws Exception {
+    public void storedUpgradeNoticeKeepsTheCompletePreviewVersion(DatabaseType databaseType)
+            throws Exception {
         try (var db = ZrLogTestDatabase.open(databaseType)) {
-            var notices = new UpgradeNoticeService(() -> true, new WebsiteKvService(() -> new WebSiteRepository(db.dataSource())));
+            var notices =
+                    new UpgradeNoticeService(
+                            () -> true,
+                            new WebsiteKvService(() -> new WebSiteRepository(db.dataSource())));
             Version preview = version("99.0.0-SNAPSHOT");
             preview.setArtifactVersion(preview.getVersion());
             preview.setBuildDate(new Date(System.currentTimeMillis() + 3600000));
             notices.sync(preview);
 
-            assertEquals("99.0.0-SNAPSHOT", notices.getStoredUpgradeNotice().getVersion().getVersion());
+            assertEquals(
+                    "99.0.0-SNAPSHOT", notices.getStoredUpgradeNotice().getVersion().getVersion());
             assertEquals("99.0.0-SNAPSHOT", notices.getNotice().getVersion().getVersion());
             assertEquals("99.0.0-SNAPSHOT", notices.getNotice().getVersion().getArtifactVersion());
         }
@@ -84,11 +87,22 @@ public class UpdateVersionInfoPluginTest {
 
     @Test
     public void shouldExposeLifecycleWithoutStartingNetworkTask() {
-        UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> {
-            throw new IllegalStateException("Database is unavailable in this test");
-        })), () -> "zh_CN", null, new WebsiteKvService(() -> {
-            throw new IllegalStateException("Database is unavailable in this test");
-        }));
+        UpdateVersionInfoPlugin plugin =
+                new UpdateVersionInfoPlugin(
+                        new UpgradeNoticeService(
+                                () -> false,
+                                new WebsiteKvService(
+                                        () -> {
+                                            throw new IllegalStateException(
+                                                    "Database is unavailable in this test");
+                                        })),
+                        () -> "zh_CN",
+                        null,
+                        new WebsiteKvService(
+                                () -> {
+                                    throw new IllegalStateException(
+                                            "Database is unavailable in this test");
+                                }));
 
         assertEquals(!EnvKit.isFaaSMode(), plugin.autoStart());
         assertFalse(plugin.isStarted());
@@ -98,10 +112,16 @@ public class UpdateVersionInfoPluginTest {
     }
 
     @Theory
-    public void hostSchedulingDisablesLegacyTimerAndKeepsOnDemandChecks(DatabaseType databaseType) throws Exception {
+    public void hostSchedulingDisablesLegacyTimerAndKeepsOnDemandChecks(DatabaseType databaseType)
+            throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-            db.update("insert into website(name, value) values(?, ?)", WebsiteKvService.AUTO_UPGRADE_VERSION_KEY, "60");
-            var plugin = new TestUpdateVersionInfoPlugin(new FakeVersionTimerTask(version("3.7.0")), db.dataSource());
+            db.update(
+                    "insert into website(name, value) values(?, ?)",
+                    WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
+                    "60");
+            var plugin =
+                    new TestUpdateVersionInfoPlugin(
+                            new FakeVersionTimerTask(version("3.7.0")), db.dataSource());
             plugin.setExternallyScheduled(true);
             assertFalse(plugin.autoStart());
             assertTrue(plugin.start());
@@ -112,12 +132,23 @@ public class UpdateVersionInfoPluginTest {
     }
 
     @Theory
-    public void shouldStartWithoutSchedulingWhenAutoUpgradeIsDisabled(DatabaseType databaseType) throws Exception {
+    public void shouldStartWithoutSchedulingWhenAutoUpgradeIsDisabled(DatabaseType databaseType)
+            throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-            db.update("insert into website(name, value, remark) values(?, ?, ?)",
+            db.update(
+                    "insert into website(name, value, remark) values(?, ?, ?)",
                     WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
-                    String.valueOf(AutoUpgradeVersionType.NEVER.getCycle()), "");
-            UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSiteRepository(db.dataSource()))), () -> "zh_CN", null, new WebsiteKvService(() -> new WebSiteRepository(db.dataSource())));
+                    String.valueOf(AutoUpgradeVersionType.NEVER.getCycle()),
+                    "");
+            UpdateVersionInfoPlugin plugin =
+                    new UpdateVersionInfoPlugin(
+                            new UpgradeNoticeService(
+                                    () -> false,
+                                    new WebsiteKvService(
+                                            () -> new WebSiteRepository(db.dataSource()))),
+                            () -> "zh_CN",
+                            null,
+                            new WebsiteKvService(() -> new WebSiteRepository(db.dataSource())));
 
             assertTrue(plugin.start());
 
@@ -127,14 +158,22 @@ public class UpdateVersionInfoPluginTest {
     }
 
     @Theory
-    public void shouldStartScheduledVersionTaskFromDatabaseConfigWithoutNetwork(DatabaseType databaseType) throws Exception {
+    public void shouldStartScheduledVersionTaskFromDatabaseConfigWithoutNetwork(
+            DatabaseType databaseType) throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-            db.update("insert into website(name, value, remark) values(?, ?, ?)",
+            db.update(
+                    "insert into website(name, value, remark) values(?, ?, ?)",
                     WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
-                    String.valueOf(AutoUpgradeVersionType.ONE_MINUTE.getCycle()), "");
-            db.update("insert into website(name, value, remark) values(?, ?, ?)",
-                    WebsiteKvService.UPGRADE_PREVIEW_KEY, "true", "");
-            TestUpdateVersionInfoPlugin plugin = new TestUpdateVersionInfoPlugin(new FakeVersionTimerTask(version("3.7.0")), db.dataSource());
+                    String.valueOf(AutoUpgradeVersionType.ONE_MINUTE.getCycle()),
+                    "");
+            db.update(
+                    "insert into website(name, value, remark) values(?, ?, ?)",
+                    WebsiteKvService.UPGRADE_PREVIEW_KEY,
+                    "true",
+                    "");
+            TestUpdateVersionInfoPlugin plugin =
+                    new TestUpdateVersionInfoPlugin(
+                            new FakeVersionTimerTask(version("3.7.0")), db.dataSource());
 
             assertTrue(plugin.start());
 
@@ -183,10 +222,13 @@ public class UpdateVersionInfoPluginTest {
     @Test
     public void shouldReturnFetchedCurrentChangeLogMarkdown() {
         AtomicReference<String> requestedPath = new AtomicReference<>();
-        String changeLog = UpdateVersionInfoPlugin.getCurrentChangeLog(noChangeLogRes(), (version, buildId, locale) -> {
-            requestedPath.set(version + "/" + buildId + "/" + locale);
-            return "### current\n- fixed";
-        });
+        String changeLog =
+                UpdateVersionInfoPlugin.getCurrentChangeLog(
+                        noChangeLogRes(),
+                        (version, buildId, locale) -> {
+                            requestedPath.set(version + "/" + buildId + "/" + locale);
+                            return "### current\n- fixed";
+                        });
 
         assertEquals("### current\n- fixed", changeLog);
         assertNotNull(requestedPath.get());
@@ -194,8 +236,10 @@ public class UpdateVersionInfoPluginTest {
 
     @Test
     public void shouldFallbackCurrentChangeLogWhenRemoteContentIsHtml() {
-        String changeLog = UpdateVersionInfoPlugin.getCurrentChangeLog(noChangeLogRes(), (version, buildId, locale) ->
-                "<html><body>not markdown</body></html>");
+        String changeLog =
+                UpdateVersionInfoPlugin.getCurrentChangeLog(
+                        noChangeLogRes(),
+                        (version, buildId, locale) -> "<html><body>not markdown</body></html>");
 
         assertTrue(changeLog.startsWith("No commit log"));
         assertTrue(changeLog.contains("94fzb/zrlog/commits/"));
@@ -204,9 +248,12 @@ public class UpdateVersionInfoPluginTest {
 
     @Test
     public void shouldFallbackCurrentChangeLogWhenFetchFails() {
-        String changeLog = UpdateVersionInfoPlugin.getCurrentChangeLog(noChangeLogRes(), (version, buildId, locale) -> {
-            throw new IOException("offline");
-        });
+        String changeLog =
+                UpdateVersionInfoPlugin.getCurrentChangeLog(
+                        noChangeLogRes(),
+                        (version, buildId, locale) -> {
+                            throw new IOException("offline");
+                        });
 
         assertTrue(changeLog.startsWith("No commit log"));
         assertFalse(changeLog.contains("diff"));
@@ -220,7 +267,13 @@ public class UpdateVersionInfoPluginTest {
         private Boolean upgradePreview;
 
         TestUpdateVersionInfoPlugin(UpdateVersionTimerTask task, DataSourceWrapper testDataSource) {
-            super(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSiteRepository(testDataSource))), () -> "zh_CN", null, new WebsiteKvService(() -> new WebSiteRepository(testDataSource)));
+            super(
+                    new UpgradeNoticeService(
+                            () -> false,
+                            new WebsiteKvService(() -> new WebSiteRepository(testDataSource))),
+                    () -> "zh_CN",
+                    null,
+                    new WebsiteKvService(() -> new WebSiteRepository(testDataSource)));
             this.task = task;
         }
 

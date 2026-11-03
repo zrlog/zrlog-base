@@ -1,13 +1,13 @@
 package com.zrlog.data.di;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.common.dao.DAO;
 import com.zrlog.data.service.DistributedLock;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-
-import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class DataComponentDatabaseTest {
@@ -25,7 +25,7 @@ public class DataComponentDatabaseTest {
     @Test
     public void graphsOwnTheirDatabaseCacheAndLocksWithoutADefaultSource() throws Exception {
         try (ZrLogTestDatabase first = ZrLogTestDatabase.open(type);
-             ZrLogTestDatabase second = ZrLogTestDatabase.open(type)) {
+                ZrLogTestDatabase second = ZrLogTestDatabase.open(type)) {
             DataComponent a = DaggerDataComponent.factory().create(first::dataSource, () -> true);
             DataComponent b = DaggerDataComponent.factory().create(second::dataSource, () -> true);
             org.junit.Assert.assertNull(DAO.getDefaultDataSource());
@@ -38,7 +38,8 @@ public class DataComponentDatabaseTest {
             assertNotSame(a.cache(), b.cache());
             com.zrlog.model.Log draft = new com.zrlog.model.Log();
             draft.setTitle("uncommitted row");
-            assertEquals(0L, ((Number) a.log().queryFirstObj("SELECT count(*) FROM log")).longValue());
+            assertEquals(
+                    0L, ((Number) a.log().queryFirstObj("SELECT count(*) FROM log")).longValue());
             assertNotSame(a.website(), a.website());
 
             DistributedLock firstLock = a.locks().create("same-key");

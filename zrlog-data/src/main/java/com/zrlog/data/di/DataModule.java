@@ -9,7 +9,6 @@ import dagger.Module;
 import dagger.Provides;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
-
 import java.util.function.Supplier;
 
 @Module

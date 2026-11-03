@@ -1,7 +1,6 @@
 package com.hibegin.common.util.http;
 
 import com.zrlog.util.ExecutionDeadline;
-
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -12,39 +11,44 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.Supplier;
 
-/**
- * Keeps headers, the complete body and cancellation inside the caller's budget.
- */
+/** Keeps headers, the complete body and cancellation inside the caller's budget. */
 public final class BoundedHttpExchange {
-    private BoundedHttpExchange() {
-    }
+    private BoundedHttpExchange() {}
 
-    /**
-     * Keeps the caller's client configuration while bounding the complete buffered response.
-     */
-    public static HttpResponse<byte[]> sendBytes(HttpClient client, HttpRequest request,
-                                                 ExecutionDeadline deadline, long maxBytes)
+    /** Keeps the caller's client configuration while bounding the complete buffered response. */
+    public static HttpResponse<byte[]> sendBytes(
+            HttpClient client, HttpRequest request, ExecutionDeadline deadline, long maxBytes)
             throws IOException, InterruptedException {
         return send(client, request, HttpResponse.BodySubscribers::ofByteArray, maxBytes, deadline);
     }
 
-    static <T> HttpResponse<T> send(HttpClient client, HttpRequest request,
-                                    Supplier<HttpResponse.BodySubscriber<T>> bodyFactory, long maxBytes,
-                                    ExecutionDeadline deadline) throws IOException, InterruptedException {
-        if (maxBytes <= 0) throw new IllegalArgumentException("Response size limit must be positive");
+    static <T> HttpResponse<T> send(
+            HttpClient client,
+            HttpRequest request,
+            Supplier<HttpResponse.BodySubscriber<T>> bodyFactory,
+            long maxBytes,
+            ExecutionDeadline deadline)
+            throws IOException, InterruptedException {
+        if (maxBytes <= 0)
+            throw new IllegalArgumentException("Response size limit must be positive");
         if (request.timeout().isPresent()) {
-            deadline = deadline.capMillis(Math.min(TimeUnit.DAYS.toMillis(1), request.timeout().get().toMillis()));
+            deadline =
+                    deadline.capMillis(
+                            Math.min(
+                                    TimeUnit.DAYS.toMillis(1), request.timeout().get().toMillis()));
         }
         deadline.requireRemainingMillis();
         Body<T> body = new Body<>(bodyFactory, maxBytes);
         CompletableFuture<HttpResponse<T>> transfer = null;
         try {
             transfer = client.sendAsync(request, body);
-            HttpResponse<T> response = transfer.get(deadline.requireRemainingMillis(), TimeUnit.MILLISECONDS);
+            HttpResponse<T> response =
+                    transfer.get(deadline.requireRemainingMillis(), TimeUnit.MILLISECONDS);
             deadline.requireRemainingMillis();
             return response;
         } catch (Exception failure) {
-            // Serialize cancellation with body creation and writes before the caller deletes a staging file.
+            // Serialize cancellation with body creation and writes before the caller deletes a
+            // staging file.
             body.cancel(failure);
             if (transfer != null) transfer.cancel(true);
             if (failure instanceof InterruptedException) {
@@ -54,7 +58,8 @@ public final class BoundedHttpExchange {
             if (failure instanceof ExecutionException && failure.getCause() instanceof Exception) {
                 failure = (Exception) failure.getCause();
             }
-            if (failure instanceof TimeoutException) throw new HttpTimeoutException("HTTP time budget exhausted");
+            if (failure instanceof TimeoutException)
+                throw new HttpTimeoutException("HTTP time budget exhausted");
             if (failure instanceof IOException) throw (IOException) failure;
             if (failure instanceof RuntimeException) throw (RuntimeException) failure;
             throw new IOException("HTTP exchange failed", failure);

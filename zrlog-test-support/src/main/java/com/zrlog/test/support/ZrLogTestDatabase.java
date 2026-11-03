@@ -4,9 +4,6 @@ import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.InMemoryDatabase;
 import com.hibegin.common.dao.SqlConvertUtils;
 import com.hibegin.common.dao.WebApiQueryRunner;
-import org.apache.commons.dbutils.QueryRunner;
-import org.apache.commons.dbutils.ResultSetHandler;
-
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
@@ -19,25 +16,26 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.commons.dbutils.QueryRunner;
+import org.apache.commons.dbutils.ResultSetHandler;
 
-/**
- * Isolated schema fixture. Installation behavior must be tested through InstallService instead.
- */
+/** Isolated schema fixture. Installation behavior must be tested through InstallService instead. */
 public final class ZrLogTestDatabase implements AutoCloseable {
 
     private final Path sqliteFile;
     private final Properties properties;
     private final InMemoryDatabase database;
     private DataSourceWrapper activeDataSource;
-    private volatile SqlHook beforeWebApiUpdate = (sql, params) -> {
-    };
-    private volatile SqlHook afterWebApiQuery = (sql, params) -> {
-    };
+    private volatile SqlHook beforeWebApiUpdate = (sql, params) -> {};
+    private volatile SqlHook afterWebApiQuery = (sql, params) -> {};
 
     private ZrLogTestDatabase(DatabaseType type, String schemaResource) throws Exception {
-        sqliteFile = type == DatabaseType.SQLITE ? Files.createTempFile("zrlog-test-", ".db") : null;
-        properties = sqliteFile == null ? InMemoryDatabase.h2Properties("zrlog_test_" + UUID.randomUUID())
-                : sqliteProperties(sqliteFile);
+        sqliteFile =
+                type == DatabaseType.SQLITE ? Files.createTempFile("zrlog-test-", ".db") : null;
+        properties =
+                sqliteFile == null
+                        ? InMemoryDatabase.h2Properties("zrlog_test_" + UUID.randomUUID())
+                        : sqliteProperties(sqliteFile);
         InMemoryDatabase opened = null;
         try {
             opened = InMemoryDatabase.open(properties, false);
@@ -48,9 +46,13 @@ public final class ZrLogTestDatabase implements AutoCloseable {
                 if (sqliteFile == null) {
                     opened.loadMySQLSchema(input);
                 } else {
-                    opened.executeStatements(SqlConvertUtils.doMySQLToSqliteBySqlText(
-                                    new String(input.readAllBytes(), StandardCharsets.UTF_8)).stream()
-                            .filter(sql -> !SqlConvertUtils.isBatchDropTableSql(sql)).collect(Collectors.toList()));
+                    opened.executeStatements(
+                            SqlConvertUtils.doMySQLToSqliteBySqlText(
+                                            new String(
+                                                    input.readAllBytes(), StandardCharsets.UTF_8))
+                                    .stream()
+                                    .filter(sql -> !SqlConvertUtils.isBatchDropTableSql(sql))
+                                    .collect(Collectors.toList()));
                 }
             }
         } catch (Exception | Error failure) {
@@ -78,16 +80,15 @@ public final class ZrLogTestDatabase implements AutoCloseable {
         return open(type, "/init-table-structure.sql");
     }
 
-    /**
-     * Loads an explicitly versioned historical schema for migration tests.
-     */
-    public static ZrLogTestDatabase open(DatabaseType type, String schemaResource) throws Exception {
-        return new ZrLogTestDatabase(java.util.Objects.requireNonNull(type), java.util.Objects.requireNonNull(schemaResource));
+    /** Loads an explicitly versioned historical schema for migration tests. */
+    public static ZrLogTestDatabase open(DatabaseType type, String schemaResource)
+            throws Exception {
+        return new ZrLogTestDatabase(
+                java.util.Objects.requireNonNull(type),
+                java.util.Objects.requireNonNull(schemaResource));
     }
 
-    /**
-     * SQLite-backed, single-statement adapter for D1-style behavior; no JDBC transactions.
-     */
+    /** SQLite-backed, single-statement adapter for D1-style behavior; no JDBC transactions. */
     public static ZrLogTestDatabase openWebApi() throws Exception {
         return openWebApi("/init-table-structure.sql");
     }
@@ -96,62 +97,81 @@ public final class ZrLogTestDatabase implements AutoCloseable {
         ZrLogTestDatabase db = open(DatabaseType.SQLITE, schemaResource);
         Properties webApi = new Properties();
         webApi.setProperty("jdbcUrl", "jdbc:https://fixture.invalid/query");
-        QueryRunner runner = new WebApiQueryRunner(webApi, false, 1) {
-            @Override
-            public int update(String sql) throws SQLException {
-                return update(sql, new Object[0]);
-            }
-
-            @Override
-            public <T> T query(String sql, ResultSetHandler<T> handler) throws SQLException {
-                return query(sql, handler, new Object[0]);
-            }
-
-            @Override
-            public int updateEntity(String sql, Object... params) throws SQLException {
-                return update(sql, params);
-            }
-
-            @Override
-            public List<Map<String, Object>> queryEntityRows(String sql, Object... params) throws SQLException {
-                if (sql.startsWith("INSERT")) db.beforeWebApiUpdate.run(sql, params);
-                return query(sql, new org.apache.commons.dbutils.handlers.MapListHandler(), params);
-            }
-
-            @Override
-            public int update(String sql, Object... params) throws SQLException {
-                db.beforeWebApiUpdate.run(sql, params);
-                return db.database.update(sql, params);
-            }
-
-            @Override
-            public <T> T query(String sql, ResultSetHandler<T> handler, Object... params) throws SQLException {
-                T result = db.database.dataSource().getQueryRunner().query(sql, handler, params);
-                db.afterWebApiQuery.run(sql, params);
-                return result;
-            }
-        };
-        db.activeDataSource = (DataSourceWrapper) Proxy.newProxyInstance(DataSourceWrapper.class.getClassLoader(),
-                new Class<?>[]{DataSourceWrapper.class}, (proxy, method, args) -> {
-                    if (method.getName().equals("isWebApi")) return true;
-                    if (method.getName().equals("getQueryRunner")) return runner;
-                    if (method.getName().equals("getConnection"))
-                        throw new AssertionError("Web API cannot open JDBC transactions");
-                    try {
-                        return method.invoke(db.database.dataSource(), args);
-                    } catch (InvocationTargetException e) {
-                        throw e.getCause();
+        QueryRunner runner =
+                new WebApiQueryRunner(webApi, false, 1) {
+                    @Override
+                    public int update(String sql) throws SQLException {
+                        return update(sql, new Object[0]);
                     }
-                });
+
+                    @Override
+                    public <T> T query(String sql, ResultSetHandler<T> handler)
+                            throws SQLException {
+                        return query(sql, handler, new Object[0]);
+                    }
+
+                    @Override
+                    public int updateEntity(String sql, Object... params) throws SQLException {
+                        return update(sql, params);
+                    }
+
+                    @Override
+                    public List<Map<String, Object>> queryEntityRows(String sql, Object... params)
+                            throws SQLException {
+                        if (sql.startsWith("INSERT")) db.beforeWebApiUpdate.run(sql, params);
+                        return query(
+                                sql,
+                                new org.apache.commons.dbutils.handlers.MapListHandler(),
+                                params);
+                    }
+
+                    @Override
+                    public int update(String sql, Object... params) throws SQLException {
+                        db.beforeWebApiUpdate.run(sql, params);
+                        return db.database.update(sql, params);
+                    }
+
+                    @Override
+                    public <T> T query(String sql, ResultSetHandler<T> handler, Object... params)
+                            throws SQLException {
+                        T result =
+                                db.database
+                                        .dataSource()
+                                        .getQueryRunner()
+                                        .query(sql, handler, params);
+                        db.afterWebApiQuery.run(sql, params);
+                        return result;
+                    }
+                };
+        db.activeDataSource =
+                (DataSourceWrapper)
+                        Proxy.newProxyInstance(
+                                DataSourceWrapper.class.getClassLoader(),
+                                new Class<?>[] {DataSourceWrapper.class},
+                                (proxy, method, args) -> {
+                                    if (method.getName().equals("isWebApi")) return true;
+                                    if (method.getName().equals("getQueryRunner")) return runner;
+                                    if (method.getName().equals("getConnection"))
+                                        throw new AssertionError(
+                                                "Web API cannot open JDBC transactions");
+                                    try {
+                                        return method.invoke(db.database.dataSource(), args);
+                                    } catch (InvocationTargetException e) {
+                                        throw e.getCause();
+                                    }
+                                });
         return db;
     }
 
     private static Properties sqliteProperties(Path file) {
         Properties properties = new Properties();
         properties.setProperty("driverClass", "org.sqlite.JDBC");
-        properties.setProperty("jdbcUrl", "jdbc:sqlite:" + file
-                + "?journal_mode=WAL&busy_timeout=10000&foreign_keys=on&synchronous=NORMAL"
-                + "&date_class=TEXT&date_string_format=yyyy-MM-dd HH:mm:ss");
+        properties.setProperty(
+                "jdbcUrl",
+                "jdbc:sqlite:"
+                        + file
+                        + "?journal_mode=WAL&busy_timeout=10000&foreign_keys=on&synchronous=NORMAL"
+                        + "&date_class=TEXT&date_string_format=yyyy-MM-dd HH:mm:ss");
         properties.setProperty("user", "");
         properties.setProperty("password", "");
         return properties;
@@ -198,7 +218,10 @@ public final class ZrLogTestDatabase implements AutoCloseable {
 
     public void putWebsite(String name, Object value) throws SQLException {
         update("delete from website where name=?", name);
-        update("insert into website(name,value) values(?,?)", name, value == null ? null : value.toString());
+        update(
+                "insert into website(name,value) values(?,?)",
+                name,
+                value == null ? null : value.toString());
     }
 
     private void deleteSqliteFiles() throws Exception {
@@ -218,7 +241,10 @@ public final class ZrLogTestDatabase implements AutoCloseable {
         }
     }
 
-    public enum DatabaseType {H2, SQLITE}
+    public enum DatabaseType {
+        H2,
+        SQLITE
+    }
 
     @FunctionalInterface
     public interface SqlHook {

@@ -1,14 +1,12 @@
 package com.zrlog.data.repository;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.common.dao.entity.EntityRepository;
 import com.hibegin.common.dao.entity.OptimisticLockException;
 import com.zrlog.model.Comment;
 import com.zrlog.model.Log;
 import com.zrlog.test.support.ZrLogTestDatabase;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -17,8 +15,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 @RunWith(Parameterized.class)
 public class EntityRepositoryDatabaseTest {
@@ -30,11 +29,12 @@ public class EntityRepositoryDatabaseTest {
 
     @Parameterized.Parameters(name = "{0}")
     public static Object[] backends() {
-        return new Object[]{"H2", "SQLITE", "WEB_API"};
+        return new Object[] {"H2", "SQLITE", "WEB_API"};
     }
 
     private ZrLogTestDatabase open() throws Exception {
-        return backend.equals("WEB_API") ? ZrLogTestDatabase.openWebApi()
+        return backend.equals("WEB_API")
+                ? ZrLogTestDatabase.openWebApi()
                 : ZrLogTestDatabase.open(ZrLogTestDatabase.DatabaseType.valueOf(backend));
     }
 
@@ -42,9 +42,11 @@ public class EntityRepositoryDatabaseTest {
     public void projectionsCannotBeUsedToLoadPartialEntitiesOrUntypedRows() throws Exception {
         try (ZrLogTestDatabase db = open()) {
             LogRepository repository = new LogRepository(db.dataSource());
-            assertThrows(IllegalArgumentException.class,
+            assertThrows(
+                    IllegalArgumentException.class,
                     () -> repository.queryOne("SELECT title FROM log", Log.class));
-            assertThrows(IllegalArgumentException.class,
+            assertThrows(
+                    IllegalArgumentException.class,
                     () -> repository.queryList("SELECT title FROM log", java.util.Map.class));
             assertNull(repository.loadById(-1L));
         }
@@ -91,8 +93,11 @@ public class EntityRepositoryDatabaseTest {
             article.setTitle("original");
             article.setContent("body");
             article.setClick(100);
-            new EntityRepository<>(Log.class, db.dataSource(),
-                    Clock.fixed(Instant.parse("2020-01-01T00:00:00Z"), ZoneOffset.UTC)).insert(article);
+            new EntityRepository<>(
+                            Log.class,
+                            db.dataSource(),
+                            Clock.fixed(Instant.parse("2020-01-01T00:00:00Z"), ZoneOffset.UTC))
+                    .insert(article);
             Log editor = repository.loadById(7L);
             Log otherEditor = repository.loadById(7L);
 
@@ -129,7 +134,8 @@ public class EntityRepositoryDatabaseTest {
     }
 
     @Test
-    public void concurrentReadsKeepEveryIncrementWithoutCreatingContentRevisions() throws Exception {
+    public void concurrentReadsKeepEveryIncrementWithoutCreatingContentRevisions()
+            throws Exception {
         try (ZrLogTestDatabase db = open()) {
             LogRepository repository = new LogRepository(db.dataSource());
             Log article = new Log();
@@ -145,15 +151,17 @@ public class EntityRepositoryDatabaseTest {
             try {
                 List<Future<?>> results = new ArrayList<>();
                 for (int i = 0; i < readerCount; i++) {
-                    results.add(workers.submit(() -> {
-                        LogRepository reader = new LogRepository(db.dataSource());
-                        ready.countDown();
-                        assertTrue(start.await(10, TimeUnit.SECONDS));
-                        for (int read = 0; read < readsPerReader; read++) {
-                            assertTrue(reader.incrementClick(7L));
-                        }
-                        return null;
-                    }));
+                    results.add(
+                            workers.submit(
+                                    () -> {
+                                        LogRepository reader = new LogRepository(db.dataSource());
+                                        ready.countDown();
+                                        assertTrue(start.await(10, TimeUnit.SECONDS));
+                                        for (int read = 0; read < readsPerReader; read++) {
+                                            assertTrue(reader.incrementClick(7L));
+                                        }
+                                        return null;
+                                    }));
                 }
                 assertTrue(ready.await(10, TimeUnit.SECONDS));
                 start.countDown();
@@ -193,9 +201,14 @@ public class EntityRepositoryDatabaseTest {
     }
 
     @Test
-    public void historicalUnknownCreationTimeAndAuthorizationVersionRemainIndependent() throws Exception {
+    public void historicalUnknownCreationTimeAndAuthorizationVersionRemainIndependent()
+            throws Exception {
         try (ZrLogTestDatabase db = open()) {
-            db.update("INSERT INTO user(userId,userName,authVersion) VALUES(?,?,?)", 1, "existing", 7);
+            db.update(
+                    "INSERT INTO user(userId,userName,authVersion) VALUES(?,?,?)",
+                    1,
+                    "existing",
+                    7);
             UserRepository repository = new UserRepository(db.dataSource());
             var row = repository.loadById(1L);
             row.setEmail("saved@example.com");

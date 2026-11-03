@@ -10,7 +10,8 @@ public class BackupProtectionStatus implements Serializable {
     public static final String MISSING_VERIFICATION = "MISSING_VERIFICATION";
     public static final String VERIFICATION_FAILED = "VERIFICATION_FAILED";
     public static final String VERIFICATION_STALE = "VERIFICATION_STALE";
-    public static final String BACKUP_CHANGED_AFTER_VERIFICATION = "BACKUP_CHANGED_AFTER_VERIFICATION";
+    public static final String BACKUP_CHANGED_AFTER_VERIFICATION =
+            "BACKUP_CHANGED_AFTER_VERIFICATION";
     public static final String INVALID_EVIDENCE = "INVALID_EVIDENCE";
 
     private Boolean ready;

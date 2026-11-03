@@ -1,5 +1,7 @@
 package com.zrlog.business.service;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.sun.net.httpserver.HttpServer;
 import com.zrlog.business.exception.DownloadUpgradeFileException;
@@ -16,21 +18,17 @@ import com.zrlog.common.updater.UpgradeProgressListener;
 import com.zrlog.common.vo.Version;
 import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.util.BlogBuildInfoUtil;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-
-import static org.junit.Assert.*;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 public class UpgradeServicePublicFlowTest {
 
-    @Rule
-    public TemporaryFolder temporaryFolder = new TemporaryFolder();
+    @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     private static Version futureVersion(String versionText) {
         Version version = new Version();
@@ -50,14 +48,18 @@ public class UpgradeServicePublicFlowTest {
         backend.put("upgrade.tips.systemService", "/etc/init.d/zrlog upgrade");
         backend.put("upgrade.status.downloading", "Downloading");
         backend.put("upgrade.status.downloaded", "Downloaded");
-        backend.put("upgrade.backupProtection.riskAcceptanceRequired",
+        backend.put(
+                "upgrade.backupProtection.riskAcceptanceRequired",
                 "Verify a recent backup or accept the backup risk");
         return backend;
     }
 
     @Test
     public void shouldReturnNoUpgradeWhenPluginIsMissing() {
-        CheckVersionResponse response = com.zrlog.business.di.ServiceComponent.forUninstalledApplication(null).upgrades().getCheckVersionResponse(false, null);
+        CheckVersionResponse response =
+                com.zrlog.business.di.ServiceComponent.forUninstalledApplication(null)
+                        .upgrades()
+                        .getCheckVersionResponse(false, null);
 
         assertFalse(response.getUpgrade());
         assertNull(response.getVersion());
@@ -67,7 +69,10 @@ public class UpgradeServicePublicFlowTest {
     public void shouldBuildPreCheckResponseWhenPluginHasNoVersion() {
         FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(null, null);
 
-        PreCheckVersionResponse response = com.zrlog.business.di.ServiceComponent.forUninstalledApplication(null).upgrades().getPreCheckVersionResponse(false, plugin);
+        PreCheckVersionResponse response =
+                com.zrlog.business.di.ServiceComponent.forUninstalledApplication(null)
+                        .upgrades()
+                        .getPreCheckVersionResponse(false, plugin);
 
         assertFalse(response.getUpgrade());
         assertNull(response.getVersion());
@@ -79,8 +84,9 @@ public class UpgradeServicePublicFlowTest {
     public void shouldBuildPreUpgradeResponseWhenOnlineUpgradeIsAllowed() {
         FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(null, null);
 
-        PreCheckVersionResponse response = new TestableUpgradeService(false, false, false, true)
-                .preUpgradeVersion(false, plugin);
+        PreCheckVersionResponse response =
+                new TestableUpgradeService(false, false, false, true)
+                        .preUpgradeVersion(false, plugin);
 
         assertFalse(response.getUpgrade());
         assertTrue(response.getOnlineUpgradable());
@@ -95,7 +101,8 @@ public class UpgradeServicePublicFlowTest {
 
     @Test
     public void shouldExposeRuntimeModeHelpers() {
-        UpgradeService service = com.zrlog.business.di.ServiceComponent.forUninstalledApplication(null).upgrades();
+        UpgradeService service =
+                com.zrlog.business.di.ServiceComponent.forUninstalledApplication(null).upgrades();
 
         assertNotNull(Boolean.valueOf(service.isDockerMode()));
         assertNotNull(Boolean.valueOf(service.isSystemServiceMode()));
@@ -110,8 +117,10 @@ public class UpgradeServicePublicFlowTest {
         backend.put("upgrade.result.noChange", "No change");
         backend.put("upgrade.lambda.download", "download upgrade file");
 
-        UpgradeProcessResponse response = com.zrlog.business.di.ServiceComponent.forUninstalledApplication(null).upgrades().doUpgrade(plugin, UpgradeProgressListener.NONE,
-                backend);
+        UpgradeProcessResponse response =
+                com.zrlog.business.di.ServiceComponent.forUninstalledApplication(null)
+                        .upgrades()
+                        .doUpgrade(plugin, UpgradeProgressListener.NONE, backend);
 
         assertTrue(response.getFinish());
         assertEquals("No change", response.getMessage());
@@ -121,8 +130,13 @@ public class UpgradeServicePublicFlowTest {
 
     @Test
     public void shouldRejectExplicitUpgradeWithoutUpdater() {
-        UpgradeProcessResponse response = new TestableUpgradeService(false, false, false, true)
-                .doUpgrade(futureVersion("99.0.0"), null, UpgradeProgressListener.NONE, backend());
+        UpgradeProcessResponse response =
+                new TestableUpgradeService(false, false, false, true)
+                        .doUpgrade(
+                                futureVersion("99.0.0"),
+                                null,
+                                UpgradeProgressListener.NONE,
+                                backend());
 
         assertFalse(response.getFinish());
     }
@@ -131,15 +145,19 @@ public class UpgradeServicePublicFlowTest {
     public void shouldUseTheClaimedVersionForManualInstructionsWithoutFetchingAgain() {
         Version selected = futureVersion("99.1.0");
         selected.setZipDownloadUrl("https://example.invalid/reviewed-version.zip");
-        UpgradeProcessResponse response = new TestableUpgradeService(false, false, true, false)
-                .doUpgradeVersion(selected, UpgradeProgressListener.NONE, backend());
+        UpgradeProcessResponse response =
+                new TestableUpgradeService(false, false, true, false)
+                        .doUpgradeVersion(selected, UpgradeProgressListener.NONE, backend());
         assertTrue(response.getFinish());
-        assertEquals("[download upgrade file](https://example.invalid/reviewed-version.zip)", response.getMessage());
+        assertEquals(
+                "[download upgrade file](https://example.invalid/reviewed-version.zip)",
+                response.getMessage());
     }
 
     @Test
     public void shouldReturnDockerManualUpgradeResponseWithoutDownloading() {
-        FakeUpdateVersionInfoPlugin preCheckPlugin = new FakeUpdateVersionInfoPlugin(futureVersion("99.0.0"), null);
+        FakeUpdateVersionInfoPlugin preCheckPlugin =
+                new FakeUpdateVersionInfoPlugin(futureVersion("99.0.0"), null);
         TestableUpgradeService service = new TestableUpgradeService(true, false, false, true);
 
         PreCheckVersionResponse preCheckResponse = service.preUpgradeVersion(false, preCheckPlugin);
@@ -153,8 +171,10 @@ public class UpgradeServicePublicFlowTest {
         assertNotNull(preCheckResponse.getBackupProtection());
         assertNotNull(preCheckResponse.getDisableUpgradeReason());
 
-        FakeUpdateVersionInfoPlugin upgradePlugin = new FakeUpdateVersionInfoPlugin(futureVersion("99.0.0"), null);
-        UpgradeProcessResponse response = service.doUpgrade(upgradePlugin, UpgradeProgressListener.NONE, backend());
+        FakeUpdateVersionInfoPlugin upgradePlugin =
+                new FakeUpdateVersionInfoPlugin(futureVersion("99.0.0"), null);
+        UpgradeProcessResponse response =
+                service.doUpgrade(upgradePlugin, UpgradeProgressListener.NONE, backend());
 
         assertTrue(response.getFinish());
         assertEquals("Use docker image", response.getMessage());
@@ -164,9 +184,11 @@ public class UpgradeServicePublicFlowTest {
 
     @Test
     public void shouldReturnSystemServiceManualUpgradeResponseWithoutDownloading() {
-        FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(futureVersion("99.0.0-SNAPSHOT"), null);
-        UpgradeProcessResponse response = new TestableUpgradeService(false, true, false, true)
-                .doUpgrade(plugin, UpgradeProgressListener.NONE, backend());
+        FakeUpdateVersionInfoPlugin plugin =
+                new FakeUpdateVersionInfoPlugin(futureVersion("99.0.0-SNAPSHOT"), null);
+        UpgradeProcessResponse response =
+                new TestableUpgradeService(false, true, false, true)
+                        .doUpgrade(plugin, UpgradeProgressListener.NONE, backend());
 
         assertTrue(response.getFinish());
         assertEquals("/etc/init.d/zrlog upgrade-preview", response.getMessage());
@@ -175,14 +197,19 @@ public class UpgradeServicePublicFlowTest {
     }
 
     @Test
-    public void shouldReturnFaasManualUpgradeResponseWithoutDownloadingWhenOnlineUpgradeUnsupported() {
-        FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(futureVersion("99.0.0"), null);
+    public void
+            shouldReturnFaasManualUpgradeResponseWithoutDownloadingWhenOnlineUpgradeUnsupported() {
+        FakeUpdateVersionInfoPlugin plugin =
+                new FakeUpdateVersionInfoPlugin(futureVersion("99.0.0"), null);
 
-        UpgradeProcessResponse response = new TestableUpgradeService(false, false, true, false)
-                .doUpgrade(plugin, UpgradeProgressListener.NONE, backend());
+        UpgradeProcessResponse response =
+                new TestableUpgradeService(false, false, true, false)
+                        .doUpgrade(plugin, UpgradeProgressListener.NONE, backend());
 
         assertTrue(response.getFinish());
-        assertEquals("[download upgrade file](https://example.invalid/zrlog.zip)", response.getMessage());
+        assertEquals(
+                "[download upgrade file](https://example.invalid/zrlog.zip)",
+                response.getMessage());
         assertEquals(1, plugin.fetchTrueCount);
         assertEquals(1, plugin.fetchFalseCount);
     }
@@ -191,23 +218,31 @@ public class UpgradeServicePublicFlowTest {
     public void shouldFailUpgradeWhenDownloadedPackageChecksumMismatches() throws Exception {
         byte[] packageBytes = "zip-bytes".getBytes(StandardCharsets.UTF_8);
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/zrlog.zip", exchange -> {
-            exchange.sendResponseHeaders(200, packageBytes.length);
-            exchange.getResponseBody().write(packageBytes);
-            exchange.close();
-        });
+        server.createContext(
+                "/zrlog.zip",
+                exchange -> {
+                    exchange.sendResponseHeaders(200, packageBytes.length);
+                    exchange.getResponseBody().write(packageBytes);
+                    exchange.close();
+                });
         server.start();
         try {
             Version version = futureVersion("99.0.1");
-            version.setZipDownloadUrl("http://127.0.0.1:" + server.getAddress().getPort() + "/zrlog.zip");
+            version.setZipDownloadUrl(
+                    "http://127.0.0.1:" + server.getAddress().getPort() + "/zrlog.zip");
             version.setZipFileSize(packageBytes.length);
             version.setZipMd5sum("bad-md5");
             FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(version, null);
             List<UpgradeProgressEvent.Data> progressEvents = new ArrayList<>();
 
-            assertThrows(DownloadUpgradeFileException.class, () ->
-                    new TestableUpgradeService(false, false, false, true)
-                            .doUpgrade(plugin, (event, data) -> progressEvents.add(data), backend()));
+            assertThrows(
+                    DownloadUpgradeFileException.class,
+                    () ->
+                            new TestableUpgradeService(false, false, false, true)
+                                    .doUpgrade(
+                                            plugin,
+                                            (event, data) -> progressEvents.add(data),
+                                            backend()));
 
             assertFalse(progressEvents.isEmpty());
             assertEquals(UpgradeProgressEvent.STAGE_DOWNLOAD, progressEvents.get(0).getStage());
@@ -223,50 +258,60 @@ public class UpgradeServicePublicFlowTest {
     public void shouldUseWarPackageMetadataWhenRunningInWarMode() throws Exception {
         byte[] packageBytes = "war-bytes".getBytes(StandardCharsets.UTF_8);
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        java.util.concurrent.atomic.AtomicBoolean warRequested = new java.util.concurrent.atomic.AtomicBoolean();
-        server.createContext("/zrlog.war", exchange -> {
-            warRequested.set(true);
-            exchange.sendResponseHeaders(200, packageBytes.length);
-            exchange.getResponseBody().write(packageBytes);
-            exchange.close();
-        });
+        java.util.concurrent.atomic.AtomicBoolean warRequested =
+                new java.util.concurrent.atomic.AtomicBoolean();
+        server.createContext(
+                "/zrlog.war",
+                exchange -> {
+                    warRequested.set(true);
+                    exchange.sendResponseHeaders(200, packageBytes.length);
+                    exchange.getResponseBody().write(packageBytes);
+                    exchange.close();
+                });
         server.start();
         try {
             Version version = futureVersion("99.0.2");
             version.setZipDownloadUrl("https://example.invalid/unused.zip");
-            version.setWarDownloadUrl("http://127.0.0.1:" + server.getAddress().getPort() + "/zrlog.war");
+            version.setWarDownloadUrl(
+                    "http://127.0.0.1:" + server.getAddress().getPort() + "/zrlog.war");
             version.setWarFileSize(packageBytes.length);
             version.setWarMd5sum("bad-md5");
             File updateTemp = temporaryFolder.newFolder("war-download");
-            Updater updater = new Updater() {
-                @Override
-                public void restartProcessAsync(Version ignored) {
-                }
+            Updater updater =
+                    new Updater() {
+                        @Override
+                        public void restartProcessAsync(Version ignored) {}
 
-                @Override
-                public File getUpdateTempPath() {
-                    return updateTemp;
-                }
+                        @Override
+                        public File getUpdateTempPath() {
+                            return updateTemp;
+                        }
 
-                @Override
-                public String getUnzipPath() {
-                    return updateTemp.getAbsolutePath();
-                }
+                        @Override
+                        public String getUnzipPath() {
+                            return updateTemp.getAbsolutePath();
+                        }
 
-                @Override
-                public File execFile() {
-                    return null;
-                }
+                        @Override
+                        public File execFile() {
+                            return null;
+                        }
 
-                @Override
-                public UpdaterTypeEnum getType() {
-                    return UpdaterTypeEnum.WAR;
-                }
-            };
+                        @Override
+                        public UpdaterTypeEnum getType() {
+                            return UpdaterTypeEnum.WAR;
+                        }
+                    };
 
-            assertThrows(DownloadUpgradeFileException.class, () ->
-                    new TestableUpgradeService(false, false, false, true, true)
-                            .doUpgrade(version, updater, UpgradeProgressListener.NONE, backend()));
+            assertThrows(
+                    DownloadUpgradeFileException.class,
+                    () ->
+                            new TestableUpgradeService(false, false, false, true, true)
+                                    .doUpgrade(
+                                            version,
+                                            updater,
+                                            UpgradeProgressListener.NONE,
+                                            backend()));
 
             assertTrue(warRequested.get());
         } finally {
@@ -278,24 +323,28 @@ public class UpgradeServicePublicFlowTest {
     public void shouldDownloadPackageWhenBackupEvidenceIsMissing() throws Exception {
         byte[] packageBytes = "zip-bytes".getBytes(StandardCharsets.UTF_8);
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/zrlog.zip", exchange -> {
-            exchange.sendResponseHeaders(200, packageBytes.length);
-            exchange.getResponseBody().write(packageBytes);
-            exchange.close();
-        });
+        server.createContext(
+                "/zrlog.zip",
+                exchange -> {
+                    exchange.sendResponseHeaders(200, packageBytes.length);
+                    exchange.getResponseBody().write(packageBytes);
+                    exchange.close();
+                });
         server.start();
         try {
             Version version = futureVersion("99.0.4");
-            version.setZipDownloadUrl("http://127.0.0.1:" + server.getAddress().getPort() + "/zrlog.zip");
+            version.setZipDownloadUrl(
+                    "http://127.0.0.1:" + server.getAddress().getPort() + "/zrlog.zip");
             FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(version, null);
             FakeUpdateVersionHandler handler = new FakeUpdateVersionHandler(true, "Updated");
-            TestableUpgradeService service = new TestableUpgradeService(false, false, false, true,
-                    false, false, null);
+            TestableUpgradeService service =
+                    new TestableUpgradeService(false, false, false, true, false, false, null);
             service.onlineHandler = handler;
             List<UpgradeProgressEvent.Data> progressEvents = new ArrayList<>();
 
-            UpgradeProcessResponse response = service.doUpgrade(plugin,
-                    (event, data) -> progressEvents.add(data), backend(), false);
+            UpgradeProcessResponse response =
+                    service.doUpgrade(
+                            plugin, (event, data) -> progressEvents.add(data), backend(), false);
 
             assertTrue(response.getFinish());
             assertEquals("Updated", response.getMessage());
@@ -305,8 +354,12 @@ public class UpgradeServicePublicFlowTest {
             assertEquals(packageBytes.length, service.onlinePackage.length());
             assertEquals(1, plugin.fetchTrueCount);
             assertEquals(1, plugin.fetchFalseCount);
-            assertTrue(progressEvents.stream().anyMatch(data ->
-                    UpgradeProgressEvent.STATUS_COMPLETE.equals(data.getStatus())));
+            assertTrue(
+                    progressEvents.stream()
+                            .anyMatch(
+                                    data ->
+                                            UpgradeProgressEvent.STATUS_COMPLETE.equals(
+                                                    data.getStatus())));
         } finally {
             server.stop(0);
         }
@@ -319,7 +372,13 @@ public class UpgradeServicePublicFlowTest {
         private int fetchFalseCount;
 
         FakeUpdateVersionInfoPlugin(Version version, DataSourceWrapper testDataSource) {
-            super(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSiteRepository(testDataSource))), () -> "zh_CN", null, new WebsiteKvService(() -> new WebSiteRepository(testDataSource)));
+            super(
+                    new UpgradeNoticeService(
+                            () -> false,
+                            new WebsiteKvService(() -> new WebSiteRepository(testDataSource))),
+                    () -> "zh_CN",
+                    null,
+                    new WebsiteKvService(() -> new WebSiteRepository(testDataSource)));
             this.version = version;
         }
 
@@ -344,19 +403,45 @@ public class UpgradeServicePublicFlowTest {
         private UpdateVersionHandler onlineHandler;
         private File onlinePackage;
 
-        TestableUpgradeService(boolean dockerMode, boolean systemServiceMode, boolean faasMode,
-                               boolean faasOnlineUpgradeSupported) {
+        TestableUpgradeService(
+                boolean dockerMode,
+                boolean systemServiceMode,
+                boolean faasMode,
+                boolean faasOnlineUpgradeSupported) {
             this(dockerMode, systemServiceMode, faasMode, faasOnlineUpgradeSupported, false);
         }
 
-        TestableUpgradeService(boolean dockerMode, boolean systemServiceMode, boolean faasMode,
-                               boolean faasOnlineUpgradeSupported, boolean warMode) {
-            this(dockerMode, systemServiceMode, faasMode, faasOnlineUpgradeSupported, warMode, true, null);
+        TestableUpgradeService(
+                boolean dockerMode,
+                boolean systemServiceMode,
+                boolean faasMode,
+                boolean faasOnlineUpgradeSupported,
+                boolean warMode) {
+            this(
+                    dockerMode,
+                    systemServiceMode,
+                    faasMode,
+                    faasOnlineUpgradeSupported,
+                    warMode,
+                    true,
+                    null);
         }
 
-        TestableUpgradeService(boolean dockerMode, boolean systemServiceMode, boolean faasMode,
-                               boolean faasOnlineUpgradeSupported, boolean warMode, boolean backupReady, DataSourceWrapper testDataSource) {
-            super(() -> null, new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSiteRepository(testDataSource))), backupProtection(backupReady, testDataSource), new WebsiteKvService(() -> new WebSiteRepository(testDataSource)));
+        TestableUpgradeService(
+                boolean dockerMode,
+                boolean systemServiceMode,
+                boolean faasMode,
+                boolean faasOnlineUpgradeSupported,
+                boolean warMode,
+                boolean backupReady,
+                DataSourceWrapper testDataSource) {
+            super(
+                    () -> null,
+                    new UpgradeNoticeService(
+                            () -> false,
+                            new WebsiteKvService(() -> new WebSiteRepository(testDataSource))),
+                    backupProtection(backupReady, testDataSource),
+                    new WebsiteKvService(() -> new WebSiteRepository(testDataSource)));
             this.dockerMode = dockerMode;
             this.systemServiceMode = systemServiceMode;
             this.faasMode = faasMode;
@@ -364,15 +449,19 @@ public class UpgradeServicePublicFlowTest {
             this.warMode = warMode;
         }
 
-        private static BackupProtectionService backupProtection(boolean ready, DataSourceWrapper testDataSource) {
-            return new BackupProtectionService(new WebsiteKvService(() -> new WebSiteRepository(testDataSource))) {
+        private static BackupProtectionService backupProtection(
+                boolean ready, DataSourceWrapper testDataSource) {
+            return new BackupProtectionService(
+                    new WebsiteKvService(() -> new WebSiteRepository(testDataSource))) {
                 @Override
                 public BackupProtectionStatus getStatus() {
                     BackupProtectionStatus status = new BackupProtectionStatus();
                     status.setReady(ready);
                     status.setRequiresRiskAcceptance(!ready);
-                    status.setStatus(ready ? BackupProtectionStatus.READY
-                            : BackupProtectionStatus.MISSING_VERIFICATION);
+                    status.setStatus(
+                            ready
+                                    ? BackupProtectionStatus.READY
+                                    : BackupProtectionStatus.MISSING_VERIFICATION);
                     return status;
                 }
             };
@@ -404,14 +493,18 @@ public class UpgradeServicePublicFlowTest {
         }
 
         @Override
-        UpdateVersionHandler newOnlineUpdateVersionHandler(Version version, File upgradePackage,
-                                                           UpgradeProgressListener progressListener,
-                                                           Map<String, Object> backend, Updater updater) {
+        UpdateVersionHandler newOnlineUpdateVersionHandler(
+                Version version,
+                File upgradePackage,
+                UpgradeProgressListener progressListener,
+                Map<String, Object> backend,
+                Updater updater) {
             onlinePackage = upgradePackage;
             if (onlineHandler != null) {
                 return onlineHandler;
             }
-            return super.newOnlineUpdateVersionHandler(version, upgradePackage, progressListener, backend, updater);
+            return super.newOnlineUpdateVersionHandler(
+                    version, upgradePackage, progressListener, backend, updater);
         }
     }
 

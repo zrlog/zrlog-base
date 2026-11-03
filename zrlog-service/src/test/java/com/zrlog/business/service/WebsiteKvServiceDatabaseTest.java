@@ -1,18 +1,17 @@
 package com.zrlog.business.service;
 
+import static org.junit.Assert.*;
+
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
 import com.zrlog.business.updater.AutoUpgradeVersionType;
 import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
+import java.util.List;
+import java.util.Map;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-
-import java.util.List;
-import java.util.Map;
-
-import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class WebsiteKvServiceDatabaseTest {
@@ -31,14 +30,16 @@ public class WebsiteKvServiceDatabaseTest {
     @Test
     public void shouldReadWriteListAndRemoveWebsiteKvUsingInstallSchema() throws Exception {
         try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
-            WebsiteKvService service = new WebsiteKvService(() -> new WebSiteRepository(ignored.dataSource()));
+            WebsiteKvService service =
+                    new WebsiteKvService(() -> new WebSiteRepository(ignored.dataSource()));
 
             assertTrue(service.putString("feature.alpha", "one"));
             assertEquals("one", service.getString("feature.alpha"));
             assertTrue(service.putString("feature.alpha", "two"));
             assertTrue(service.putString("feature.beta", "beta-value"));
 
-            Map<String, Object> values = service.getByNames(List.of("feature.alpha", "feature.beta", "missing"));
+            Map<String, Object> values =
+                    service.getByNames(List.of("feature.alpha", "feature.beta", "missing"));
             List<WebsiteKvService.Entry> prefixed = service.listByPrefix("feature.");
 
             assertEquals("two", values.get("feature.alpha"));
@@ -84,19 +85,24 @@ public class WebsiteKvServiceDatabaseTest {
     @Test
     public void shouldBuildUpgradeWebsiteInfoFromRealWebsiteKv() throws Exception {
         try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
-            WebsiteKvService service = new WebsiteKvService(() -> new WebSiteRepository(ignored.dataSource()));
+            WebsiteKvService service =
+                    new WebsiteKvService(() -> new WebSiteRepository(ignored.dataSource()));
 
             UpgradeWebSiteInfo defaults = service.upgradeWebSiteInfo();
-            assertEquals(Integer.valueOf(AutoUpgradeVersionType.ONE_DAY.getCycle()),
+            assertEquals(
+                    Integer.valueOf(AutoUpgradeVersionType.ONE_DAY.getCycle()),
                     defaults.getAutoUpgradeVersion());
             assertEquals(Boolean.FALSE, defaults.getUpgradePreview());
 
-            assertTrue(service.putString(WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
-                    String.valueOf(AutoUpgradeVersionType.ONE_HOUR.getCycle())));
+            assertTrue(
+                    service.putString(
+                            WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
+                            String.valueOf(AutoUpgradeVersionType.ONE_HOUR.getCycle())));
             assertTrue(service.putString(WebsiteKvService.UPGRADE_PREVIEW_KEY, "true"));
 
             UpgradeWebSiteInfo configured = service.upgradeWebSiteInfo();
-            assertEquals(Integer.valueOf(AutoUpgradeVersionType.ONE_HOUR.getCycle()),
+            assertEquals(
+                    Integer.valueOf(AutoUpgradeVersionType.ONE_HOUR.getCycle()),
                     configured.getAutoUpgradeVersion());
             assertEquals(Boolean.TRUE, configured.getUpgradePreview());
         }

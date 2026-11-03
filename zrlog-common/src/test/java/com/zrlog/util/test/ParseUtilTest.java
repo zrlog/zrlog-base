@@ -1,9 +1,9 @@
 package com.zrlog.util.test;
 
+import static org.junit.Assert.*;
+
 import com.zrlog.util.ParseUtil;
 import org.junit.Test;
-
-import static org.junit.Assert.*;
 
 public class ParseUtilTest {
 
@@ -11,7 +11,8 @@ public class ParseUtilTest {
     public void shouldStripHtmlForPlainSearchText() {
         assertEquals("", ParseUtil.getPlainSearchText(null));
         assertEquals("", ParseUtil.getPlainSearchText(""));
-        assertEquals("hello world", ParseUtil.getPlainSearchText("<p>hello <strong>world</strong></p>"));
+        assertEquals(
+                "hello world", ParseUtil.getPlainSearchText("<p>hello <strong>world</strong></p>"));
     }
 
     @Test
@@ -22,7 +23,8 @@ public class ParseUtilTest {
         assertEquals("hello", ParseUtil.autoDigest("hello", 10));
         assertEquals("<p>hello...</p>", ParseUtil.autoDigest("<p>hello world</p>", 5));
         assertEquals("<p>hello</p>", ParseUtil.autoDigest("<p>hello</p>", 10));
-        assertEquals("<p class=\"lead\">hello<em>world...</em></p>",
+        assertEquals(
+                "<p class=\"lead\">hello<em>world...</em></p>",
                 ParseUtil.autoDigest("<p class=\"lead\">hello <em>worldwide</em></p>", 10));
     }
 
@@ -45,12 +47,15 @@ public class ParseUtilTest {
     @Test
     public void shouldWrapKeywordCaseSensitivelyAndCaseInsensitively() {
         assertNull(ParseUtil.wrapperKeyword(null, "zrlog", 100));
-        assertEquals("hello <font color=\"#CC0000\">ZrLog</font>",
+        assertEquals(
+                "hello <font color=\"#CC0000\">ZrLog</font>",
                 ParseUtil.wrapperKeyword("hello ZrLog", "ZrLog", 100));
-        assertEquals("hello <font color=\"#CC0000\">ZrLog</font>",
+        assertEquals(
+                "hello <font color=\"#CC0000\">ZrLog</font>",
                 ParseUtil.wrapperKeyword("hello ZrLog", "zrlog", 100));
         assertEquals("hello world", ParseUtil.wrapperKeyword("hello world", "zrlog", 100));
-        assertEquals("<font color=\"#CC0000\">ZrLog</font>",
+        assertEquals(
+                "<font color=\"#CC0000\">ZrLog</font>",
                 ParseUtil.wrapperKeyword("ZrLog", "zrlog", 100));
     }
 
@@ -63,18 +68,20 @@ public class ParseUtilTest {
 
     @Test
     public void shouldTrimWrappedKeywordToDigestWindowAndSentenceBounds() {
-        String result = ParseUtil.wrapperKeyword(
-                "drop this sentence. keep before zrlog after。drop after sentence.",
-                "zrlog", 200);
+        String result =
+                ParseUtil.wrapperKeyword(
+                        "drop this sentence. keep before zrlog after。drop after sentence.",
+                        "zrlog",
+                        200);
 
         assertEquals(" keep before <font color=\"#CC0000\">zrlog</font> after。", result);
     }
 
     @Test
     public void shouldTrimLongWrappedKeywordDigestNearMatch() {
-        String result = ParseUtil.wrapperKeyword(
-                "0123456789 prefix zrlog " + "x".repeat(180) + " suffix",
-                "zrlog", 80);
+        String result =
+                ParseUtil.wrapperKeyword(
+                        "0123456789 prefix zrlog " + "x".repeat(180) + " suffix", "zrlog", 80);
 
         assertTrue(result.contains("<font color=\"#CC0000\">zrlog</font>"));
         assertTrue(result.length() < 260);

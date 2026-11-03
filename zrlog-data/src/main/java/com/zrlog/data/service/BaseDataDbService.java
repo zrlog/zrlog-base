@@ -17,7 +17,6 @@ import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.repository.*;
 import com.zrlog.data.util.DateValueFormatUtils;
 import jakarta.inject.Inject;
-
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -27,9 +26,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-/**
- * 全局基础数据的查询
- */
+/** 全局基础数据的查询 */
 public class BaseDataDbService {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(BaseDataDbService.class);
@@ -87,22 +84,36 @@ public class BaseDataDbService {
         return BeanUtil.convert(log, HotLogBasicInfoEntry.class);
     }
 
-    private CompletableFuture<List<HotTypeLogInfo>> loadTypeHotLogs(List<TypeDTO> types, Executor executor) {
+    private CompletableFuture<List<HotTypeLogInfo>> loadTypeHotLogs(
+            List<TypeDTO> types, Executor executor) {
         List<CompletableFuture<HotTypeLogInfo>> loads = new ArrayList<>();
         for (TypeDTO type : types) {
-            loads.add(CompletableFuture.supplyAsync(() -> {
-                HotTypeLogInfo info = new HotTypeLogInfo();
-                info.setTypeAlias(type.getAlias());
-                info.setTypeName(type.getTypeName());
-                info.setTypeId(type.getId());
-                info.setLogs(logProvider.get().findByTypeAlias(1, 6, type.getAlias()).getRows()
-                        .stream().map(this::convertToBasicVO).collect(Collectors.toList()));
-                return info;
-            }, executor));
+            loads.add(
+                    CompletableFuture.supplyAsync(
+                            () -> {
+                                HotTypeLogInfo info = new HotTypeLogInfo();
+                                info.setTypeAlias(type.getAlias());
+                                info.setTypeName(type.getTypeName());
+                                info.setTypeId(type.getId());
+                                info.setLogs(
+                                        logProvider
+                                                .get()
+                                                .findByTypeAlias(1, 6, type.getAlias())
+                                                .getRows()
+                                                .stream()
+                                                .map(this::convertToBasicVO)
+                                                .collect(Collectors.toList()));
+                                return info;
+                            },
+                            executor));
         }
         // Include every category load in the parent future before publishing the list.
         return CompletableFuture.allOf(loads.toArray(new CompletableFuture[0]))
-                .thenApply(ignored -> loads.stream().map(CompletableFuture::join).collect(Collectors.toList()));
+                .thenApply(
+                        ignored ->
+                                loads.stream()
+                                        .map(CompletableFuture::join)
+                                        .collect(Collectors.toList()));
     }
 
     public BaseDataInitVO queryCacheInit(Executor executor) {
@@ -113,14 +124,16 @@ public class BaseDataDbService {
         cacheInit.setWebSiteVersion(getWebSiteVersion(refreshWebSite));
         Map<String, CompletableFuture<Void>> futures = new LinkedHashMap<>();
         BaseDataInitVO.Statistics statistics = new BaseDataInitVO.Statistics();
-        futures.put("article-statistics",
+        futures.put(
+                "article-statistics",
                 CompletableFuture.runAsync(
                         () -> {
                             statistics.setTotalArticleSize(logProvider.get().getVisitorCount());
                             cacheInit.setStatistics(statistics);
                         },
                         executor));
-        futures.put("links",
+        futures.put(
+                "links",
                 CompletableFuture.runAsync(
                         () -> {
                             try {
@@ -130,7 +143,8 @@ public class BaseDataDbService {
                             }
                         },
                         executor));
-        futures.put("types-and-category-articles",
+        futures.put(
+                "types-and-category-articles",
                 CompletableFuture.supplyAsync(
                                 () -> {
                                     try {
@@ -145,7 +159,8 @@ public class BaseDataDbService {
                                 executor)
                         .thenCompose(types -> loadTypeHotLogs(types, executor))
                         .thenAccept(cacheInit::setTypeHotLogs));
-        futures.put("recent-articles",
+        futures.put(
+                "recent-articles",
                 CompletableFuture.runAsync(
                         () -> {
                             // Last article
@@ -159,7 +174,8 @@ public class BaseDataDbService {
                                             .collect(Collectors.toList()));
                         },
                         executor));
-        futures.put("navigation",
+        futures.put(
+                "navigation",
                 CompletableFuture.runAsync(
                         () -> {
                             try {
@@ -169,7 +185,8 @@ public class BaseDataDbService {
                             }
                         },
                         executor));
-        futures.put("plugins",
+        futures.put(
+                "plugins",
                 CompletableFuture.runAsync(
                         () -> {
                             try {
@@ -179,7 +196,8 @@ public class BaseDataDbService {
                             }
                         },
                         executor));
-        futures.put("archives",
+        futures.put(
+                "archives",
                 CompletableFuture.runAsync(
                         () -> {
                             try {
@@ -191,7 +209,8 @@ public class BaseDataDbService {
                             }
                         },
                         executor));
-        futures.put("users",
+        futures.put(
+                "users",
                 CompletableFuture.runAsync(
                         () -> {
                             try {
@@ -201,7 +220,8 @@ public class BaseDataDbService {
                             }
                         },
                         executor));
-        futures.put("tags",
+        futures.put(
+                "tags",
                 CompletableFuture.runAsync(
                         () -> {
                             try {
@@ -212,7 +232,8 @@ public class BaseDataDbService {
                             statistics.setTotalTagSize((long) cacheInit.getTags().size());
                         },
                         executor));
-        futures.put("template-config",
+        futures.put(
+                "template-config",
                 CompletableFuture.runAsync(
                         () -> {
                             String template = refreshWebSite.getTemplate();
@@ -230,35 +251,55 @@ public class BaseDataDbService {
             CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0])).join();
         } catch (CompletionException e) {
             // allOf exposes only one failure; report every failed load with its original cause.
-            futures.forEach((task, future) -> {
-                if (future.isCompletedExceptionally()) {
-                    try {
-                        future.join();
-                    } catch (CompletionException failure) {
-                        LOGGER.log(Level.WARNING, "Load data error [task=" + task + "]", failure.getCause());
-                    }
-                }
-            });
+            futures.forEach(
+                    (task, future) -> {
+                        if (future.isCompletedExceptionally()) {
+                            try {
+                                future.join();
+                            } catch (CompletionException failure) {
+                                LOGGER.log(
+                                        Level.WARNING,
+                                        "Load data error [task=" + task + "]",
+                                        failure.getCause());
+                            }
+                        }
+                    });
         }
         if (cacheInit.getTags() == null || cacheInit.getTags().isEmpty()) {
-            cacheInit.getPlugins().stream().filter(e -> Objects.equals(e.getPluginName(), "tags")).findFirst().ifPresent(e -> {
-                cacheInit.getPlugins().remove(e);
-            });
+            cacheInit.getPlugins().stream()
+                    .filter(e -> Objects.equals(e.getPluginName(), "tags"))
+                    .findFirst()
+                    .ifPresent(
+                            e -> {
+                                cacheInit.getPlugins().remove(e);
+                            });
         }
         if (cacheInit.getArchives() == null || cacheInit.getArchives().isEmpty()) {
-            cacheInit.getPlugins().stream().filter(e -> Objects.equals(e.getPluginName(), "archives")).findFirst().ifPresent(e -> {
-                cacheInit.getPlugins().remove(e);
-            });
+            cacheInit.getPlugins().stream()
+                    .filter(e -> Objects.equals(e.getPluginName(), "archives"))
+                    .findFirst()
+                    .ifPresent(
+                            e -> {
+                                cacheInit.getPlugins().remove(e);
+                            });
         }
         if (cacheInit.getTypes() == null || cacheInit.getTypes().isEmpty()) {
-            cacheInit.getPlugins().stream().filter(e -> Objects.equals(e.getPluginName(), "types")).findFirst().ifPresent(e -> {
-                cacheInit.getPlugins().remove(e);
-            });
+            cacheInit.getPlugins().stream()
+                    .filter(e -> Objects.equals(e.getPluginName(), "types"))
+                    .findFirst()
+                    .ifPresent(
+                            e -> {
+                                cacheInit.getPlugins().remove(e);
+                            });
         }
         if (cacheInit.getLinks() == null || cacheInit.getLinks().isEmpty()) {
-            cacheInit.getPlugins().stream().filter(e -> Objects.equals(e.getPluginName(), "links")).findFirst().ifPresent(e -> {
-                cacheInit.getPlugins().remove(e);
-            });
+            cacheInit.getPlugins().stream()
+                    .filter(e -> Objects.equals(e.getPluginName(), "links"))
+                    .findFirst()
+                    .ifPresent(
+                            e -> {
+                                cacheInit.getPlugins().remove(e);
+                            });
         }
         cacheInit.getTypeHotLogs().sort(Comparator.comparing(x -> Math.toIntExact(x.getTypeId())));
         return cacheInit;

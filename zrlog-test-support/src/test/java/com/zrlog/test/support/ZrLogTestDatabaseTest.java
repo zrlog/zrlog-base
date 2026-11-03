@@ -1,13 +1,12 @@
 package com.zrlog.test.support;
 
-import com.hibegin.common.dao.DAO;
-import org.junit.Test;
+import static org.junit.Assert.*;
 
+import com.hibegin.common.dao.DAO;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class ZrLogTestDatabaseTest {
 
@@ -18,16 +17,25 @@ public class ZrLogTestDatabaseTest {
             try (ZrLogTestDatabase outer = ZrLogTestDatabase.open(type)) {
                 outer.putWebsite("title", "outer");
                 try (ZrLogTestDatabase inner = ZrLogTestDatabase.open(type)) {
-                    assertEquals(0L, ((Number) inner.scalar("select count(*) from website")).longValue());
+                    assertEquals(
+                            0L,
+                            ((Number) inner.scalar("select count(*) from website")).longValue());
                     inner.putWebsite("title", "inner");
                     assertSame(previous, DAO.getDefaultDataSource());
-                    assertEquals("inner", new DAO(inner.dataSource()).queryFirstObj("select value from website where name='title'"));
+                    assertEquals(
+                            "inner",
+                            new DAO(inner.dataSource())
+                                    .queryFirstObj("select value from website where name='title'"));
                     // Use the installer's real schema; no test-only column patches.
                     inner.queryList("select sticky, extensions from log");
                 }
                 assertSame(previous, DAO.getDefaultDataSource());
-                assertEquals("outer", new DAO(outer.dataSource()).queryFirstObj("select value from website where name='title'"));
-                assertEquals("outer", outer.scalar("select value from website where name=?", "title"));
+                assertEquals(
+                        "outer",
+                        new DAO(outer.dataSource())
+                                .queryFirstObj("select value from website where name='title'"));
+                assertEquals(
+                        "outer", outer.scalar("select value from website where name=?", "title"));
             }
         }
     }
@@ -57,13 +65,17 @@ public class ZrLogTestDatabaseTest {
             assertThrows(AssertionError.class, () -> db.dataSource().getConnection());
             AtomicInteger updates = new AtomicInteger();
             db.beforeWebApiUpdate((sql, params) -> updates.incrementAndGet());
-            db.dataSource().getQueryRunner().update("insert into website(name,value) values(?,?)", "title", "web-api");
+            db.dataSource()
+                    .getQueryRunner()
+                    .update("insert into website(name,value) values(?,?)", "title", "web-api");
             assertEquals(1, updates.get());
             assertEquals("web-api", db.scalar("select value from website where name='title'"));
-            db.beforeWebApiUpdate((sql, params) -> {
-                throw new java.sql.SQLException("controlled failure");
-            });
-            assertThrows(java.sql.SQLException.class,
+            db.beforeWebApiUpdate(
+                    (sql, params) -> {
+                        throw new java.sql.SQLException("controlled failure");
+                    });
+            assertThrows(
+                    java.sql.SQLException.class,
                     () -> db.dataSource().getQueryRunner().update("delete from website"));
             assertEquals(1L, ((Number) db.scalar("select count(*) from website")).longValue());
         }

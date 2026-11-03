@@ -12,12 +12,6 @@ import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.plugin.BaseStaticSitePlugin;
 import com.zrlog.util.StaticFileCacheUtils;
 import com.zrlog.util.ThreadUtils;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.parser.Parser;
-import org.jsoup.select.Elements;
-
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -29,10 +23,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.parser.Parser;
+import org.jsoup.select.Elements;
 
-/**
- * 对响应的模板文件生成的 html 进行转化，主要处理静态资源文件和插件相关的逻辑
- */
+/** 对响应的模板文件生成的 html 进行转化，主要处理静态资源文件和插件相关的逻辑 */
 public class HtmlTemplateProcessor {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(HtmlTemplateProcessor.class);
@@ -50,11 +47,20 @@ public class HtmlTemplateProcessor {
     private final PluginCorePlugin pluginCore;
     private final StaticGenerationBudget budget;
 
-    public HtmlTemplateProcessor(HttpRequest request, AdminTokenVO adminTokenVO, String staticResourceBaseUrl,
-                                 PluginCorePlugin pluginCore) {
+    public HtmlTemplateProcessor(
+            HttpRequest request,
+            AdminTokenVO adminTokenVO,
+            String staticResourceBaseUrl,
+            PluginCorePlugin pluginCore) {
         this.pluginCore = pluginCore;
-        Object execution = request.getAttr() == null ? null : request.getAttr().get(StaticGenerationBudget.REQUEST_ATTRIBUTE);
-        this.budget = execution instanceof StaticGenerationBudget ? (StaticGenerationBudget) execution : null;
+        Object execution =
+                request.getAttr() == null
+                        ? null
+                        : request.getAttr().get(StaticGenerationBudget.REQUEST_ATTRIBUTE);
+        this.budget =
+                execution instanceof StaticGenerationBudget
+                        ? (StaticGenerationBudget) execution
+                        : null;
         this.baseUrl = request.getContextPath() + "/";
         this.request = request;
         this.adminTokenVO = adminTokenVO;
@@ -80,7 +86,8 @@ public class HtmlTemplateProcessor {
                     replaceMap.put(tag.outerHtml(), content);
                 } catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
-                    throw new IllegalStateException("Plugin view rendering interrupted", interrupted);
+                    throw new IllegalStateException(
+                            "Plugin view rendering interrupted", interrupted);
                 } catch (java.io.IOException error) {
                     throw new IllegalStateException("Plugin view rendering failed", error);
                 }
@@ -89,9 +96,11 @@ public class HtmlTemplateProcessor {
         }
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         for (Element tag : plugins) {
-            ExecutorService executorService = ThreadUtils.newFixedThreadPool(Math.min(4, plugins.size()));
+            ExecutorService executorService =
+                    ThreadUtils.newFixedThreadPool(Math.min(4, plugins.size()));
             try {
-                CompletableFuture<Void> voidCompletableFuture = parseCustomHtmlTag(tag, replaceMap, executorService);
+                CompletableFuture<Void> voidCompletableFuture =
+                        parseCustomHtmlTag(tag, replaceMap, executorService);
                 if (Objects.nonNull(voidCompletableFuture)) {
                     futures.add(voidCompletableFuture);
                 }
@@ -122,38 +131,56 @@ public class HtmlTemplateProcessor {
         if (BaseStaticSitePlugin.isStaticPluginRequest(request)) {
             return html + "<!--" + versionInfo + "-->";
         }
-        return html + "<!--" + (System.currentTimeMillis() - startTime) + "ms(" + versionInfo + ")-->";
+        return html
+                + "<!--"
+                + (System.currentTimeMillis() - startTime)
+                + "ms("
+                + versionInfo
+                + ")-->";
     }
 
-    private CompletableFuture<Void> parseCustomHtmlTag(Element element, Map<String, String> replaceMap, ExecutorService executorService) {
+    private CompletableFuture<Void> parseCustomHtmlTag(
+            Element element, Map<String, String> replaceMap, ExecutorService executorService) {
         String name = element.attr("name");
         if (name.isEmpty()) {
             return null;
         }
         element.attr("data-plugin-id", pluginId.incrementAndGet() + "");
-        return CompletableFuture.runAsync(() -> {
-            String url = "/" + element.attr("name") + "/" + element.attr("view").replaceFirst("/", "");
-            if (!element.attr("param").isEmpty()) {
-                url += "?" + element.attr("param");
-            }
-
-            try {
-                CloseResponseHandle handle = pluginCore.getContext(url, HttpMethod.GET, request, adminTokenVO);
-                try (InputStream in = handle.getT().body()) {
-                    byte[] bytes = IOUtil.getByteByInputStream(in);
-                    if (handle.getStatusCode() != 200) {
-                        throw new RuntimeException("Template plugin page render status error " + handle.getStatusCode() + ", response body " + new String(bytes));
+        return CompletableFuture.runAsync(
+                () -> {
+                    String url =
+                            "/"
+                                    + element.attr("name")
+                                    + "/"
+                                    + element.attr("view").replaceFirst("/", "");
+                    if (!element.attr("param").isEmpty()) {
+                        url += "?" + element.attr("param");
                     }
-                    replaceMap.put(element.outerHtml(), new String(bytes, StandardCharsets.UTF_8));
-                }
-            } catch (Exception e) {
-                if (e instanceof RuntimeException) {
-                    throw (RuntimeException) e;
-                }
-                throw new RuntimeException("Template plugin page render error " + e.getMessage(), e);
-            }
-        }, executorService);
 
+                    try {
+                        CloseResponseHandle handle =
+                                pluginCore.getContext(url, HttpMethod.GET, request, adminTokenVO);
+                        try (InputStream in = handle.getT().body()) {
+                            byte[] bytes = IOUtil.getByteByInputStream(in);
+                            if (handle.getStatusCode() != 200) {
+                                throw new RuntimeException(
+                                        "Template plugin page render status error "
+                                                + handle.getStatusCode()
+                                                + ", response body "
+                                                + new String(bytes));
+                            }
+                            replaceMap.put(
+                                    element.outerHtml(), new String(bytes, StandardCharsets.UTF_8));
+                        }
+                    } catch (Exception e) {
+                        if (e instanceof RuntimeException) {
+                            throw (RuntimeException) e;
+                        }
+                        throw new RuntimeException(
+                                "Template plugin page render error " + e.getMessage(), e);
+                    }
+                },
+                executorService);
     }
 
     private void addStaticResourceFlag(Element tag, String tagName) {
@@ -178,7 +205,8 @@ public class HtmlTemplateProcessor {
         } else if (href.startsWith(baseUrl)) {
             uriPath = href.substring(baseUrl.length());
         }
-        String flag = StaticFileCacheUtils.getInstance().getFileFlagFirstByCache(uriPath.split("\\?")[0]);
+        String flag =
+                StaticFileCacheUtils.getInstance().getFileFlagFirstByCache(uriPath.split("\\?")[0]);
         if (flag != null) {
             if (href.contains("?")) {
                 href = href + "&t=" + flag;
@@ -188,5 +216,4 @@ public class HtmlTemplateProcessor {
         }
         return href;
     }
-
 }

@@ -12,17 +12,14 @@ import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.util.WebSiteUtils;
 import com.zrlog.model.WebSite;
 import jakarta.inject.Inject;
-
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 存放全局的设置，比如网站标题，关键字，插件，主题的配置信息等，当字典表处理即可，对应数据库的 website 表
- */
+/** 存放全局的设置，比如网站标题，关键字，插件，主题的配置信息等，当字典表处理即可，对应数据库的 website 表 */
 public class WebSiteRepository extends BaseRepository<WebSite, Long> {
 
-    //number
+    // number
     public static final String generator_html_status = "generator_html_status";
     public static final String disable_comment_status = "disable_comment_status";
     public static final String article_thumbnail_status = "article_thumbnail_status";
@@ -33,7 +30,7 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
     public static final String rows = "rows";
     public static final String session_timeout = "session_timeout";
     public static final String content_protector_enabled = "content_protector_enabled";
-    //string
+    // string
     public static final String appId = "appId";
     public static final String changyan_status = "changyan_status";
     public static final String title = "title";
@@ -58,16 +55,42 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
     private static final String TEMPLATE_CONFIG_SUFFIX = "_setting";
 
     static {
-
-        String[] listNum = new String[]{generator_html_status, disable_comment_status,
-                article_thumbnail_status, article_auto_digest_length, admin_darkMode, admin_compactMode, rows,
-                session_timeout, content_protector_enabled};
+        String[] listNum =
+                new String[] {
+                    generator_html_status,
+                    disable_comment_status,
+                    article_thumbnail_status,
+                    article_auto_digest_length,
+                    admin_darkMode,
+                    admin_compactMode,
+                    rows,
+                    session_timeout,
+                    content_protector_enabled
+                };
         websitePublicQueryKeys = new ArrayList<>();
-        //str
-        websitePublicQueryStrKeys = Arrays.asList(appId, changyan_status, title, second_title, keywords, description, host,
-                icp, robotRuleContent, comment_plugin_name, webCm, language, admin_color_primary, admin_theme,
-                staticResourceHost, template, system_notification, author, content_protector_license_type,
-                content_protector_template);
+        // str
+        websitePublicQueryStrKeys =
+                Arrays.asList(
+                        appId,
+                        changyan_status,
+                        title,
+                        second_title,
+                        keywords,
+                        description,
+                        host,
+                        icp,
+                        robotRuleContent,
+                        comment_plugin_name,
+                        webCm,
+                        language,
+                        admin_color_primary,
+                        admin_theme,
+                        staticResourceHost,
+                        template,
+                        system_notification,
+                        author,
+                        content_protector_license_type,
+                        content_protector_template);
         websitePublicQueryKeys.addAll(websitePublicQueryStrKeys);
         websitePublicQueryKeys.addAll(Arrays.asList(listNum));
     }
@@ -80,9 +103,7 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
         this.dataSource = dataSource;
     }
 
-    /**
-     * A new row or an explicit conditional-write template; no persisted metadata is fabricated.
-     */
+    /** A new row or an explicit conditional-write template; no persisted metadata is fabricated. */
     public static WebSite entry(String name, String value, String remark) {
         WebSite row = new WebSite();
         row.setName(name);
@@ -92,7 +113,9 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
     }
 
     public PublicWebSiteInfo getPublicWebSite() {
-        return WebSiteUtils.fillDefaultInfo(ResultBeanUtils.convert(getWebSiteByNameIn(websitePublicQueryKeys), PublicWebSiteInfo.class));
+        return WebSiteUtils.fillDefaultInfo(
+                ResultBeanUtils.convert(
+                        getWebSiteByNameIn(websitePublicQueryKeys), PublicWebSiteInfo.class));
     }
 
     private Map<String, Object> fillToMap(List<WebSite> lw, List<String> names) {
@@ -132,16 +155,20 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
         return fillToMap(lw, names);
     }
 
-    public int updateValueWhere(String value, String predicate, Object... params) throws SQLException {
+    public int updateValueWhere(String value, String predicate, Object... params)
+            throws SQLException {
         return updateWhere(entry(null, value, null), List.of("value"), predicate, params);
     }
 
-    public int updateRemarkWhere(String remark, String predicate, Object... params) throws SQLException {
+    public int updateRemarkWhere(String remark, String predicate, Object... params)
+            throws SQLException {
         return updateWhere(entry(null, null, remark), List.of("remark"), predicate, params);
     }
 
-    public int updateContentWhere(String value, String remark, String predicate, Object... params) throws SQLException {
-        return updateWhere(entry(null, value, remark), List.of("value", "remark"), predicate, params);
+    public int updateContentWhere(String value, String remark, String predicate, Object... params)
+            throws SQLException {
+        return updateWhere(
+                entry(null, value, remark), List.of("value", "remark"), predicate, params);
     }
 
     public boolean updateByKV(String name, Object value) throws SQLException {
@@ -159,20 +186,18 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
     }
 
     public WebSite findByName(String name) throws SQLException {
-        return findMatching(Collections.singletonMap("name", name), 1).stream().findFirst().orElse(null);
+        return findMatching(Collections.singletonMap("name", name), 1).stream()
+                .findFirst()
+                .orElse(null);
     }
 
-    /**
-     * Nullable scalar read, including before the entity metadata columns have been migrated.
-     */
+    /** Nullable scalar read, including before the entity metadata columns have been migrated. */
     public String findValueByName(String name) throws SQLException {
         Object value = queryFirstObj("SELECT value FROM " + tableName + " WHERE name=?", name);
         return value == null ? null : value.toString();
     }
 
-    /**
-     * Lock coordination must also work before the entity metadata columns exist.
-     */
+    /** Lock coordination must also work before the entity metadata columns exist. */
     public void insertLock(String name, String owner, String remark) throws SQLException {
         execute("INSERT INTO website(name,value,remark) VALUES(?,?,?)", name, owner, remark);
     }
@@ -183,29 +208,31 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
 
     public String getStringValueByName(String name) {
         try {
-            Map<String, Object> webSiteByNameIn = getWebSiteByNameIn(Collections.singletonList(name));
+            Map<String, Object> webSiteByNameIn =
+                    getWebSiteByNameIn(Collections.singletonList(name));
             Object value = webSiteByNameIn.get(name);
             if (Objects.isNull(value)) {
                 return "";
             }
             return value.toString();
         } catch (Exception e) {
-            //ignore，比如在未安装时，会有该异常但是不影响逻辑
+            // ignore，比如在未安装时，会有该异常但是不影响逻辑
         }
         return "";
     }
 
-
     public Map<String, Object> getTemplateConfigMap(String templateName) {
         String dbJsonStr =
-                new WebSiteRepository(dataSource).getStringValueByName(templateName + TEMPLATE_CONFIG_SUFFIX);
+                new WebSiteRepository(dataSource)
+                        .getStringValueByName(templateName + TEMPLATE_CONFIG_SUFFIX);
         if (StringUtils.isNotEmpty(dbJsonStr)) {
             return new Gson().fromJson(dbJsonStr, Map.class);
         }
         return new ConcurrentHashMap<>();
     }
 
-    public Map<String, Object> updateTemplateConfigMap(String templateName, Map<String, Object> settingMap) throws SQLException {
+    public Map<String, Object> updateTemplateConfigMap(
+            String templateName, Map<String, Object> settingMap) throws SQLException {
         new WebSiteRepository(dataSource)
                 .updateByKV(
                         templateName + TEMPLATE_CONFIG_SUFFIX,
@@ -214,7 +241,13 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
     }
 
     public FaviconBase64DTO faviconBase64DTO() {
-        Map<String, Object> dataMap = getWebSiteByNameIn(Arrays.asList("favicon_ico_base64", "favicon_png_pwa_192_base64", "favicon_png_pwa_512_base64", generator_html_status));
+        Map<String, Object> dataMap =
+                getWebSiteByNameIn(
+                        Arrays.asList(
+                                "favicon_ico_base64",
+                                "favicon_png_pwa_192_base64",
+                                "favicon_png_pwa_512_base64",
+                                generator_html_status));
         return BeanUtil.convert(dataMap, FaviconBase64DTO.class);
     }
 }

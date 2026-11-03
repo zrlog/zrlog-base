@@ -10,7 +10,6 @@ import com.zrlog.common.vo.Version;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.I18nUtil;
 import com.zrlog.util.ZrLogUtil;
-
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.text.ParseException;
@@ -23,9 +22,7 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * 定时检查是否有新的更新包可用，比对服务器生成最新buildId和包的构建时间（与resources/build.properties对比，注意：开发环境没有这个文件）
- */
+/** 定时检查是否有新的更新包可用，比对服务器生成最新buildId和包的构建时间（与resources/build.properties对比，注意：开发环境没有这个文件） */
 public class UpdateVersionTimerTask extends TimerTask {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(UpdateVersionTimerTask.class);
@@ -37,17 +34,19 @@ public class UpdateVersionTimerTask extends TimerTask {
     private volatile boolean lastCheckFailed;
 
     public UpdateVersionTimerTask(boolean previewAble, String lang) {
-        this(previewAble, lang, version -> {
-        });
+        this(previewAble, lang, version -> {});
     }
 
-    public UpdateVersionTimerTask(boolean previewAble, String lang, Consumer<Version> versionConsumer) {
-        this(previewAble, lang, versionConsumer, result -> {
-        });
+    public UpdateVersionTimerTask(
+            boolean previewAble, String lang, Consumer<Version> versionConsumer) {
+        this(previewAble, lang, versionConsumer, result -> {});
     }
 
-    public UpdateVersionTimerTask(boolean previewAble, String lang, Consumer<Version> versionConsumer,
-                                  Consumer<UpdateVersionCheckResult> checkResultConsumer) {
+    public UpdateVersionTimerTask(
+            boolean previewAble,
+            String lang,
+            Consumer<Version> versionConsumer,
+            Consumer<UpdateVersionCheckResult> checkResultConsumer) {
         this.previewAble = previewAble;
         this.lang = lang;
         this.versionConsumer = versionConsumer;
@@ -59,7 +58,8 @@ public class UpdateVersionTimerTask extends TimerTask {
     }
 
     private static String getJsonFilename() {
-        return ZrLogUtil.isDockerMode() ? BlogBuildInfoUtil.getDockerUpdateVersionJsonFilename()
+        return ZrLogUtil.isDockerMode()
+                ? BlogBuildInfoUtil.getDockerUpdateVersionJsonFilename()
                 : BlogBuildInfoUtil.getUpdateVersionJsonFilename();
     }
 
@@ -67,11 +67,20 @@ public class UpdateVersionTimerTask extends TimerTask {
         return lastCheckFailed;
     }
 
-    private String getChangeLog(String version, Date releaseDate, String buildId, Map<String, Object> res) {
+    private String getChangeLog(
+            String version, Date releaseDate, String buildId, Map<String, Object> res) {
         try {
-            String changeLogMd = HttpUtil.getInstance().getSuccessTextByUrl("https://www.zrlog.com/changelog/" +
-                    version + "-" + buildId + ".md?lang=" +
-                    lang + "&v=" + BlogBuildInfoUtil.getBuildId());
+            String changeLogMd =
+                    HttpUtil.getInstance()
+                            .getSuccessTextByUrl(
+                                    "https://www.zrlog.com/changelog/"
+                                            + version
+                                            + "-"
+                                            + buildId
+                                            + ".md?lang="
+                                            + lang
+                                            + "&v="
+                                            + BlogBuildInfoUtil.getBuildId());
             if (StringUtils.isNotEmpty(changeLogMd) && !isHtml(changeLogMd)) {
                 return changeLogMd;
             }
@@ -85,7 +94,17 @@ public class UpdateVersionTimerTask extends TimerTask {
         }
         String uriPath = "94fzb/zrlog/compare/" + BlogBuildInfoUtil.getBuildId() + "..." + buildId;
         String changeUrl = "https://github.com/" + uriPath;
-        return "### " + version + " (" + new SimpleDateFormat("yyyy-MM-dd HH:mm").format(releaseDate) + ")\n" + res.get("upgrade.result.noChangeLog") + "\n[" + uriPath + "](" + changeUrl + ")";
+        return "### "
+                + version
+                + " ("
+                + new SimpleDateFormat("yyyy-MM-dd HH:mm").format(releaseDate)
+                + ")\n"
+                + res.get("upgrade.result.noChangeLog")
+                + "\n["
+                + uriPath
+                + "]("
+                + changeUrl
+                + ")";
     }
 
     @Override
@@ -96,7 +115,7 @@ public class UpdateVersionTimerTask extends TimerTask {
             Version lastVersion = checkResult.getVersion();
             versionConsumer.accept(lastVersion);
             checkResultConsumer.accept(checkResult);
-            //build date ok
+            // build date ok
             if (lastVersion.getBuildDate().getTime() > 0) {
                 this.version = lastVersion;
             }
@@ -106,17 +125,28 @@ public class UpdateVersionTimerTask extends TimerTask {
         }
     }
 
-    protected UpdateVersionCheckResult fetchLastVersion(boolean preview) throws IOException, ParseException,
-            URISyntaxException, InterruptedException {
-        com.zrlog.updater.spi.UpdateContext.Builder context = UpdaterHosts.builder(new String[0], null);
+    protected UpdateVersionCheckResult fetchLastVersion(boolean preview)
+            throws IOException, ParseException, URISyntaxException, InterruptedException {
+        com.zrlog.updater.spi.UpdateContext.Builder context =
+                UpdaterHosts.builder(new String[0], null);
         context.manifestFilename = getJsonFilename();
-        context.docker = ZrLogUtil.isDockerMode()
-                ? new com.zrlog.updater.spi.DockerConnection(null, null, context.metadataOrigin, context.manifestFilename)
-                : null;
+        context.docker =
+                ZrLogUtil.isDockerMode()
+                        ? new com.zrlog.updater.spi.DockerConnection(
+                                null, null, context.metadataOrigin, context.manifestFilename)
+                        : null;
         UpdateVersionCheckResult result;
         try {
-            result = com.zrlog.updater.spi.UpdateCatalogs.getInstance().checkVersion(context.build(), preview,
-                    value -> ZrLogUtil.greatThenCurrentVersion(value.getBuildId(), value.getBuildDate(), value.getVersion()));
+            result =
+                    com.zrlog.updater.spi.UpdateCatalogs.getInstance()
+                            .checkVersion(
+                                    context.build(),
+                                    preview,
+                                    value ->
+                                            ZrLogUtil.greatThenCurrentVersion(
+                                                    value.getBuildId(),
+                                                    value.getBuildDate(),
+                                                    value.getVersion()));
         } catch (IOException | InterruptedException | ParseException e) {
             throw e;
         } catch (Exception e) {
@@ -124,8 +154,14 @@ public class UpdateVersionTimerTask extends TimerTask {
         }
         Version selected = result.getVersion();
         Map<String, Object> resources = I18nUtil.getBackend();
-        selected.setChangeLog(lang == null || resources == null ? ""
-                : getChangeLog(selected.getVersion(), selected.getBuildDate(), selected.getBuildId(), resources));
+        selected.setChangeLog(
+                lang == null || resources == null
+                        ? ""
+                        : getChangeLog(
+                                selected.getVersion(),
+                                selected.getBuildDate(),
+                                selected.getBuildId(),
+                                resources));
         return result;
     }
 

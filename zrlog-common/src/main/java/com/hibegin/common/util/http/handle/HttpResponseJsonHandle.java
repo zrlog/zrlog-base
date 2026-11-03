@@ -2,7 +2,6 @@ package com.hibegin.common.util.http.handle;
 
 import com.google.gson.Gson;
 import com.hibegin.common.util.IOUtil;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.http.HttpRequest;

@@ -12,13 +12,10 @@ import dagger.BindsInstance;
 import dagger.Component;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
-
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
-/**
- * Application data ownership; DAO methods create fresh mutable instances.
- */
+/** Application data ownership; DAO methods create fresh mutable instances. */
 @Singleton
 @Component(modules = DataModule.class)
 public interface DataComponent {

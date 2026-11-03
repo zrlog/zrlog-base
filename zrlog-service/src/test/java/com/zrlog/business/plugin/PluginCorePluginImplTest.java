@@ -1,5 +1,7 @@
 package com.zrlog.business.plugin;
 
+import static org.junit.Assert.*;
+
 import com.hibegin.common.util.UrlEncodeUtils;
 import com.hibegin.common.util.http.handle.CloseResponseHandle;
 import com.hibegin.http.HttpMethod;
@@ -13,8 +15,6 @@ import com.zrlog.common.CacheService;
 import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.plugin.PluginAdminAppearance;
-import org.junit.Test;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -30,60 +30,73 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class PluginCorePluginImplTest {
 
     private static StaticGenerationBudget viewBudget() {
-        return new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(20000), () -> {
-        }, "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7);
+        return new StaticGenerationBudget(
+                com.zrlog.util.ExecutionDeadline.afterMillis(20000),
+                () -> {},
+                "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b",
+                7);
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, String> headerMap(HttpRequest request, AdminTokenVO adminTokenVO) throws Exception {
-        Method method = PluginCorePluginImpl.class.getDeclaredMethod("genHeaderMapByRequest",
-                HttpRequest.class, AdminTokenVO.class);
+    private static Map<String, String> headerMap(HttpRequest request, AdminTokenVO adminTokenVO)
+            throws Exception {
+        Method method =
+                PluginCorePluginImpl.class.getDeclaredMethod(
+                        "genHeaderMapByRequest", HttpRequest.class, AdminTokenVO.class);
         method.setAccessible(true);
-        return (Map<String, String>) method.invoke(new PluginCorePluginImpl(new File("db.properties"), "/blog",
-                () -> 19084, cacheService()::getPublicWebSiteInfo), request, adminTokenVO);
+        return (Map<String, String>)
+                method.invoke(
+                        new PluginCorePluginImpl(
+                                new File("db.properties"),
+                                "/blog",
+                                () -> 19084,
+                                cacheService()::getPublicWebSiteInfo),
+                        request,
+                        adminTokenVO);
     }
 
     private static HttpRequest request(Map<String, String> headers) {
         Map<String, Object> attributes = new java.util.HashMap<>();
         ServerConfig serverConfig = new ServerConfig();
         serverConfig.setPort(19080);
-        return (HttpRequest) Proxy.newProxyInstance(
-                PluginCorePluginImplTest.class.getClassLoader(),
-                new Class[]{HttpRequest.class},
-                (proxy, method, args) -> {
-                    switch (method.getName()) {
-                        case "getAttr":
-                            return attributes;
-                        case "getHeader":
-                            return headers.get((String) args[0]);
-                        case "getHeaderMap":
-                            return headers;
-                        case "getServerConfig":
-                            return serverConfig;
-                        case "getFullUrl":
-                            return "http://example.com/admin/plugin";
-                        case "getRemoteHost":
-                            return "198.51.100.8";
-                        case "getQueryStr":
-                            return "q=1";
-                        case "getMethod":
-                            return HttpMethod.GET;
-                        case "getInputStream":
-                            return new ByteArrayInputStream("body".getBytes(StandardCharsets.UTF_8));
-                        case "getContextPath":
-                            return "/blog";
-                        case "toString":
-                            return "HttpRequestProxy";
-                        default:
-                            return null;
-                    }
-                });
+        return (HttpRequest)
+                Proxy.newProxyInstance(
+                        PluginCorePluginImplTest.class.getClassLoader(),
+                        new Class[] {HttpRequest.class},
+                        (proxy, method, args) -> {
+                            switch (method.getName()) {
+                                case "getAttr":
+                                    return attributes;
+                                case "getHeader":
+                                    return headers.get((String) args[0]);
+                                case "getHeaderMap":
+                                    return headers;
+                                case "getServerConfig":
+                                    return serverConfig;
+                                case "getFullUrl":
+                                    return "http://example.com/admin/plugin";
+                                case "getRemoteHost":
+                                    return "198.51.100.8";
+                                case "getQueryStr":
+                                    return "q=1";
+                                case "getMethod":
+                                    return HttpMethod.GET;
+                                case "getInputStream":
+                                    return new ByteArrayInputStream(
+                                            "body".getBytes(StandardCharsets.UTF_8));
+                                case "getContextPath":
+                                    return "/blog";
+                                case "toString":
+                                    return "HttpRequestProxy";
+                                default:
+                                    return null;
+                            }
+                        });
     }
 
     private static HttpServer localServer() throws Exception {
@@ -91,28 +104,40 @@ public class PluginCorePluginImplTest {
     }
 
     private static PluginCorePluginImpl startedPlugin(HttpServer server) throws Exception {
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo);
+        PluginCorePluginImpl plugin =
+                new PluginCorePluginImpl(
+                        new File("db.properties"),
+                        "/blog",
+                        () -> 19084,
+                        cacheService()::getPublicWebSiteInfo);
         setPluginServerBaseUrl(plugin, "http://127.0.0.1:" + server.getAddress().getPort());
         return plugin;
     }
 
-    private static void setPluginServerBaseUrl(PluginCorePluginImpl plugin, String value) throws Exception {
+    private static void setPluginServerBaseUrl(PluginCorePluginImpl plugin, String value)
+            throws Exception {
         Field serverBaseUrl = PluginCorePluginImpl.class.getDeclaredField("pluginServerBaseUrl");
         serverBaseUrl.setAccessible(true);
         serverBaseUrl.set(plugin, value);
     }
 
-    private static void setPluginCoreProcess(PluginCorePluginImpl plugin, PluginCoreProcess process) throws Exception {
+    private static void setPluginCoreProcess(PluginCorePluginImpl plugin, PluginCoreProcess process)
+            throws Exception {
         Field field = PluginCorePluginImpl.class.getDeclaredField("pluginCoreProcess");
         field.setAccessible(true);
         field.set(plugin, process);
     }
 
-    private static PluginCoreProcess pluginCoreProcess(AtomicInteger startCount, AtomicInteger stopCount, int port) {
+    private static PluginCoreProcess pluginCoreProcess(
+            AtomicInteger startCount, AtomicInteger stopCount, int port) {
         return new PluginCoreProcess() {
             @Override
-            public int pluginServerStart(String dbProperties, String pluginJvmArgs, String runtimePath,
-                                         String runTimeVersion, String token) {
+            public int pluginServerStart(
+                    String dbProperties,
+                    String pluginJvmArgs,
+                    String runtimePath,
+                    String runTimeVersion,
+                    String token) {
                 startCount.incrementAndGet();
                 return port;
             }
@@ -124,17 +149,20 @@ public class PluginCorePluginImplTest {
         };
     }
 
-    private static boolean invokeWaitToStarted(String serverBaseUrl, String token, int retryCount) throws Exception {
-        Method method = PluginCorePluginImpl.class.getDeclaredMethod("waitToStarted", String.class, String.class,
-                int.class);
+    private static boolean invokeWaitToStarted(String serverBaseUrl, String token, int retryCount)
+            throws Exception {
+        Method method =
+                PluginCorePluginImpl.class.getDeclaredMethod(
+                        "waitToStarted", String.class, String.class, int.class);
         method.setAccessible(true);
         return (boolean) method.invoke(null, serverBaseUrl, token, retryCount);
     }
 
-    private static void invokeRefreshCacheWithRetry(PluginCorePluginImpl plugin, int retryCount,
-                                                    String cacheVersion) throws Exception {
-        Method method = PluginCorePluginImpl.class.getDeclaredMethod("refreshCacheWithRetry", int.class,
-                String.class);
+    private static void invokeRefreshCacheWithRetry(
+            PluginCorePluginImpl plugin, int retryCount, String cacheVersion) throws Exception {
+        Method method =
+                PluginCorePluginImpl.class.getDeclaredMethod(
+                        "refreshCacheWithRetry", int.class, String.class);
         method.setAccessible(true);
         method.invoke(plugin, retryCount, cacheVersion);
     }
@@ -151,21 +179,23 @@ public class PluginCorePluginImplTest {
         info.setAdmin_color_primary("#1677ff");
         info.setAdmin_theme("desk");
         info.setAdmin_compactMode(true);
-        return (CacheService) Proxy.newProxyInstance(
-                PluginCorePluginImplTest.class.getClassLoader(),
-                new Class[]{CacheService.class},
-                (proxy, method, args) -> {
-                    if ("getPublicWebSiteInfo".equals(method.getName())) {
-                        return info;
-                    }
-                    if ("getCurrentSqlVersion".equals(method.getName()) || "getWebSiteVersion".equals(method.getName())) {
-                        return 0L;
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "CacheServiceProxy";
-                    }
-                    return null;
-                });
+        return (CacheService)
+                Proxy.newProxyInstance(
+                        PluginCorePluginImplTest.class.getClassLoader(),
+                        new Class[] {CacheService.class},
+                        (proxy, method, args) -> {
+                            if ("getPublicWebSiteInfo".equals(method.getName())) {
+                                return info;
+                            }
+                            if ("getCurrentSqlVersion".equals(method.getName())
+                                    || "getWebSiteVersion".equals(method.getName())) {
+                                return 0L;
+                            }
+                            if ("toString".equals(method.getName())) {
+                                return "CacheServiceProxy";
+                            }
+                            return null;
+                        });
     }
 
     @Test
@@ -174,62 +204,131 @@ public class PluginCorePluginImplTest {
         assertEquals("/comment/内容", uri.getPath());
         assertEquals("tag=a&tag=b", uri.getRawQuery());
         assertEquals("/comment", PluginCorePluginImpl.parsePublicViewUri("/comment").getPath());
-        for (String invalid : new String[]{"https://host/comment", "//host/comment", "/comment/../admin",
-                "/comment/%2e%2e/admin", "/comment/%5cadmin", "/comment/%00", "/comment/#secret",
-                "/comment/%3fsecret", "/comment/%23secret", "/comment//index", "/comment/" + "x".repeat(1024)}) {
-            assertThrows(invalid, IllegalArgumentException.class, () -> PluginCorePluginImpl.parsePublicViewUri(invalid));
+        for (String invalid :
+                new String[] {
+                    "https://host/comment",
+                    "//host/comment",
+                    "/comment/../admin",
+                    "/comment/%2e%2e/admin",
+                    "/comment/%5cadmin",
+                    "/comment/%00",
+                    "/comment/#secret",
+                    "/comment/%3fsecret",
+                    "/comment/%23secret",
+                    "/comment//index",
+                    "/comment/" + "x".repeat(1024)
+                }) {
+            assertThrows(
+                    invalid,
+                    IllegalArgumentException.class,
+                    () -> PluginCorePluginImpl.parsePublicViewUri(invalid));
         }
     }
 
     @Test
-    public void scheduledViewRequiresMatchingCompletionAndForwardsOnlyPublicHeaders() throws Exception {
+    public void scheduledViewRequiresMatchingCompletionAndForwardsOnlyPublicHeaders()
+            throws Exception {
         AtomicInteger calls = new AtomicInteger();
         AtomicReference<com.sun.net.httpserver.Headers> received = new AtomicReference<>();
         AtomicReference<String> query = new AtomicReference<>();
         AtomicReference<String> mode = new AtomicReference<>("success");
         HttpServer server = localServer();
-        server.createContext("/internal/runtime-scheduler/render-view", exchange -> {
-            calls.incrementAndGet();
-            received.set(exchange.getRequestHeaders());
-            query.set(exchange.getRequestURI().getRawQuery());
-            var result = new com.google.gson.JsonObject();
-            result.addProperty("triggerId", mode.get().equals("wrong-trigger") ? "other" : "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b");
-            result.addProperty("requestId", mode.get().equals("wrong-request") ? "other" : received.get().getFirst("X-ZrLog-Request-Id"));
-            result.addProperty("completed", !mode.get().equals("unfinished"));
-            result.addProperty("outcomeUncertain", mode.get().equals("uncertain"));
-            if (!mode.get().equals("missing-content"))
-                result.addProperty("content", mode.get().equals("oversize") ? "x".repeat(2 * 1024 * 1024 + 1) : "<p>你好</p>");
-            byte[] bytes = (mode.get().equals("malformed") ? "invalid" : result.toString()).getBytes(StandardCharsets.UTF_8);
-            if (!mode.get().equals("legacy")) exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
-            exchange.sendResponseHeaders(mode.get().equals("unavailable") ? 503 : 200, bytes.length);
-            exchange.getResponseBody().write(bytes);
-            exchange.close();
-        });
+        server.createContext(
+                "/internal/runtime-scheduler/render-view",
+                exchange -> {
+                    calls.incrementAndGet();
+                    received.set(exchange.getRequestHeaders());
+                    query.set(exchange.getRequestURI().getRawQuery());
+                    var result = new com.google.gson.JsonObject();
+                    result.addProperty(
+                            "triggerId",
+                            mode.get().equals("wrong-trigger")
+                                    ? "other"
+                                    : "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b");
+                    result.addProperty(
+                            "requestId",
+                            mode.get().equals("wrong-request")
+                                    ? "other"
+                                    : received.get().getFirst("X-ZrLog-Request-Id"));
+                    result.addProperty("completed", !mode.get().equals("unfinished"));
+                    result.addProperty("outcomeUncertain", mode.get().equals("uncertain"));
+                    if (!mode.get().equals("missing-content"))
+                        result.addProperty(
+                                "content",
+                                mode.get().equals("oversize")
+                                        ? "x".repeat(2 * 1024 * 1024 + 1)
+                                        : "<p>你好</p>");
+                    byte[] bytes =
+                            (mode.get().equals("malformed") ? "invalid" : result.toString())
+                                    .getBytes(StandardCharsets.UTF_8);
+                    if (!mode.get().equals("legacy"))
+                        exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
+                    exchange.sendResponseHeaders(
+                            mode.get().equals("unavailable") ? 503 : 200, bytes.length);
+                    exchange.getResponseBody().write(bytes);
+                    exchange.close();
+                });
         server.start();
         try {
             PluginCorePluginImpl plugin = startedPlugin(server);
-            HttpRequest source = request(Map.of("Authorization", "Bearer browser-secret", "Cookie", "session=private",
-                    "IsLogin", "true", "LoginUserId", "99", "User-Agent", "View fixture"));
-            assertEquals("<p>你好</p>", plugin.renderViewWithinBudget("/comment/内容?tag=a&tag=b", source, viewBudget()));
+            HttpRequest source =
+                    request(
+                            Map.of(
+                                    "Authorization",
+                                    "Bearer browser-secret",
+                                    "Cookie",
+                                    "session=private",
+                                    "IsLogin",
+                                    "true",
+                                    "LoginUserId",
+                                    "99",
+                                    "User-Agent",
+                                    "View fixture"));
+            assertEquals(
+                    "<p>你好</p>",
+                    plugin.renderViewWithinBudget("/comment/内容?tag=a&tag=b", source, viewBudget()));
             assertEquals("tag=a&tag=b&q=1", query.get());
             assertEquals("/" + "%E5%86%85%E5%AE%B9", received.get().getFirst("X-ZrLog-View-Path"));
             assertEquals("comment", received.get().getFirst("X-ZrLog-Plugin-Name"));
             assertEquals("7", received.get().getFirst("X-ZrLog-Actor-Id"));
             assertEquals("View fixture", received.get().getFirst("X-ZrLog-View-User-Agent"));
-            for (String secret : new String[]{"Authorization", "Cookie", "IsLogin", "LoginUserId"})
+            for (String secret : new String[] {"Authorization", "Cookie", "IsLogin", "LoginUserId"})
                 assertNull(received.get().getFirst(secret));
             assertNotNull(received.get().getFirst("X-Plugin-Token"));
-            for (String failure : new String[]{"wrong-trigger", "wrong-request", "unfinished", "uncertain", "missing-content",
-                    "oversize", "malformed", "legacy", "unavailable"}) {
+            for (String failure :
+                    new String[] {
+                        "wrong-trigger",
+                        "wrong-request",
+                        "unfinished",
+                        "uncertain",
+                        "missing-content",
+                        "oversize",
+                        "malformed",
+                        "legacy",
+                        "unavailable"
+                    }) {
                 mode.set(failure);
                 int before = calls.get();
-                assertThrows(failure, java.io.IOException.class, () -> plugin.renderViewWithinBudget("/comment/index", source, viewBudget()));
+                assertThrows(
+                        failure,
+                        java.io.IOException.class,
+                        () ->
+                                plugin.renderViewWithinBudget(
+                                        "/comment/index", source, viewBudget()));
                 assertEquals("Uncertain requests must not retry", before + 1, calls.get());
             }
             int before = calls.get();
-            assertThrows(java.io.IOException.class, () -> plugin.renderViewWithinBudget("/comment/index", source,
-                    new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(11000), () -> {
-                    }, "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7)));
+            assertThrows(
+                    java.io.IOException.class,
+                    () ->
+                            plugin.renderViewWithinBudget(
+                                    "/comment/index",
+                                    source,
+                                    new StaticGenerationBudget(
+                                            com.zrlog.util.ExecutionDeadline.afterMillis(11000),
+                                            () -> {},
+                                            "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b",
+                                            7)));
             assertEquals(before, calls.get());
         } finally {
             server.stop(0);
@@ -237,21 +336,25 @@ public class PluginCorePluginImplTest {
     }
 
     @Test
-    public void schedulerTickUsesMachineIdentityAndReturnsOnlyThisTriggerChildren() throws Exception {
+    public void schedulerTickUsesMachineIdentityAndReturnsOnlyThisTriggerChildren()
+            throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicReference<com.sun.net.httpserver.Headers> received = new AtomicReference<>();
         AtomicInteger calls = new AtomicInteger();
-        server.createContext("/internal/runtime-scheduler/tick", exchange -> {
-            calls.incrementAndGet();
-            received.set(exchange.getRequestHeaders());
-            String response = "{\"triggerId\":\"parent-run\",\"executedCount\":1,\"failedCount\":0,\"uncertainCount\":0,"
-                    + "\"children\":[{\"automationId\":\"child-task\",\"name\":\"Refresh RSS\",\"status\":\"success\",\"runId\":\"child-run\"}]}";
-            exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
-            byte[] body = response.getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
-        });
+        server.createContext(
+                "/internal/runtime-scheduler/tick",
+                exchange -> {
+                    calls.incrementAndGet();
+                    received.set(exchange.getRequestHeaders());
+                    String response =
+                            "{\"triggerId\":\"parent-run\",\"executedCount\":1,\"failedCount\":0,\"uncertainCount\":0,"
+                                    + "\"children\":[{\"automationId\":\"child-task\",\"name\":\"Refresh RSS\",\"status\":\"success\",\"runId\":\"child-run\"}]}";
+                    exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
+                    byte[] body = response.getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, body.length);
+                    exchange.getResponseBody().write(body);
+                    exchange.close();
+                });
         server.start();
         try {
             PluginCorePluginImpl plugin = startedPlugin(server);
@@ -278,21 +381,27 @@ public class PluginCorePluginImplTest {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicInteger calls = new AtomicInteger();
         AtomicInteger redirected = new AtomicInteger();
-        server.createContext("/internal/runtime-scheduler/tick", exchange -> {
-            calls.incrementAndGet();
-            exchange.getResponseHeaders().add("Location", "/unexpected");
-            exchange.sendResponseHeaders(307, -1);
-            exchange.close();
-        });
-        server.createContext("/unexpected", exchange -> {
-            redirected.incrementAndGet();
-            exchange.sendResponseHeaders(200, -1);
-            exchange.close();
-        });
+        server.createContext(
+                "/internal/runtime-scheduler/tick",
+                exchange -> {
+                    calls.incrementAndGet();
+                    exchange.getResponseHeaders().add("Location", "/unexpected");
+                    exchange.sendResponseHeaders(307, -1);
+                    exchange.close();
+                });
+        server.createContext(
+                "/unexpected",
+                exchange -> {
+                    redirected.incrementAndGet();
+                    exchange.sendResponseHeaders(200, -1);
+                    exchange.close();
+                });
         server.start();
         try {
             PluginCorePluginImpl plugin = startedPlugin(server);
-            assertThrows(java.io.IOException.class, () -> plugin.tickScheduledTasks("parent-run", 7, 650000));
+            assertThrows(
+                    java.io.IOException.class,
+                    () -> plugin.tickScheduledTasks("parent-run", 7, 650000));
             assertEquals(1, calls.get());
             assertEquals(0, redirected.get());
         } finally {
@@ -301,20 +410,27 @@ public class PluginCorePluginImplTest {
     }
 
     @Test
-    public void schedulerTickRejectsMissingChildrenOrMismatchedParentWithoutCallingAgain() throws Exception {
+    public void schedulerTickRejectsMissingChildrenOrMismatchedParentWithoutCallingAgain()
+            throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicInteger calls = new AtomicInteger();
-        server.createContext("/internal/runtime-scheduler/tick", exchange -> {
-            calls.incrementAndGet();
-            exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
-            byte[] body = "{\"triggerId\":\"different-parent\",\"executedCount\":1}".getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
-        });
+        server.createContext(
+                "/internal/runtime-scheduler/tick",
+                exchange -> {
+                    calls.incrementAndGet();
+                    exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
+                    byte[] body =
+                            "{\"triggerId\":\"different-parent\",\"executedCount\":1}"
+                                    .getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, body.length);
+                    exchange.getResponseBody().write(body);
+                    exchange.close();
+                });
         server.start();
         try {
-            assertThrows(java.io.IOException.class, () -> startedPlugin(server).tickScheduledTasks("parent-run", 7, 650000));
+            assertThrows(
+                    java.io.IOException.class,
+                    () -> startedPlugin(server).tickScheduledTasks("parent-run", 7, 650000));
             assertEquals(1, calls.get());
         } finally {
             server.stop(0);
@@ -327,35 +443,41 @@ public class PluginCorePluginImplTest {
         AtomicInteger calls = new AtomicInteger();
         CountDownLatch sent = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        server.createContext("/internal/runtime-scheduler/tick", exchange -> {
-            calls.incrementAndGet();
-            try {
-                exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
-                exchange.sendResponseHeaders(200, 0);
-                exchange.getResponseBody().write("{\"triggerId\":".getBytes(StandardCharsets.UTF_8));
-                exchange.getResponseBody().flush();
-                sent.countDown();
-                release.await();
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-            } finally {
-                exchange.close();
-            }
-        });
+        server.createContext(
+                "/internal/runtime-scheduler/tick",
+                exchange -> {
+                    calls.incrementAndGet();
+                    try {
+                        exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
+                        exchange.sendResponseHeaders(200, 0);
+                        exchange.getResponseBody()
+                                .write("{\"triggerId\":".getBytes(StandardCharsets.UTF_8));
+                        exchange.getResponseBody().flush();
+                        sent.countDown();
+                        release.await();
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        exchange.close();
+                    }
+                });
         server.start();
         try {
             PluginCorePluginImpl plugin = startedPlugin(server);
-            CompletableFuture<Exception> result = CompletableFuture.supplyAsync(() -> {
-                try {
-                    plugin.tickScheduledTasks("parent-run", 7, 7000);
-                    return null;
-                } catch (Exception error) {
-                    return error;
-                }
-            });
+            CompletableFuture<Exception> result =
+                    CompletableFuture.supplyAsync(
+                            () -> {
+                                try {
+                                    plugin.tickScheduledTasks("parent-run", 7, 7000);
+                                    return null;
+                                } catch (Exception error) {
+                                    return error;
+                                }
+                            });
             assertTrue(sent.await(2, TimeUnit.SECONDS));
-            assertTrue("submitted tick must report unavailable outcome", result.get(9, TimeUnit.SECONDS)
-                    instanceof java.net.http.HttpTimeoutException);
+            assertTrue(
+                    "submitted tick must report unavailable outcome",
+                    result.get(9, TimeUnit.SECONDS) instanceof java.net.http.HttpTimeoutException);
             assertEquals(1, calls.get());
         } finally {
             release.countDown();
@@ -365,7 +487,12 @@ public class PluginCorePluginImplTest {
 
     @Test
     public void shouldExposeLifecycleWithoutStartingPluginCore() {
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo);
+        PluginCorePluginImpl plugin =
+                new PluginCorePluginImpl(
+                        new File("db.properties"),
+                        "/blog",
+                        () -> 19084,
+                        cacheService()::getPublicWebSiteInfo);
 
         assertTrue(plugin.autoStart());
         assertFalse(plugin.isStarted());
@@ -379,14 +506,15 @@ public class PluginCorePluginImplTest {
         AdminTokenVO adminToken = new AdminTokenVO();
         adminToken.setUserId(5);
         adminToken.setProtocol("https");
-        HttpRequest request = request(Map.of(
-                "Cookie", "sid=1",
-                "Content-Type", "application/json",
-                "Referer", "https://example.com/admin",
-                "User-Agent", "JUnit",
-                "Authorization", "Bearer token",
-                "X-forwarded-for", "203.0.113.7, 10.0.0.1"
-        ));
+        HttpRequest request =
+                request(
+                        Map.of(
+                                "Cookie", "sid=1",
+                                "Content-Type", "application/json",
+                                "Referer", "https://example.com/admin",
+                                "User-Agent", "JUnit",
+                                "Authorization", "Bearer token",
+                                "X-forwarded-for", "203.0.113.7, 10.0.0.1"));
 
         Map<String, String> headers = headerMap(request, adminToken);
 
@@ -403,7 +531,9 @@ public class PluginCorePluginImplTest {
         assertEquals("JUnit", headers.get("User-Agent"));
         assertEquals("Bearer token", headers.get("Authorization"));
         assertEquals("203.0.113.7", headers.get("X-Real-IP"));
-        assertEquals(UrlEncodeUtils.encodeUrl("https://example.com/admin/plugin"), headers.get("Full-Url"));
+        assertEquals(
+                UrlEncodeUtils.encodeUrl("https://example.com/admin/plugin"),
+                headers.get("Full-Url"));
     }
 
     @Test
@@ -420,14 +550,17 @@ public class PluginCorePluginImplTest {
     }
 
     @Test
-    public void shouldForwardTrustedPersonalAppearanceOnlyForAuthenticatedRequests() throws Exception {
+    public void shouldForwardTrustedPersonalAppearanceOnlyForAuthenticatedRequests()
+            throws Exception {
         HttpRequest request = request(Map.of("Admin-Theme", "spoofed", "Dark-Mode", "false"));
         AdminTokenVO token = new AdminTokenVO();
         token.setUserId(5);
         token.setProtocol("https");
         assertEquals("desk", headerMap(request, token).get("Admin-Theme"));
-        request.getAttr().put(PluginAdminAppearance.REQUEST_ATTRIBUTE,
-                new PluginAdminAppearance("antd", false, "#00875a", false));
+        request.getAttr()
+                .put(
+                        PluginAdminAppearance.REQUEST_ATTRIBUTE,
+                        new PluginAdminAppearance("antd", false, "#00875a", false));
 
         Map<String, String> headers = headerMap(request, token);
         assertEquals("antd", headers.get("Admin-Theme"));
@@ -442,21 +575,27 @@ public class PluginCorePluginImplTest {
         AtomicReference<String> queryRef = new AtomicReference<>();
         AtomicReference<String> loginHeaderRef = new AtomicReference<>();
         HttpServer server = localServer();
-        server.createContext("/api/test", exchange -> {
-            queryRef.set(exchange.getRequestURI().getQuery());
-            loginHeaderRef.set(exchange.getRequestHeaders().getFirst("IsLogin"));
-            byte[] body = "plugin-ok".getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("X-Plugin", "ok");
-            exchange.sendResponseHeaders(200, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
-        });
+        server.createContext(
+                "/api/test",
+                exchange -> {
+                    queryRef.set(exchange.getRequestURI().getQuery());
+                    loginHeaderRef.set(exchange.getRequestHeaders().getFirst("IsLogin"));
+                    byte[] body = "plugin-ok".getBytes(StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().add("X-Plugin", "ok");
+                    exchange.sendResponseHeaders(200, body.length);
+                    exchange.getResponseBody().write(body);
+                    exchange.close();
+                });
         server.start();
         try {
             PluginCorePluginImpl plugin = startedPlugin(server);
 
-            CloseResponseHandle handle = plugin.getContext("/api/test", HttpMethod.GET,
-                    request(Map.of("User-Agent", "JUnit")), null);
+            CloseResponseHandle handle =
+                    plugin.getContext(
+                            "/api/test",
+                            HttpMethod.GET,
+                            request(Map.of("User-Agent", "JUnit")),
+                            null);
 
             assertEquals(200, handle.getStatusCode());
             assertEquals("plugin-ok", readBody(handle.getT().body()));
@@ -468,24 +607,31 @@ public class PluginCorePluginImplTest {
     }
 
     @Test
-    public void shouldForwardPostContextWhenRequestMethodDiffersFromTargetMethod() throws Exception {
+    public void shouldForwardPostContextWhenRequestMethodDiffersFromTargetMethod()
+            throws Exception {
         AtomicReference<String> methodRef = new AtomicReference<>();
         AtomicReference<String> bodyRef = new AtomicReference<>();
         HttpServer server = localServer();
-        server.createContext("/api/post", exchange -> {
-            methodRef.set(exchange.getRequestMethod());
-            bodyRef.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            byte[] body = "posted".getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
-        });
+        server.createContext(
+                "/api/post",
+                exchange -> {
+                    methodRef.set(exchange.getRequestMethod());
+                    bodyRef.set(
+                            new String(
+                                    exchange.getRequestBody().readAllBytes(),
+                                    StandardCharsets.UTF_8));
+                    byte[] body = "posted".getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, body.length);
+                    exchange.getResponseBody().write(body);
+                    exchange.close();
+                });
         server.start();
         try {
             PluginCorePluginImpl plugin = startedPlugin(server);
 
-            CloseResponseHandle handle = plugin.getContext("/api/post", HttpMethod.POST,
-                    request(Collections.emptyMap()), null);
+            CloseResponseHandle handle =
+                    plugin.getContext(
+                            "/api/post", HttpMethod.POST, request(Collections.emptyMap()), null);
 
             assertEquals("POST", methodRef.get());
             assertEquals("body", bodyRef.get());
@@ -498,21 +644,27 @@ public class PluginCorePluginImplTest {
     @Test
     public void shouldWritePluginResponseHeadersAndBodyToHostResponse() throws Exception {
         HttpServer server = localServer();
-        server.createContext("/redirect", exchange -> {
-            byte[] body = "redirect-body".getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Location", "/login");
-            exchange.getResponseHeaders().add("X-Plugin", "redirect");
-            exchange.sendResponseHeaders(302, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
-        });
+        server.createContext(
+                "/redirect",
+                exchange -> {
+                    byte[] body = "redirect-body".getBytes(StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().add("Location", "/login");
+                    exchange.getResponseHeaders().add("X-Plugin", "redirect");
+                    exchange.sendResponseHeaders(302, body.length);
+                    exchange.getResponseBody().write(body);
+                    exchange.close();
+                });
         server.start();
         try {
             PluginCorePluginImpl plugin = startedPlugin(server);
             CapturedHostResponse hostResponse = new CapturedHostResponse();
 
-            assertTrue(plugin.accessPlugin("/redirect", request(Collections.emptyMap()),
-                    hostResponse.proxy(), null));
+            assertTrue(
+                    plugin.accessPlugin(
+                            "/redirect",
+                            request(Collections.emptyMap()),
+                            hostResponse.proxy(),
+                            null));
 
             assertEquals(302, hostResponse.statusCode.get());
             assertEquals("redirect-body", hostResponse.body());
@@ -525,20 +677,33 @@ public class PluginCorePluginImplTest {
 
     @Test
     public void shouldReturnFalseWhenPluginResponseBodyIsMissing() throws Exception {
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
-            @Override
-            public CloseResponseHandle getContext(String uri, HttpMethod method, HttpRequest request,
-                                                  AdminTokenVO adminTokenVO) {
-                return new CloseResponseHandle();
-            }
-        };
+        PluginCorePluginImpl plugin =
+                new PluginCorePluginImpl(
+                        new File("db.properties"),
+                        "/blog",
+                        () -> 19084,
+                        cacheService()::getPublicWebSiteInfo) {
+                    @Override
+                    public CloseResponseHandle getContext(
+                            String uri,
+                            HttpMethod method,
+                            HttpRequest request,
+                            AdminTokenVO adminTokenVO) {
+                        return new CloseResponseHandle();
+                    }
+                };
         {
-            Field serverBaseUrl = PluginCorePluginImpl.class.getDeclaredField("pluginServerBaseUrl");
+            Field serverBaseUrl =
+                    PluginCorePluginImpl.class.getDeclaredField("pluginServerBaseUrl");
             serverBaseUrl.setAccessible(true);
             serverBaseUrl.set(plugin, "http://127.0.0.1:1");
 
-            assertFalse(plugin.accessPlugin("/empty", request(Collections.emptyMap()),
-                    new CapturedHostResponse().proxy(), null));
+            assertFalse(
+                    plugin.accessPlugin(
+                            "/empty",
+                            request(Collections.emptyMap()),
+                            new CapturedHostResponse().proxy(),
+                            null));
         }
     }
 
@@ -548,24 +713,34 @@ public class PluginCorePluginImplTest {
         AtomicReference<String> bodyRef = new AtomicReference<>();
         AtomicReference<String> loginUserRef = new AtomicReference<>();
         HttpServer server = localServer();
-        server.createContext("/service", exchange -> {
-            methodRef.set(exchange.getRequestMethod());
-            bodyRef.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            loginUserRef.set(exchange.getRequestHeaders().getFirst("LoginUserId"));
-            byte[] body = "{\"code\":200,\"status\":\"STARTED\",\"runningPlugins\":[\"comment\"]}"
-                    .getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
-        });
+        server.createContext(
+                "/service",
+                exchange -> {
+                    methodRef.set(exchange.getRequestMethod());
+                    bodyRef.set(
+                            new String(
+                                    exchange.getRequestBody().readAllBytes(),
+                                    StandardCharsets.UTF_8));
+                    loginUserRef.set(exchange.getRequestHeaders().getFirst("LoginUserId"));
+                    byte[] body =
+                            "{\"code\":200,\"status\":\"STARTED\",\"runningPlugins\":[\"comment\"]}"
+                                    .getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, body.length);
+                    exchange.getResponseBody().write(body);
+                    exchange.close();
+                });
         server.start();
         try {
             PluginCorePluginImpl plugin = startedPlugin(server);
             AdminTokenVO adminToken = new AdminTokenVO();
             adminToken.setUserId(7);
 
-            PluginStatusResponse response = plugin.requestService(request(Collections.emptyMap()),
-                    Map.of("action", new String[]{"ping"}), adminToken, PluginStatusResponse.class);
+            PluginStatusResponse response =
+                    plugin.requestService(
+                            request(Collections.emptyMap()),
+                            Map.of("action", new String[] {"ping"}),
+                            adminToken,
+                            PluginStatusResponse.class);
 
             assertEquals("POST", methodRef.get());
             assertEquals("action=ping", bodyRef.get());
@@ -581,27 +756,41 @@ public class PluginCorePluginImplTest {
     public void shouldStartPluginCoreProcessAndWaitForStartedStatus() throws Exception {
         AtomicInteger startCount = new AtomicInteger();
         HttpServer server = localServer();
-        server.createContext("/api/status", exchange -> {
-            byte[] body = "{\"status\":\"STARTED\",\"runningPlugins\":[]}".getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
-        });
+        server.createContext(
+                "/api/status",
+                exchange -> {
+                    byte[] body =
+                            "{\"status\":\"STARTED\",\"runningPlugins\":[]}"
+                                    .getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, body.length);
+                    exchange.getResponseBody().write(body);
+                    exchange.close();
+                });
         server.start();
         try {
-            PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo);
-            setPluginCoreProcess(plugin, new PluginCoreProcess() {
-                @Override
-                public int pluginServerStart(String dbProperties, String pluginJvmArgs, String runtimePath,
-                                             String runTimeVersion, String token) {
-                    startCount.incrementAndGet();
-                    return server.getAddress().getPort();
-                }
+            PluginCorePluginImpl plugin =
+                    new PluginCorePluginImpl(
+                            new File("db.properties"),
+                            "/blog",
+                            () -> 19084,
+                            cacheService()::getPublicWebSiteInfo);
+            setPluginCoreProcess(
+                    plugin,
+                    new PluginCoreProcess() {
+                        @Override
+                        public int pluginServerStart(
+                                String dbProperties,
+                                String pluginJvmArgs,
+                                String runtimePath,
+                                String runTimeVersion,
+                                String token) {
+                            startCount.incrementAndGet();
+                            return server.getAddress().getPort();
+                        }
 
-                @Override
-                public void stopPluginCore() {
-                }
-            });
+                        @Override
+                        public void stopPluginCore() {}
+                    });
 
             assertTrue(plugin.start());
             assertTrue(plugin.start());
@@ -618,26 +807,37 @@ public class PluginCorePluginImplTest {
         AtomicInteger startCount = new AtomicInteger();
         AtomicInteger stopCount = new AtomicInteger();
         AtomicInteger readinessCount = new AtomicInteger();
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
-            @Override
-            boolean waitToStarted(String pluginServerBaseUrl, String token) {
-                assertEquals("http://127.0.0.1:21000", pluginServerBaseUrl);
-                return readinessCount.incrementAndGet() > 1;
-            }
-        };
-        setPluginCoreProcess(plugin, new PluginCoreProcess() {
-            @Override
-            public int pluginServerStart(String dbProperties, String pluginJvmArgs, String runtimePath,
-                                         String runTimeVersion, String token) {
-                startCount.incrementAndGet();
-                return 21000;
-            }
+        PluginCorePluginImpl plugin =
+                new PluginCorePluginImpl(
+                        new File("db.properties"),
+                        "/blog",
+                        () -> 19084,
+                        cacheService()::getPublicWebSiteInfo) {
+                    @Override
+                    boolean waitToStarted(String pluginServerBaseUrl, String token) {
+                        assertEquals("http://127.0.0.1:21000", pluginServerBaseUrl);
+                        return readinessCount.incrementAndGet() > 1;
+                    }
+                };
+        setPluginCoreProcess(
+                plugin,
+                new PluginCoreProcess() {
+                    @Override
+                    public int pluginServerStart(
+                            String dbProperties,
+                            String pluginJvmArgs,
+                            String runtimePath,
+                            String runTimeVersion,
+                            String token) {
+                        startCount.incrementAndGet();
+                        return 21000;
+                    }
 
-            @Override
-            public void stopPluginCore() {
-                stopCount.incrementAndGet();
-            }
-        });
+                    @Override
+                    public void stopPluginCore() {
+                        stopCount.incrementAndGet();
+                    }
+                });
 
         assertFalse(plugin.start());
         assertFalse(plugin.isStarted());
@@ -653,24 +853,33 @@ public class PluginCorePluginImplTest {
     @Test
     public void shouldLaunchOnlyOneSupervisorForConcurrentStarts() throws Exception {
         AtomicInteger startCount = new AtomicInteger();
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
-            @Override
-            boolean waitToStarted(String pluginServerBaseUrl, String token) {
-                return true;
-            }
-        };
+        PluginCorePluginImpl plugin =
+                new PluginCorePluginImpl(
+                        new File("db.properties"),
+                        "/blog",
+                        () -> 19084,
+                        cacheService()::getPublicWebSiteInfo) {
+                    @Override
+                    boolean waitToStarted(String pluginServerBaseUrl, String token) {
+                        return true;
+                    }
+                };
         setPluginCoreProcess(plugin, pluginCoreProcess(startCount, new AtomicInteger(), 21000));
         ExecutorService executor = Executors.newFixedThreadPool(2);
         CountDownLatch startGate = new CountDownLatch(1);
         try {
-            Future<Boolean> first = executor.submit(() -> {
-                startGate.await();
-                return plugin.start();
-            });
-            Future<Boolean> second = executor.submit(() -> {
-                startGate.await();
-                return plugin.start();
-            });
+            Future<Boolean> first =
+                    executor.submit(
+                            () -> {
+                                startGate.await();
+                                return plugin.start();
+                            });
+            Future<Boolean> second =
+                    executor.submit(
+                            () -> {
+                                startGate.await();
+                                return plugin.start();
+                            });
 
             startGate.countDown();
 
@@ -685,12 +894,17 @@ public class PluginCorePluginImplTest {
     @Test
     public void shouldRejectForwardingWhilePendingWithoutBuildingNullUrl() throws Exception {
         AtomicInteger startCount = new AtomicInteger();
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
-            @Override
-            boolean waitToStarted(String pluginServerBaseUrl, String token) {
-                return false;
-            }
-        };
+        PluginCorePluginImpl plugin =
+                new PluginCorePluginImpl(
+                        new File("db.properties"),
+                        "/blog",
+                        () -> 19084,
+                        cacheService()::getPublicWebSiteInfo) {
+                    @Override
+                    boolean waitToStarted(String pluginServerBaseUrl, String token) {
+                        return false;
+                    }
+                };
         setPluginCoreProcess(plugin, pluginCoreProcess(startCount, new AtomicInteger(), 21000));
 
         try {
@@ -700,14 +914,21 @@ public class PluginCorePluginImplTest {
             assertEquals("plugin-core is not ready", e.getMessage());
         }
         try {
-            plugin.requestService(request(Collections.emptyMap()), Collections.emptyMap(), null,
+            plugin.requestService(
+                    request(Collections.emptyMap()),
+                    Collections.emptyMap(),
+                    null,
                     PluginStatusResponse.class);
             throw new AssertionError("Expected plugin-core readiness failure");
         } catch (java.io.IOException e) {
             assertEquals("plugin-core is not ready", e.getMessage());
         }
-        assertFalse(plugin.accessPlugin("/test", request(Collections.emptyMap()),
-                new CapturedHostResponse().proxy(), null));
+        assertFalse(
+                plugin.accessPlugin(
+                        "/test",
+                        request(Collections.emptyMap()),
+                        new CapturedHostResponse().proxy(),
+                        null));
         assertFalse(plugin.refreshCache("cache-123", request(Collections.emptyMap())));
         assertEquals(1, startCount.get());
     }
@@ -716,12 +937,17 @@ public class PluginCorePluginImplTest {
     public void shouldClearPendingSupervisorOnExplicitStop() throws Exception {
         AtomicInteger startCount = new AtomicInteger();
         AtomicInteger stopCount = new AtomicInteger();
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
-            @Override
-            boolean waitToStarted(String pluginServerBaseUrl, String token) {
-                return false;
-            }
-        };
+        PluginCorePluginImpl plugin =
+                new PluginCorePluginImpl(
+                        new File("db.properties"),
+                        "/blog",
+                        () -> 19084,
+                        cacheService()::getPublicWebSiteInfo) {
+                    @Override
+                    boolean waitToStarted(String pluginServerBaseUrl, String token) {
+                        return false;
+                    }
+                };
         setPluginCoreProcess(plugin, pluginCoreProcess(startCount, stopCount, 21000));
 
         assertFalse(plugin.start());
@@ -739,19 +965,24 @@ public class PluginCorePluginImplTest {
         AtomicInteger stopCount = new AtomicInteger();
         CountDownLatch readinessEntered = new CountDownLatch(1);
         CountDownLatch releaseReadiness = new CountDownLatch(1);
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
-            @Override
-            boolean waitToStarted(String pluginServerBaseUrl, String token) {
-                readinessEntered.countDown();
-                try {
-                    releaseReadiness.await();
-                    return true;
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return false;
-                }
-            }
-        };
+        PluginCorePluginImpl plugin =
+                new PluginCorePluginImpl(
+                        new File("db.properties"),
+                        "/blog",
+                        () -> 19084,
+                        cacheService()::getPublicWebSiteInfo) {
+                    @Override
+                    boolean waitToStarted(String pluginServerBaseUrl, String token) {
+                        readinessEntered.countDown();
+                        try {
+                            releaseReadiness.await();
+                            return true;
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return false;
+                        }
+                    }
+                };
         setPluginCoreProcess(plugin, pluginCoreProcess(startCount, stopCount, 21000));
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
@@ -776,13 +1007,15 @@ public class PluginCorePluginImplTest {
     public void shouldRefreshPluginCacheThroughStartedPluginCoreServer() throws Exception {
         AtomicReference<String> queryRef = new AtomicReference<>();
         HttpServer server = localServer();
-        server.createContext("/api/refreshCache", exchange -> {
-            queryRef.set(exchange.getRequestURI().getQuery());
-            byte[] body = "ok".getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
-        });
+        server.createContext(
+                "/api/refreshCache",
+                exchange -> {
+                    queryRef.set(exchange.getRequestURI().getQuery());
+                    byte[] body = "ok".getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, body.length);
+                    exchange.getResponseBody().write(body);
+                    exchange.close();
+                });
         server.start();
         try {
             PluginCorePluginImpl plugin = startedPlugin(server);
@@ -801,20 +1034,44 @@ public class PluginCorePluginImplTest {
     public void scheduledRefreshUsesOneAttemptAndDoesNotStartUnreadyPlugin() throws Exception {
         AtomicInteger requests = new AtomicInteger();
         HttpServer server = localServer();
-        server.createContext("/internal/runtime-scheduler/refresh-cache", exchange -> {
-            requests.incrementAndGet();
-            exchange.sendResponseHeaders(503, -1);
-            exchange.close();
-        });
+        server.createContext(
+                "/internal/runtime-scheduler/refresh-cache",
+                exchange -> {
+                    requests.incrementAndGet();
+                    exchange.sendResponseHeaders(503, -1);
+                    exchange.close();
+                });
         server.start();
         try {
             PluginCorePluginImpl plugin = startedPlugin(server);
-            assertThrows(java.io.IOException.class, () -> plugin.refreshCacheWithinBudget("cache-1", "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7, 20000));
+            assertThrows(
+                    java.io.IOException.class,
+                    () ->
+                            plugin.refreshCacheWithinBudget(
+                                    "cache-1",
+                                    "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b",
+                                    7,
+                                    20000));
             assertEquals(1, requests.get());
-            assertFalse(plugin.refreshCacheWithinBudget("cache-1", "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7, 0));
-            assertFalse(plugin.refreshCacheWithinBudget("cache-1", "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7, 11000));
+            assertFalse(
+                    plugin.refreshCacheWithinBudget(
+                            "cache-1",
+                            "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b",
+                            7,
+                            0));
+            assertFalse(
+                    plugin.refreshCacheWithinBudget(
+                            "cache-1",
+                            "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b",
+                            7,
+                            11000));
             setPluginServerBaseUrl(plugin, null);
-            assertFalse(plugin.refreshCacheWithinBudget("cache-1", "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7, 20000));
+            assertFalse(
+                    plugin.refreshCacheWithinBudget(
+                            "cache-1",
+                            "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b",
+                            7,
+                            20000));
             assertEquals(1, requests.get());
         } finally {
             server.stop(0);
@@ -822,40 +1079,86 @@ public class PluginCorePluginImplTest {
     }
 
     @Test
-    public void scheduledRefreshRequiresMatchingBusinessCompletionAndKeepsCredentialsOutOfUrl() throws Exception {
+    public void scheduledRefreshRequiresMatchingBusinessCompletionAndKeepsCredentialsOutOfUrl()
+            throws Exception {
         AtomicReference<String> body = new AtomicReference<>();
         AtomicInteger calls = new AtomicInteger();
         HttpServer server = localServer();
-        server.createContext("/internal/runtime-scheduler/refresh-cache", exchange -> {
-            calls.incrementAndGet();
-            assertEquals("POST", exchange.getRequestMethod());
-            assertNull(exchange.getRequestURI().getQuery());
-            assertEquals("0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", exchange.getRequestHeaders().getFirst("X-ZrLog-Trigger-Id"));
-            assertEquals("7", exchange.getRequestHeaders().getFirst("X-ZrLog-Actor-Id"));
-            assertEquals("cache-1", exchange.getRequestHeaders().getFirst("X-ZrLog-Cache-Version"));
-            assertNotNull(exchange.getRequestHeaders().getFirst("X-Plugin-Token"));
-            assertEquals("15000", exchange.getRequestHeaders().getFirst("X-ZrLog-Budget-Millis"));
-            byte[] bytes = body.get().getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
-            exchange.sendResponseHeaders(200, bytes.length);
-            exchange.getResponseBody().write(bytes);
-            exchange.close();
-        });
+        server.createContext(
+                "/internal/runtime-scheduler/refresh-cache",
+                exchange -> {
+                    calls.incrementAndGet();
+                    assertEquals("POST", exchange.getRequestMethod());
+                    assertNull(exchange.getRequestURI().getQuery());
+                    assertEquals(
+                            "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b",
+                            exchange.getRequestHeaders().getFirst("X-ZrLog-Trigger-Id"));
+                    assertEquals("7", exchange.getRequestHeaders().getFirst("X-ZrLog-Actor-Id"));
+                    assertEquals(
+                            "cache-1",
+                            exchange.getRequestHeaders().getFirst("X-ZrLog-Cache-Version"));
+                    assertNotNull(exchange.getRequestHeaders().getFirst("X-Plugin-Token"));
+                    assertEquals(
+                            "15000",
+                            exchange.getRequestHeaders().getFirst("X-ZrLog-Budget-Millis"));
+                    byte[] bytes = body.get().getBytes(StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
+                    exchange.sendResponseHeaders(200, bytes.length);
+                    exchange.getResponseBody().write(bytes);
+                    exchange.close();
+                });
         server.start();
         try {
             PluginCorePluginImpl plugin = startedPlugin(server);
-            body.set("{\"triggerId\":\"0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b\",\"cacheVersion\":\"cache-1\",\"completed\":true,\"successCount\":1}");
-            assertTrue(plugin.refreshCacheWithinBudget("cache-1", "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7, 20000));
-            body.set("{\"triggerId\":\"0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b\",\"cacheVersion\":\"cache-1\",\"failedCount\":1,\"outcomeUncertain\":true}");
-            assertFalse(plugin.refreshCacheWithinBudget("cache-1", "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7, 20000));
-            body.set("{\"triggerId\":\"0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b\",\"cacheVersion\":\"cache-1\",\"completed\":true,\"failedCount\":1}");
-            assertThrows(java.io.IOException.class, () -> plugin.refreshCacheWithinBudget("cache-1", "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7, 20000));
-            body.set("{\"triggerId\":\"wrong-run\",\"cacheVersion\":\"cache-1\",\"completed\":true}");
-            assertThrows(java.io.IOException.class, () -> plugin.refreshCacheWithinBudget("cache-1", "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7, 20000));
+            body.set(
+                    "{\"triggerId\":\"0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b\",\"cacheVersion\":\"cache-1\",\"completed\":true,\"successCount\":1}");
+            assertTrue(
+                    plugin.refreshCacheWithinBudget(
+                            "cache-1",
+                            "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b",
+                            7,
+                            20000));
+            body.set(
+                    "{\"triggerId\":\"0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b\",\"cacheVersion\":\"cache-1\",\"failedCount\":1,\"outcomeUncertain\":true}");
+            assertFalse(
+                    plugin.refreshCacheWithinBudget(
+                            "cache-1",
+                            "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b",
+                            7,
+                            20000));
+            body.set(
+                    "{\"triggerId\":\"0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b\",\"cacheVersion\":\"cache-1\",\"completed\":true,\"failedCount\":1}");
+            assertThrows(
+                    java.io.IOException.class,
+                    () ->
+                            plugin.refreshCacheWithinBudget(
+                                    "cache-1",
+                                    "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b",
+                                    7,
+                                    20000));
+            body.set(
+                    "{\"triggerId\":\"wrong-run\",\"cacheVersion\":\"cache-1\",\"completed\":true}");
+            assertThrows(
+                    java.io.IOException.class,
+                    () ->
+                            plugin.refreshCacheWithinBudget(
+                                    "cache-1",
+                                    "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b",
+                                    7,
+                                    20000));
             body.set("{\"code\":0}");
-            assertThrows(java.io.IOException.class, () -> plugin.refreshCacheWithinBudget("cache-1", "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7, 20000));
+            assertThrows(
+                    java.io.IOException.class,
+                    () ->
+                            plugin.refreshCacheWithinBudget(
+                                    "cache-1",
+                                    "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b",
+                                    7,
+                                    20000));
             assertEquals(5, calls.get());
-            assertThrows(IllegalArgumentException.class, () -> plugin.refreshCacheWithinBudget("cache-1", "invalid id", 7, 20000));
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> plugin.refreshCacheWithinBudget("cache-1", "invalid id", 7, 20000));
             assertEquals(5, calls.get());
         } finally {
             server.stop(0);
@@ -865,12 +1168,17 @@ public class PluginCorePluginImplTest {
     @Test
     public void shouldRetryRefreshCacheUntilRetriesAreExhausted() throws Exception {
         AtomicInteger pauseCount = new AtomicInteger();
-        PluginCorePluginImpl plugin = new PluginCorePluginImpl(new File("db.properties"), "/blog", () -> 19084, cacheService()::getPublicWebSiteInfo) {
-            @Override
-            void pauseBeforeRefreshCacheRetry() {
-                pauseCount.incrementAndGet();
-            }
-        };
+        PluginCorePluginImpl plugin =
+                new PluginCorePluginImpl(
+                        new File("db.properties"),
+                        "/blog",
+                        () -> 19084,
+                        cacheService()::getPublicWebSiteInfo) {
+                    @Override
+                    void pauseBeforeRefreshCacheRetry() {
+                        pauseCount.incrementAndGet();
+                    }
+                };
         setPluginServerBaseUrl(plugin, "http://127.0.0.1:1");
 
         invokeRefreshCacheWithRetry(plugin, 0, "cache-123");
@@ -881,16 +1189,19 @@ public class PluginCorePluginImplTest {
     @Test
     public void shouldWaitToStartedFailWhenStatusPayloadIsMissing() throws Exception {
         HttpServer server = localServer();
-        server.createContext("/api/status", exchange -> {
-            byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
-        });
+        server.createContext(
+                "/api/status",
+                exchange -> {
+                    byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, body.length);
+                    exchange.getResponseBody().write(body);
+                    exchange.close();
+                });
         server.start();
         try {
-            assertFalse(invokeWaitToStarted(
-                    "http://127.0.0.1:" + server.getAddress().getPort(), "token", 0));
+            assertFalse(
+                    invokeWaitToStarted(
+                            "http://127.0.0.1:" + server.getAddress().getPort(), "token", 0));
         } finally {
             server.stop(0);
         }
@@ -900,17 +1211,25 @@ public class PluginCorePluginImplTest {
     public void shouldWaitToStartedRetryUntilStartedStatus() throws Exception {
         AtomicInteger count = new AtomicInteger();
         HttpServer server = localServer();
-        server.createContext("/api/status", exchange -> {
-            PluginCoreStatus status = count.getAndIncrement() == 0 ? PluginCoreStatus.STARTING : PluginCoreStatus.STARTED;
-            byte[] body = ("{\"status\":\"" + status + "\",\"runningPlugins\":[]}").getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
-        });
+        server.createContext(
+                "/api/status",
+                exchange -> {
+                    PluginCoreStatus status =
+                            count.getAndIncrement() == 0
+                                    ? PluginCoreStatus.STARTING
+                                    : PluginCoreStatus.STARTED;
+                    byte[] body =
+                            ("{\"status\":\"" + status + "\",\"runningPlugins\":[]}")
+                                    .getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, body.length);
+                    exchange.getResponseBody().write(body);
+                    exchange.close();
+                });
         server.start();
         try {
-            assertTrue(invokeWaitToStarted(
-                    "http://127.0.0.1:" + server.getAddress().getPort(), "token", 1));
+            assertTrue(
+                    invokeWaitToStarted(
+                            "http://127.0.0.1:" + server.getAddress().getPort(), "token", 1));
 
             assertEquals(2, count.get());
         } finally {
@@ -929,27 +1248,30 @@ public class PluginCorePluginImplTest {
         private final AtomicInteger statusCode = new AtomicInteger();
 
         HttpResponse proxy() {
-            return (HttpResponse) Proxy.newProxyInstance(
-                    PluginCorePluginImplTest.class.getClassLoader(),
-                    new Class[]{HttpResponse.class},
-                    (proxy, method, args) -> {
-                        if ("addHeader".equals(method.getName())) {
-                            headers.put(((String) args[0]).toLowerCase(), (String) args[1]);
-                            return null;
-                        }
-                        if ("write".equals(method.getName()) && args.length == 2 && args[0] instanceof InputStream) {
-                            statusCode.set((Integer) args[1]);
-                            body.write(((InputStream) args[0]).readAllBytes());
-                            return null;
-                        }
-                        if ("getHeader".equals(method.getName())) {
-                            return headers;
-                        }
-                        if ("toString".equals(method.getName())) {
-                            return "CapturedHostResponse";
-                        }
-                        return null;
-                    });
+            return (HttpResponse)
+                    Proxy.newProxyInstance(
+                            PluginCorePluginImplTest.class.getClassLoader(),
+                            new Class[] {HttpResponse.class},
+                            (proxy, method, args) -> {
+                                if ("addHeader".equals(method.getName())) {
+                                    headers.put(((String) args[0]).toLowerCase(), (String) args[1]);
+                                    return null;
+                                }
+                                if ("write".equals(method.getName())
+                                        && args.length == 2
+                                        && args[0] instanceof InputStream) {
+                                    statusCode.set((Integer) args[1]);
+                                    body.write(((InputStream) args[0]).readAllBytes());
+                                    return null;
+                                }
+                                if ("getHeader".equals(method.getName())) {
+                                    return headers;
+                                }
+                                if ("toString".equals(method.getName())) {
+                                    return "CapturedHostResponse";
+                                }
+                                return null;
+                            });
         }
 
         String header(String name) {

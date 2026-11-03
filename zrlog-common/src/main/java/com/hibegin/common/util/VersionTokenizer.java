@@ -10,8 +10,7 @@ public class VersionTokenizer {
     private boolean _hasValue;
 
     public VersionTokenizer(String versionString) {
-        if (versionString == null)
-            throw new IllegalArgumentException("versionString is null");
+        if (versionString == null) throw new IllegalArgumentException("versionString is null");
 
         _versionString = versionString;
         _length = versionString.length();
@@ -35,8 +34,7 @@ public class VersionTokenizer {
         _hasValue = false;
 
         // No more characters
-        if (_position >= _length)
-            return false;
+        if (_position >= _length) return false;
 
         _hasValue = true;
 

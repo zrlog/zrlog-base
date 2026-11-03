@@ -50,7 +50,6 @@ public class RequestInfo {
         this.userAgent = userAgent;
     }
 
-
     public String getIp() {
         return ip;
     }

@@ -2,7 +2,6 @@ package com.zrlog.business.rest.base;
 
 import com.zrlog.common.Validator;
 import com.zrlog.common.exception.ArgsException;
-
 import java.util.Objects;
 
 public class UpgradeWebSiteInfo implements Validator {
@@ -37,7 +36,9 @@ public class UpgradeWebSiteInfo implements Validator {
 
     @Override
     public void doValid() {
-        if (upgradePackageSource != null && !"dl".equals(upgradePackageSource) && !"github".equals(upgradePackageSource)) {
+        if (upgradePackageSource != null
+                && !"dl".equals(upgradePackageSource)
+                && !"github".equals(upgradePackageSource)) {
             throw new ArgsException("upgradePackageSource");
         }
         if (Objects.isNull(autoUpgradeVersion)) {

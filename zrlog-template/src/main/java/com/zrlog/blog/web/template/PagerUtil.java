@@ -1,7 +1,6 @@
 package com.zrlog.blog.web.template;
 
 import com.zrlog.util.I18nUtil;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,7 +18,13 @@ public class PagerUtil {
         PagerVO pager = new PagerVO();
         List<PagerVO.PageEntry> pageList = new ArrayList<>();
         if (currentPage != 1) {
-            PagerVO.PageEntry prevPage = pageEntity(currentUri, currentPage, I18nUtil.getBlogStringFromRes("prevPage"), currentPage - 1, totalPage);
+            PagerVO.PageEntry prevPage =
+                    pageEntity(
+                            currentUri,
+                            currentPage,
+                            I18nUtil.getBlogStringFromRes("prevPage"),
+                            currentPage - 1,
+                            totalPage);
             prevPage.setPrev(true);
             pageList.add(prevPage);
         }
@@ -48,7 +53,13 @@ public class PagerUtil {
             }
         }
         if (currentPage != totalPage) {
-            PagerVO.PageEntry nextPage = pageEntity(currentUri, currentPage, I18nUtil.getBlogStringFromRes("nextPage"), currentPage + 1, totalPage);
+            PagerVO.PageEntry nextPage =
+                    pageEntity(
+                            currentUri,
+                            currentPage,
+                            I18nUtil.getBlogStringFromRes("nextPage"),
+                            currentPage + 1,
+                            totalPage);
             nextPage.setNext(true);
             pageList.add(nextPage);
         }
@@ -60,7 +71,8 @@ public class PagerUtil {
         return pager;
     }
 
-    private static PagerVO.PageEntry pageEntity(String url, long currentPage, String desc, long page, long totalPage) {
+    private static PagerVO.PageEntry pageEntity(
+            String url, long currentPage, String desc, long page, long totalPage) {
         PagerVO.PageEntry map = new PagerVO.PageEntry();
         map.setUrl(url + page);
         map.setDesc(desc);
@@ -73,8 +85,8 @@ public class PagerUtil {
         return map;
     }
 
-    private static PagerVO.PageEntry pageEntity(String url, long currentPage, long page, long totalPage) {
+    private static PagerVO.PageEntry pageEntity(
+            String url, long currentPage, long page, long totalPage) {
         return pageEntity(url, currentPage, page + "", page, totalPage);
     }
-
 }

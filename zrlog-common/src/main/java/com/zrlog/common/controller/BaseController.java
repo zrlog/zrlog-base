@@ -1,6 +1,5 @@
 package com.zrlog.common.controller;
 
-
 import com.google.gson.Gson;
 import com.hibegin.common.util.IOUtil;
 import com.hibegin.common.util.StringUtils;
@@ -11,13 +10,11 @@ import com.zrlog.common.Validator;
 import com.zrlog.common.exception.ArgsException;
 import com.zrlog.common.exception.MissingRequestBodyException;
 import com.zrlog.util.I18nUtil;
-
 import java.util.Objects;
 
 public class BaseController extends Controller {
 
-    public BaseController() {
-    }
+    public BaseController() {}
 
     public BaseController(HttpRequest request, HttpResponse response) {
         super(request, response);

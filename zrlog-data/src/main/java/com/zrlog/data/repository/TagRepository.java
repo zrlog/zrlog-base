@@ -9,14 +9,11 @@ import com.zrlog.common.cache.dto.TagDTO;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.model.Tag;
 import jakarta.inject.Inject;
-
 import java.sql.SQLException;
 import java.util.*;
 import java.util.logging.Logger;
 
-/**
- * 统计文章中标签出现的次数，方便展示。文章的数据发生变化后，会自动更新记录，无需额外程序控制，对应数据库的 tag 表
- */
+/** 统计文章中标签出现的次数，方便展示。文章的数据发生变化后，会自动更新记录，无需额外程序控制，对应数据库的 tag 表 */
 public class TagRepository extends BaseRepository<Tag, Long> {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(TagRepository.class);
@@ -88,10 +85,12 @@ public class TagRepository extends BaseRepository<Tag, Long> {
                                 "select keywords from "
                                         + LogRepository.TABLE_NAME
                                         + " where rubbish=? and privacy=? ",
-                                com.zrlog.data.dto.ArticleBasicDTO.class, false,
+                                com.zrlog.data.dto.ArticleBasicDTO.class,
+                                false,
                                 false);
         for (com.zrlog.data.dto.ArticleBasicDTO log : logs) {
-            if (StringUtils.isNotEmpty((String) log.getKeywords()) && !((String) log.getKeywords()).trim().isEmpty()) {
+            if (StringUtils.isNotEmpty((String) log.getKeywords())
+                    && !((String) log.getKeywords()).trim().isEmpty()) {
                 Set<String> tagSet = strToSet(log.getKeywords() + ",");
                 for (String tag : tagSet) {
                     countMap.merge(tag, 1, Integer::sum);
@@ -122,8 +121,13 @@ public class TagRepository extends BaseRepository<Tag, Long> {
         return splitList;
     }
 
-    private List<TagDTO> batchInsert(Map<String, Integer> countMap, int idBase) throws SQLException {
-        StringBuilder insertSql = new StringBuilder("insert into " + tableName + " (tagId,text,count,createdAt,updatedAt,version) values ");
+    private List<TagDTO> batchInsert(Map<String, Integer> countMap, int idBase)
+            throws SQLException {
+        StringBuilder insertSql =
+                new StringBuilder(
+                        "insert into "
+                                + tableName
+                                + " (tagId,text,count,createdAt,updatedAt,version) values ");
         List<Object> params = new ArrayList<>();
         int id = idBase;
         StringJoiner valueJoiner = new StringJoiner(",");
@@ -159,8 +163,10 @@ public class TagRepository extends BaseRepository<Tag, Long> {
                     tag.setCount(1);
                     insert(tag);
                 } else {
-                    execute("UPDATE tag SET count=count+1,updatedAt=?,version=version+1 WHERE tagId=?",
-                            new java.sql.Timestamp(System.currentTimeMillis()).toString(), t.getId());
+                    execute(
+                            "UPDATE tag SET count=count+1,updatedAt=?,version=version+1 WHERE tagId=?",
+                            new java.sql.Timestamp(System.currentTimeMillis()).toString(),
+                            t.getId());
                 }
             } catch (SQLException e) {
                 throw new DAOException(e);
@@ -174,8 +180,10 @@ public class TagRepository extends BaseRepository<Tag, Long> {
                 Tag t = select("WHERE text=? LIMIT 1", del).stream().findFirst().orElse(null);
                 if (t != null) {
                     if (t.getCount() > 1) {
-                        execute("UPDATE tag SET count=count-1,updatedAt=?,version=version+1 WHERE tagId=? AND count>1",
-                                new java.sql.Timestamp(System.currentTimeMillis()).toString(), t.getId());
+                        execute(
+                                "UPDATE tag SET count=count-1,updatedAt=?,version=version+1 WHERE tagId=? AND count>1",
+                                new java.sql.Timestamp(System.currentTimeMillis()).toString(),
+                                t.getId());
                     } else {
                         execute("DELETE FROM tag WHERE tagId=? AND count<=1", t.getId());
                     }
@@ -187,6 +195,10 @@ public class TagRepository extends BaseRepository<Tag, Long> {
     }
 
     public PageData<TagDTO> find(PageRequest page) {
-        return queryPageData("select tagId as id,text,count from " + tableName, page, new Object[0], TagDTO.class);
+        return queryPageData(
+                "select tagId as id,text,count from " + tableName,
+                page,
+                new Object[0],
+                TagDTO.class);
     }
 }

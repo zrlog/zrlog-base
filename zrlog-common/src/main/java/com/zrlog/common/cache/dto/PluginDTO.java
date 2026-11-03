@@ -35,9 +35,7 @@ public class PluginDTO implements Serializable {
         this.isSystem = system;
     }
 
-    /**
-     * freemarker
-     */
+    /** freemarker */
     public Boolean getIsSystem() {
         return isSystem;
     }

@@ -1,12 +1,11 @@
 package com.zrlog.util;
 
-import org.junit.Test;
+import static org.junit.Assert.*;
 
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.Properties;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 public class BlogBuildInfoUtilTest {
 
@@ -14,10 +13,12 @@ public class BlogBuildInfoUtilTest {
     public void shouldParseCanonicalAndIsoBuildTimes() throws Exception {
         Instant expected = Instant.parse("2026-09-05T05:26:19Z");
 
-        assertEquals(expected, BlogBuildInfoUtil.parseBuildTime(
-                "2026-09-05 13:26:19+08:00").toInstant());
-        assertEquals(expected, BlogBuildInfoUtil.parseBuildTime(
-                "2026-09-05T13:26:19+08:00").toInstant());
+        assertEquals(
+                expected,
+                BlogBuildInfoUtil.parseBuildTime("2026-09-05 13:26:19+08:00").toInstant());
+        assertEquals(
+                expected,
+                BlogBuildInfoUtil.parseBuildTime("2026-09-05T13:26:19+08:00").toInstant());
     }
 
     @Test
@@ -53,16 +54,22 @@ public class BlogBuildInfoUtilTest {
         assertEquals(BlogBuildInfoUtil.getVersion(), properties.get("version"));
         assertEquals(BlogBuildInfoUtil.getBuildId(), properties.get("buildId"));
         assertEquals(BlogBuildInfoUtil.getRunMode(), properties.get("runMode"));
-        assertEquals(new SimpleDateFormat("yyyy-MM-dd").format(BlogBuildInfoUtil.getTime()),
+        assertEquals(
+                new SimpleDateFormat("yyyy-MM-dd").format(BlogBuildInfoUtil.getTime()),
                 properties.get("buildTime"));
     }
 
     @Test
     public void shouldFormatVersionInformation() {
-        assertEquals(BlogBuildInfoUtil.getVersion() + " - " + BlogBuildInfoUtil.getBuildId(),
+        assertEquals(
+                BlogBuildInfoUtil.getVersion() + " - " + BlogBuildInfoUtil.getBuildId(),
                 BlogBuildInfoUtil.getVersionShortInfo());
-        assertTrue(BlogBuildInfoUtil.getVersionInfo().startsWith(BlogBuildInfoUtil.getVersionShortInfo()));
-        assertTrue(BlogBuildInfoUtil.getVersionInfoFull().startsWith(BlogBuildInfoUtil.getVersionShortInfo()));
+        assertTrue(
+                BlogBuildInfoUtil.getVersionInfo()
+                        .startsWith(BlogBuildInfoUtil.getVersionShortInfo()));
+        assertTrue(
+                BlogBuildInfoUtil.getVersionInfoFull()
+                        .startsWith(BlogBuildInfoUtil.getVersionShortInfo()));
         assertTrue(BlogBuildInfoUtil.getVersionInfoFull().contains(":"));
     }
 

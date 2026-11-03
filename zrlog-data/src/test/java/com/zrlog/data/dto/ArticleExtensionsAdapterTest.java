@@ -1,14 +1,13 @@
 package com.zrlog.data.dto;
 
-import com.hibegin.common.dao.ResultBeanUtils;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
+import com.hibegin.common.dao.ResultBeanUtils;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import org.junit.Test;
 
 public class ArticleExtensionsAdapterTest {
 
@@ -26,9 +25,11 @@ public class ArticleExtensionsAdapterTest {
 
     @Test
     public void shouldTreatMissingOrMalformedExtensionsAsEmpty() {
-        ArticleBasicDTO missing = ResultBeanUtils.convert(Collections.emptyMap(), ArticleBasicDTO.class);
-        ArticleBasicDTO malformed = ResultBeanUtils.convert(
-                Collections.singletonMap("extensions", "{invalid"), ArticleBasicDTO.class);
+        ArticleBasicDTO missing =
+                ResultBeanUtils.convert(Collections.emptyMap(), ArticleBasicDTO.class);
+        ArticleBasicDTO malformed =
+                ResultBeanUtils.convert(
+                        Collections.singletonMap("extensions", "{invalid"), ArticleBasicDTO.class);
 
         assertTrue(missing.getExtensions().isEmpty());
         assertTrue(malformed.getExtensions().isEmpty());

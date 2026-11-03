@@ -1,5 +1,7 @@
 package com.zrlog.model;
 
+import com.zrlog.data.repository.*;
+
 import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.hibegin.common.dao.dto.Direction;
 import com.hibegin.common.dao.dto.OrderBy;
@@ -90,7 +92,7 @@ public class CoreModelDatabaseTest {
             seedContent(db);
             db.update("update log set extensions=? where logId=?",
                     "{\"metadata\":{\"topicIds\":[\"tech\"],\"priority\":3}}", 1);
-            Log log = new Log(db.dataSource());
+            LogRepository log = new LogRepository(db.dataSource());
 
             PageData<ArticleBasicDTO> visitorPage = log.visitorFind(page(), "content");
             PageData<ArticleBasicDTO> adminPublished = log.adminFind(page(), "First", "tech", "published");
@@ -136,7 +138,7 @@ public class CoreModelDatabaseTest {
             seedContent(db);
             insertArticle(db, 4, "private", "Private", "Private content", "secret",
                     "2026-02-02 10:00:00", 1, false, true);
-            Log log = new Log(db.dataSource());
+            LogRepository log = new LogRepository(db.dataSource());
 
             assertEquals(2L, log.adminFind(page(), null, null, "published").getTotalElements());
             assertEquals("Private", log.adminFind(page(), null, null, "private").getRows().get(0).getTitle());
@@ -158,7 +160,7 @@ public class CoreModelDatabaseTest {
             db.update("update log set sticky=? where logId=?", 5, 2);
             db.update("update log set sticky=? where logId=?", 100, 3);
             db.update("update log set sticky=? where logId=?", 100, 5);
-            Log log = new Log(db.dataSource());
+            LogRepository log = new LogRepository(db.dataSource());
 
             PageData<ArticleBasicDTO> firstPage =
                     log.visitorFindHome(new PageRequestImpl(1L, 2L));
@@ -185,7 +187,7 @@ public class CoreModelDatabaseTest {
     public void shouldQueryArticleDetailThroughRealTables() throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
-            Log log = new Log(db.dataSource());
+            LogRepository log = new LogRepository(db.dataSource());
 
             ArticleDetailDTO byId = log.findByIdOrAlias(1, false);
             ArticleDetailDTO byAlias = log.findByIdOrAlias("first", false);
@@ -206,7 +208,7 @@ public class CoreModelDatabaseTest {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
 
-            ArticleDetailDTO detail = new Log(db.dataSource()).findByIdOrAlias(1, true);
+            ArticleDetailDTO detail = new LogRepository(db.dataSource()).findByIdOrAlias(1, true);
 
             assertEquals("First", detail.getTitle());
             assertTrue(detail.getComments().isEmpty());
@@ -218,7 +220,7 @@ public class CoreModelDatabaseTest {
     public void shouldQueryCommentsThroughRealTables() throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
-            Comment comment = new Comment(db.dataSource());
+            CommentRepository comment = new CommentRepository(db.dataSource());
 
             PageData<CommentDTO> page = comment.find(page());
             List<Map<String, Object>> unread = comment.findHaveReadIsFalse();
@@ -245,29 +247,29 @@ public class CoreModelDatabaseTest {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
 
-            List<LinkDTO> links = new Link(db.dataSource()).findAll();
-            List<LogNavDTO> navs = new LogNav(db.dataSource()).findAll();
-            List<TypeDTO> types = new Type(db.dataSource()).findAll();
-            List<UserBasicDTO> users = new User(db.dataSource()).findBasicAll();
-            List<PluginDTO> plugins = new Plugin(db.dataSource()).findAll();
-            List<TagDTO> refreshedTags = new Tag(db.dataSource()).refreshTag();
+            List<LinkDTO> links = new LinkRepository(db.dataSource()).findAll();
+            List<LogNavDTO> navs = new LogNavRepository(db.dataSource()).findAll();
+            List<TypeDTO> types = new TypeRepository(db.dataSource()).findAll();
+            List<UserBasicDTO> users = new UserRepository(db.dataSource()).findBasicAll();
+            List<PluginDTO> plugins = new PluginRepository(db.dataSource()).findAll();
+            List<TagDTO> refreshedTags = new TagRepository(db.dataSource()).refreshTag();
             Set<String> tagTexts = refreshedTags.stream().map(TagDTO::getText).collect(Collectors.toSet());
 
             assertEquals("ZrLog", links.get(0).getLinkName());
-            assertEquals(1L, new Link(db.dataSource()).find(page()).getTotalElements());
+            assertEquals(1L, new LinkRepository(db.dataSource()).find(page()).getTotalElements());
             assertEquals("Home", navs.get(0).getNavName());
-            assertEquals(1L, new LogNav(db.dataSource()).find(page()).getTotalElements());
+            assertEquals(1L, new LogNavRepository(db.dataSource()).find(page()).getTotalElements());
             assertEquals("Tech", types.get(0).getTypeName());
             assertEquals(2L, types.get(0).getTypeamount().longValue());
-            assertEquals(1L, new Type(db.dataSource()).find(page()).getTotalElements());
-            assertEquals("tech", new Type(db.dataSource()).findByAlias("tech").get("alias"));
+            assertEquals(1L, new TypeRepository(db.dataSource()).find(page()).getTotalElements());
+            assertEquals("tech", new TypeRepository(db.dataSource()).findByAlias("tech").get("alias"));
             assertEquals("admin", users.get(0).getUserName());
-            assertNotNull(new User(db.dataSource()).getUserByUserName("admin"));
-            assertEquals("password", new User(db.dataSource()).getPasswordByUserId(1));
-            assertTrue(new User(db.dataSource()).updatePassword(1, "new-password"));
-            new User(db.dataSource()).updateEmailUserNameHeaderByUserId("new@example.com", "new-admin", "/new.png", 1);
-            assertEquals("new-password", new User(db.dataSource()).getPasswordByUserId(1));
-            assertEquals("new-admin", new User(db.dataSource()).getUserByUserName("new-admin").get("userName"));
+            assertNotNull(new UserRepository(db.dataSource()).getUserByUserName("admin"));
+            assertEquals("password", new UserRepository(db.dataSource()).getPasswordByUserId(1));
+            assertTrue(new UserRepository(db.dataSource()).updatePassword(1, "new-password"));
+            new UserRepository(db.dataSource()).updateEmailUserNameHeaderByUserId("new@example.com", "new-admin", "/new.png", 1);
+            assertEquals("new-password", new UserRepository(db.dataSource()).getPasswordByUserId(1));
+            assertEquals("new-admin", new UserRepository(db.dataSource()).getUserByUserName("new-admin").get("userName"));
             assertEquals(1, plugins.size());
             assertEquals("Plugin", plugins.get(0).getPluginName());
             assertTrue(tagTexts.contains("java"));
@@ -278,19 +280,19 @@ public class CoreModelDatabaseTest {
                     .orElseThrow()
                     .getCount()
                     .longValue());
-            assertTrue(new Tag(db.dataSource()).update(null, null));
-            assertTrue(new Tag(db.dataSource()).update("java,zrlog", "java,zrlog"));
-            assertTrue(new Tag(db.dataSource()).update("java,zrlog,db", "java,zrlog"));
-            assertEquals(3, new Tag(db.dataSource()).find(page()).getRows().size());
-            assertTrue(new Tag(db.dataSource()).update("zrlog", "java,zrlog,db"));
-            assertEquals(2, new Tag(db.dataSource()).find(page()).getRows().size());
-            assertEquals(1, new Tag(db.dataSource()).findAll().stream()
+            assertTrue(new TagRepository(db.dataSource()).updateArticleTags(null, null));
+            assertTrue(new TagRepository(db.dataSource()).updateArticleTags("java,zrlog", "java,zrlog"));
+            assertTrue(new TagRepository(db.dataSource()).updateArticleTags("java,zrlog,db", "java,zrlog"));
+            assertEquals(3, new TagRepository(db.dataSource()).find(page()).getRows().size());
+            assertTrue(new TagRepository(db.dataSource()).updateArticleTags("zrlog", "java,zrlog,db"));
+            assertEquals(2, new TagRepository(db.dataSource()).find(page()).getRows().size());
+            assertEquals(1, new TagRepository(db.dataSource()).findAll().stream()
                     .filter(tag -> "java".equals(tag.getText()))
                     .findFirst()
                     .orElseThrow()
                     .getCount()
                     .intValue());
-            assertFalse(new Tag(db.dataSource()).findAll().stream().anyMatch(tag -> "db".equals(tag.getText())));
+            assertFalse(new TagRepository(db.dataSource()).findAll().stream().anyMatch(tag -> "db".equals(tag.getText())));
         }
     }
 
@@ -302,13 +304,13 @@ public class CoreModelDatabaseTest {
                     "t01,t02,t03,t04,t05,t06,t07,t08,t09,t10,t11,t12",
                     "2026-03-01 10:00:00", 1, false, false);
 
-            List<TagDTO> tags = new Tag(db.dataSource()).refreshTag();
+            List<TagDTO> tags = new TagRepository(db.dataSource()).refreshTag();
             Set<String> texts = tags.stream().map(TagDTO::getText).collect(Collectors.toSet());
 
             assertEquals(14, tags.size());
             assertTrue(texts.contains("t01"));
             assertTrue(texts.contains("t12"));
-            assertEquals(14L, new Tag(db.dataSource()).find(page()).getTotalElements());
+            assertEquals(14L, new TagRepository(db.dataSource()).find(page()).getTotalElements());
         }
     }
 

@@ -6,7 +6,7 @@ import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
 import com.zrlog.business.service.UpgradeNoticeService;
 import com.zrlog.business.service.WebsiteKvService;
 import com.zrlog.common.vo.Version;
-import com.zrlog.model.WebSite;
+import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import org.junit.Test;
@@ -70,7 +70,7 @@ public class UpdateVersionInfoPluginTest {
     @Theory
     public void storedUpgradeNoticeKeepsTheCompletePreviewVersion(DatabaseType databaseType) throws Exception {
         try (var db = ZrLogTestDatabase.open(databaseType)) {
-            var notices = new UpgradeNoticeService(() -> true, new WebsiteKvService(() -> new WebSite(db.dataSource())));
+            var notices = new UpgradeNoticeService(() -> true, new WebsiteKvService(() -> new WebSiteRepository(db.dataSource())));
             Version preview = version("99.0.0-SNAPSHOT");
             preview.setArtifactVersion(preview.getVersion());
             preview.setBuildDate(new Date(System.currentTimeMillis() + 3600000));
@@ -117,7 +117,7 @@ public class UpdateVersionInfoPluginTest {
             db.update("insert into website(name, value, remark) values(?, ?, ?)",
                     WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
                     String.valueOf(AutoUpgradeVersionType.NEVER.getCycle()), "");
-            UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSite(db.dataSource()))), () -> "zh_CN", null, new WebsiteKvService(() -> new WebSite(db.dataSource())));
+            UpdateVersionInfoPlugin plugin = new UpdateVersionInfoPlugin(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSiteRepository(db.dataSource()))), () -> "zh_CN", null, new WebsiteKvService(() -> new WebSiteRepository(db.dataSource())));
 
             assertTrue(plugin.start());
 
@@ -220,7 +220,7 @@ public class UpdateVersionInfoPluginTest {
         private Boolean upgradePreview;
 
         TestUpdateVersionInfoPlugin(UpdateVersionTimerTask task, DataSourceWrapper testDataSource) {
-            super(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSite(testDataSource))), () -> "zh_CN", null, new WebsiteKvService(() -> new WebSite(testDataSource)));
+            super(new UpgradeNoticeService(() -> false, new WebsiteKvService(() -> new WebSiteRepository(testDataSource))), () -> "zh_CN", null, new WebsiteKvService(() -> new WebSiteRepository(testDataSource)));
             this.task = task;
         }
 

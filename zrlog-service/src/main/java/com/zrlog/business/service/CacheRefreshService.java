@@ -13,7 +13,7 @@ import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
-import com.zrlog.model.WebSite;
+import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.util.ThreadUtils;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 public class CacheRefreshService {
     private static final Logger LOGGER = LoggerUtil.getLogger(CacheRefreshService.class);
     private final CacheService cacheService;
-    private final jakarta.inject.Provider<WebSite> websites;
+    private final jakarta.inject.Provider<WebSiteRepository> websites;
     private final Supplier<PluginCorePlugin> pluginCore;
     private final Supplier<List<StaticSitePlugin>> staticSites;
 
@@ -43,7 +43,7 @@ public class CacheRefreshService {
             CacheService cacheService,
             Supplier<PluginCorePlugin> pluginCore,
             Supplier<List<StaticSitePlugin>> staticSites,
-            jakarta.inject.Provider<WebSite> websites) {
+            jakarta.inject.Provider<WebSiteRepository> websites) {
         this.websites = Objects.requireNonNull(websites);
         this.cacheService = Objects.requireNonNull(cacheService);
         this.pluginCore = Objects.requireNonNull(pluginCore);

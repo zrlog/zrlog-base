@@ -16,7 +16,7 @@ import com.zrlog.common.vo.AdminFullTokenVO;
 import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.data.security.AccountAccess;
 import com.zrlog.data.service.UserPreferenceStore;
-import com.zrlog.model.User;
+import com.zrlog.data.repository.UserRepository;
 import com.zrlog.util.CrossUtils;
 import com.zrlog.util.ParseUtil;
 import jakarta.inject.Inject;
@@ -47,7 +47,7 @@ public class AdminTokenService implements TokenService {
     private final String TOKEN_SPLIT_CHAR = "#";
     private final IvParameterSpec iv;
     private final BooleanSupplier installed;
-    private final jakarta.inject.Provider<User> users;
+    private final jakarta.inject.Provider<UserRepository> users;
     private final jakarta.inject.Provider<UserPreferenceStore> preferences;
     private final BooleanSupplier staticHtml;
     private final Map<Integer, String> userSecretKeyCacheMap = new ConcurrentHashMap<>();
@@ -58,7 +58,7 @@ public class AdminTokenService implements TokenService {
             @Named("adminSessionTimeoutMinutes") long sessionTimeoutInMinutes,
             BooleanSupplier installed,
             @Named("adminStaticHtml") BooleanSupplier staticHtml,
-            jakarta.inject.Provider<User> users,
+            jakarta.inject.Provider<UserRepository> users,
             jakarta.inject.Provider<UserPreferenceStore> preferences) {
         this.users = Objects.requireNonNull(users);
         this.preferences = Objects.requireNonNull(preferences);
@@ -149,7 +149,7 @@ public class AdminTokenService implements TokenService {
             if (!account.isEnabled()) return null;
             String sk = userSecretKeyCacheMap.get(userId);
             if (Objects.isNull(sk)) {
-                sk = (String) users.get().set("userId", userId).queryFirst("secretKey");
+                sk = (String) users.get().queryFirstObj("SELECT secretKey FROM user WHERE userId=?", userId);
                 if (Objects.isNull(sk)) {
                     return null;
                 }

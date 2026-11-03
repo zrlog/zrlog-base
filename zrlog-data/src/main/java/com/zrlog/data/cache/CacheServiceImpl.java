@@ -16,10 +16,10 @@ import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.service.BaseDataDbService;
 import com.zrlog.data.service.DistributedLock;
 import com.zrlog.data.util.WebSiteUtils;
-import com.zrlog.model.Tag;
-import com.zrlog.model.Type;
-import com.zrlog.model.User;
-import com.zrlog.model.WebSite;
+import com.zrlog.data.repository.TagRepository;
+import com.zrlog.data.repository.TypeRepository;
+import com.zrlog.data.repository.UserRepository;
+import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.util.ThreadUtils;
 import jakarta.inject.Inject;
 
@@ -45,20 +45,20 @@ public class CacheServiceImpl implements CacheService {
     private final long sqlVersion;
     private final BooleanSupplier installed;
     private final Lock lock;
-    private final jakarta.inject.Provider<WebSite> websites;
-    private final jakarta.inject.Provider<Type> types;
-    private final jakarta.inject.Provider<Tag> tags;
-    private final jakarta.inject.Provider<User> users;
+    private final jakarta.inject.Provider<WebSiteRepository> websites;
+    private final jakarta.inject.Provider<TypeRepository> types;
+    private final jakarta.inject.Provider<TagRepository> tags;
+    private final jakarta.inject.Provider<UserRepository> users;
     private final BaseDataDbService baseData;
     private volatile BaseDataInitVO cacheInit;
 
     @Inject
     public CacheServiceImpl(
             BooleanSupplier installed,
-            jakarta.inject.Provider<WebSite> websites,
-            jakarta.inject.Provider<Type> types,
-            jakarta.inject.Provider<Tag> tags,
-            jakarta.inject.Provider<User> users,
+            jakarta.inject.Provider<WebSiteRepository> websites,
+            jakarta.inject.Provider<TypeRepository> types,
+            jakarta.inject.Provider<TagRepository> tags,
+            jakarta.inject.Provider<UserRepository> users,
             BaseDataDbService baseData,
             DistributedLock.Factory locks) {
         this.websites = Objects.requireNonNull(websites);

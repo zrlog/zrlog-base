@@ -1,5 +1,7 @@
 package com.zrlog.model;
 
+import com.zrlog.data.repository.*;
+
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.dto.FaviconBase64DTO;
 import com.zrlog.test.support.ZrLogTestDatabase;
@@ -30,7 +32,7 @@ public class WebSiteDatabaseTest {
     @Test
     public void shouldInsertUpdateAndReadWebsiteValuesUsingInstallSchema() throws Exception {
         try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
-            WebSite webSite = new WebSite(ignored.dataSource());
+            WebSiteRepository webSite = new WebSiteRepository(ignored.dataSource());
 
             assertTrue(webSite.updateByKV("title", "ZrLog"));
             assertTrue(webSite.updateByKV("rows", "20"));
@@ -50,7 +52,7 @@ public class WebSiteDatabaseTest {
     @SuppressWarnings("unchecked")
     public void shouldReadPublicInfoTemplateConfigAndFaviconValues() throws Exception {
         try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(databaseType)) {
-            WebSite webSite = new WebSite(ignored.dataSource());
+            WebSiteRepository webSite = new WebSiteRepository(ignored.dataSource());
             webSite.updateByKV("title", "ZrLog");
             webSite.updateByKV("host", "https://example.com");
             webSite.updateByKV("language", "en_US");

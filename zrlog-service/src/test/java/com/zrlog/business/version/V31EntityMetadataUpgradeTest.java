@@ -1,0 +1,135 @@
+package com.zrlog.business.version;
+
+import com.hibegin.common.dao.ResultValueConvertUtils;
+import com.zrlog.business.service.DbUpgradeService;
+import com.zrlog.common.CacheService;
+import com.zrlog.test.support.ZrLogTestDatabase;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.junit.Assert.*;
+
+@RunWith(Parameterized.class)
+public class V31EntityMetadataUpgradeTest {
+    // Exact historical install schema, not a reverse transformation of the current schema.
+    private static final String V30 = "/schema/v30-install-e8d8c9d.sql";
+    private final String backend;
+
+    public V31EntityMetadataUpgradeTest(String backend) { this.backend = backend; }
+
+    @Parameterized.Parameters(name = "{0}")
+    public static Object[] backends() { return new Object[]{"H2", "SQLITE", "WEB_API"}; }
+
+    private ZrLogTestDatabase open() throws Exception {
+        return backend.equals("WEB_API") ? ZrLogTestDatabase.openWebApi(V30)
+                : ZrLogTestDatabase.open(ZrLogTestDatabase.DatabaseType.valueOf(backend), V30);
+    }
+
+    private static long time(Object value) {
+        return ResultValueConvertUtils.parseDate(value).longValue();
+    }
+
+    @Test
+    public void preservesHistoricalTimesRevisionsAndSecurityDataAcrossBatches() throws Exception {
+        try (ZrLogTestDatabase db = open()) {
+            long time = Timestamp.valueOf("2024-02-29 13:14:15.123").getTime();
+            for (int i = 0; i < 47; i++) {
+                db.update("INSERT INTO user_passkey_challenge(requestId,ceremony,requestJson,createdAt,expiresAt) VALUES(?,?,?,?,?)",
+                        "request-" + i, "authentication", "{}", time + i, time + i + 300000);
+            }
+            db.update("INSERT INTO oauth_grant(id,userId,clientId,scope,resource,authVersion,createdAt) VALUES(?,?,?,?,?,?,?)",
+                    "grant", 1, "client", "read", "resource", 7, time);
+            db.update("INSERT INTO user_access_token(id,userId,name,tokenHash,scope,resource,authVersion,createdAt,expiresAt) VALUES(?,?,?,?,?,?,?,?,?)",
+                    "token", 1, "test", "hash", "read", "resource", 7, time, time + 900000);
+            db.update("INSERT INTO user_passkey(userId,credentialIdHash,credentialId,publicKeyCose,signatureCount,origin,rpId,createdAt,backupEligible,backupState) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    1, "credential-hash", "credential", "public-key", 123L, "https://example.com", "example.com", time, false, false);
+            db.update("INSERT INTO log(title,version,releaseTime,last_update_date) VALUES(?,?,?,?)",
+                    "historical", 123, "2020-01-02 03:04:05", "2021-02-03 04:05:06");
+            db.update("INSERT INTO log(title,version) VALUES(?,NULL)", "no-version");
+            db.update("INSERT INTO comment(commTime,td,userComment) VALUES(?,?,?)",
+                    "2010-01-01 00:00:00", "2020-01-01 00:00:00", "imported");
+            db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "30");
+            new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
+            assertEquals("31", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+            for (Map<String, Object> row : db.queryList("SELECT id,createdAt,expiresAt FROM user_passkey_challenge ORDER BY id")) {
+                long expected = time + ((Number) row.get("id")).intValue() - 1;
+                assertEquals(expected, time(row.get("createdAt")));
+                assertEquals(expected + 300000, ((Number) row.get("expiresAt")).longValue());
+            }
+            for (String table : new String[]{"oauth_grant", "user_access_token", "user_passkey"}) {
+                assertEquals(time, time(db.scalar("SELECT createdAt FROM " + table)));
+                assertNull(db.scalar("SELECT updatedAt FROM " + table));
+                assertEquals(0L, ((Number) db.scalar("SELECT version FROM " + table)).longValue());
+            }
+            assertEquals(123L, ((Number) db.scalar("SELECT signatureCount FROM user_passkey")).longValue());
+            assertEquals(7, ((Number) db.scalar("SELECT authVersion FROM oauth_grant")).intValue());
+            assertEquals(123L, ((Number) db.scalar("SELECT version FROM log WHERE title='historical'")).longValue());
+            assertEquals(0L, ((Number) db.scalar("SELECT version FROM log WHERE title='no-version'")).longValue());
+            assertEquals(0L, ((Number) db.scalar("SELECT count(createdAt) FROM log")).longValue());
+            assertEquals(Timestamp.valueOf("2010-01-01 00:00:00").getTime(), time(db.scalar("SELECT commTime FROM comment")));
+            assertEquals(Timestamp.valueOf("2020-01-01 00:00:00").getTime(), time(db.scalar("SELECT td FROM comment")));
+            assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+            // A second cold start with a stale cached version must not replay conversion.
+            new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
+            new V31EntityMetadataUpgrade(db.dataSource()).run();
+            assertEquals(time, time(db.scalar("SELECT createdAt FROM oauth_grant")));
+        }
+    }
+
+    @Test
+    public void stopsStartupOnInvalidHistoricalTimeWithoutAdvancingVersion() throws Exception {
+        try (ZrLogTestDatabase db = open()) {
+            db.update("INSERT INTO user_passkey_challenge(requestId,ceremony,requestJson,createdAt,expiresAt) VALUES(?,?,?,?,?)",
+                    "bad-time", "authentication", "{}", Long.MAX_VALUE, Long.MAX_VALUE);
+            db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "30");
+            assertThrows(IllegalStateException.class, () -> new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade());
+            assertEquals("30", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+            assertEquals(Long.MAX_VALUE, ((Number) db.scalar("SELECT createdAt FROM user_passkey_challenge")).longValue());
+            assertNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+        }
+    }
+
+    @Test
+    public void serializesColdStartsWithoutExpiringAnActiveMigrationLock() throws Exception {
+        try (ZrLogTestDatabase db = open()) {
+            db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "30");
+            try (SchemaUpgradeLock lock = SchemaUpgradeLock.acquire(db.dataSource())) {
+                assertThrows(IllegalStateException.class, () -> new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade());
+                assertEquals("30", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+                assertNotNull(db.scalar("SELECT value FROM website WHERE name=?", SchemaUpgradeLock.KEY));
+            }
+            new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
+            assertEquals("31", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
+        }
+    }
+
+    @Test
+    public void resumesEveryInterruptedRenameStageAndRetainsOriginalsUntilVerified() throws Exception {
+        org.junit.Assume.assumeTrue(backend.equals("WEB_API"));
+        for (String boundary : new String[]{"RENAME COLUMN `createdAt`", "RENAME COLUMN `createdAt_v31`", "DROP COLUMN `createdAt_epoch_v31`"}) {
+            try (ZrLogTestDatabase db = open()) {
+                long time = Timestamp.valueOf("2024-05-06 07:08:09.987").getTime();
+                db.update("INSERT INTO user_passkey_challenge(requestId,ceremony,requestJson,createdAt,expiresAt) VALUES(?,?,?,?,?)",
+                        "resume", "authentication", "{}", time, time + 300000);
+                AtomicBoolean failed = new AtomicBoolean();
+                db.beforeWebApiUpdate((sql, params) -> {
+                    if (sql.contains("`user_passkey_challenge`") && sql.contains(boundary) && failed.compareAndSet(false, true)) {
+                        throw new SQLException("Injected interruption");
+                    }
+                });
+                assertThrows(SQLException.class, () -> new V31EntityMetadataUpgrade(db.dataSource()).run());
+                assertTrue(failed.get());
+                db.beforeWebApiUpdate((sql, params) -> {});
+                new V31EntityMetadataUpgrade(db.dataSource()).run();
+                assertEquals(time, time(db.scalar("SELECT createdAt FROM user_passkey_challenge")));
+                assertEquals(1L, ((Number) db.scalar("SELECT count(*) FROM user_passkey_challenge")).longValue());
+            }
+        }
+    }
+}

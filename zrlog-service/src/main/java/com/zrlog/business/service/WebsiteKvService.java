@@ -5,7 +5,7 @@ import com.hibegin.common.dao.ResultBeanUtils;
 import com.hibegin.common.util.LoggerUtil;
 import com.zrlog.business.rest.base.UpgradeWebSiteInfo;
 import com.zrlog.business.updater.AutoUpgradeVersionType;
-import com.zrlog.model.WebSite;
+import com.zrlog.data.repository.WebSiteRepository;
 import jakarta.inject.Inject;
 import jakarta.inject.Provider;
 import jakarta.inject.Singleton;
@@ -21,10 +21,10 @@ public class WebsiteKvService {
     public static final String AUTO_UPGRADE_VERSION_KEY = "autoUpgradeVersion";
     public static final String UPGRADE_PREVIEW_KEY = "upgradePreview";
     private static final Logger LOGGER = LoggerUtil.getLogger(WebsiteKvService.class);
-    private final Provider<WebSite> websites;
+    private final Provider<WebSiteRepository> websites;
 
     @Inject
-    public WebsiteKvService(Provider<WebSite> websites) {
+    public WebsiteKvService(Provider<WebSiteRepository> websites) {
         this.websites = Objects.requireNonNull(websites, "websites");
     }
 
@@ -33,7 +33,7 @@ public class WebsiteKvService {
      */
     public WebsiteKvService(DataSourceWrapper dataSource) {
         Objects.requireNonNull(dataSource, "dataSource");
-        this.websites = () -> new WebSite(dataSource);
+        this.websites = () -> new WebSiteRepository(dataSource);
     }
 
     public String getString(String key) {

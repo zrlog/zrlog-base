@@ -2,7 +2,7 @@ package com.zrlog.data.service;
 
 import com.google.gson.*;
 import com.zrlog.common.exception.ArgsException;
-import com.zrlog.model.User;
+import com.zrlog.data.repository.UserRepository;
 import jakarta.inject.Inject;
 
 import java.nio.charset.StandardCharsets;
@@ -21,9 +21,9 @@ public class UserPreferenceStore {
     public static final long MAX_SESSION_MINUTES = 99999;
     private static final Gson GSON = new Gson();
     private static final long UPDATE_RETRY_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(5);
-    private final jakarta.inject.Provider<User> userProvider;
+    private final jakarta.inject.Provider<UserRepository> userProvider;
     @Inject
-    public UserPreferenceStore(jakarta.inject.Provider<User> userProvider) {
+    public UserPreferenceStore(jakarta.inject.Provider<UserRepository> userProvider) {
         this.userProvider = Objects.requireNonNull(userProvider);
     }
 
@@ -80,13 +80,13 @@ public class UserPreferenceStore {
                             ? userProvider
                             .get()
                             .execute(
-                                    "update user set preferences=? where userId=? and preferences is null",
+                                    "update user set updatedAt=?,version=version+1,preferences=? where userId=? and preferences is null", new java.sql.Timestamp(System.currentTimeMillis()).toString(),
                                     updated,
                                     userId)
                             : userProvider
                             .get()
                             .execute(
-                                    "update user set preferences=? where userId=? and preferences=?",
+                                    "update user set updatedAt=?,version=version+1,preferences=? where userId=? and preferences=?", new java.sql.Timestamp(System.currentTimeMillis()).toString(),
                                     updated,
                                     userId,
                                     previous);

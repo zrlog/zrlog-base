@@ -1,25 +1,33 @@
 package com.zrlog.model;
 
-import com.hibegin.common.dao.BasePageableDAO;
-import com.hibegin.common.dao.DataSourceWrapper;
-import com.zrlog.common.cache.dto.PluginDTO;
-import jakarta.inject.Inject;
+import com.hibegin.common.dao.entity.BaseEntity;
+import com.hibegin.common.dao.entity.Column;
+import com.hibegin.common.dao.entity.Entity;
 
-import java.sql.SQLException;
-import java.util.List;
+@Entity(table = "plugin", idColumn = "pluginId", generatedId = true)
+public class Plugin extends BaseEntity<Long> {
+    private String content;
+    private Boolean isSystem;
+    private String pTitle;
+    private Integer sort;
+    private String pluginName;
+    private Integer level;
 
-/**
- * 存放了与侧边栏相关的数据，主要用于保存侧边栏的key，对应数据库的plugin表（目前实现方式不友好，建议直接使用主题设置，替换该设置）
- */
-public class Plugin extends BasePageableDAO {
+    public String getContent() { return content; }
+    public void setContent(String content) { this.content = content; }
 
-    @Inject
-    public Plugin(DataSourceWrapper dataSource) {
-        super(dataSource);
-        this.tableName = "plugin";
-    }
+    public Boolean getIsSystem() { return isSystem; }
+    public void setIsSystem(Boolean isSystem) { this.isSystem = isSystem; }
 
-    public List<PluginDTO> findAll() throws SQLException {
-        return doConvertList(queryListWithParams("select * from " + tableName + " where level>?", 0), PluginDTO.class);
-    }
+    public String getPTitle() { return pTitle; }
+    public void setPTitle(String pTitle) { this.pTitle = pTitle; }
+
+    public Integer getSort() { return sort; }
+    public void setSort(Integer sort) { this.sort = sort; }
+
+    public String getPluginName() { return pluginName; }
+    public void setPluginName(String pluginName) { this.pluginName = pluginName; }
+
+    public Integer getLevel() { return level; }
+    public void setLevel(Integer level) { this.level = level; }
 }

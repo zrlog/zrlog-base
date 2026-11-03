@@ -1,32 +1,33 @@
 package com.zrlog.model;
 
-import com.hibegin.common.dao.BasePageableDAO;
-import com.hibegin.common.dao.DataSourceWrapper;
-import com.hibegin.common.dao.dto.PageData;
-import com.hibegin.common.dao.dto.PageRequest;
-import com.zrlog.common.cache.dto.LinkDTO;
-import jakarta.inject.Inject;
+import com.hibegin.common.dao.entity.BaseEntity;
+import com.hibegin.common.dao.entity.Column;
+import com.hibegin.common.dao.entity.Entity;
 
-import java.sql.SQLException;
-import java.util.List;
+@Entity(table = "link", idColumn = "linkId", generatedId = true)
+public class Link extends BaseEntity<Long> {
+    private String alt;
+    private String linkName;
+    private Integer sort;
+    private Boolean status;
+    private String url;
+    private String icon;
 
-/**
- * 存放程序的友情链接，对应数据库 link 表
- */
-public class Link extends BasePageableDAO {
+    public String getAlt() { return alt; }
+    public void setAlt(String alt) { this.alt = alt; }
 
-    @Inject
-    public Link(DataSourceWrapper dataSource) {
-        super(dataSource);
-        this.tableName = "link";
-        this.pk = "linkId";
-    }
+    public String getLinkName() { return linkName; }
+    public void setLinkName(String linkName) { this.linkName = linkName; }
 
-    public List<LinkDTO> findAll() throws SQLException {
-        return doConvertList(queryListWithParams("select linkName,linkId as id,sort,url,alt,icon from " + tableName + " order by sort"), LinkDTO.class);
-    }
+    public Integer getSort() { return sort; }
+    public void setSort(Integer sort) { this.sort = sort; }
 
-    public PageData<LinkDTO> find(PageRequest page) {
-        return queryPageData("select linkName,linkId as id,sort,url,alt,icon from " + tableName + " order by sort", page, new Object[0], LinkDTO.class);
-    }
+    public Boolean getStatus() { return status; }
+    public void setStatus(Boolean status) { this.status = status; }
+
+    public String getUrl() { return url; }
+    public void setUrl(String url) { this.url = url; }
+
+    public String getIcon() { return icon; }
+    public void setIcon(String icon) { this.icon = icon; }
 }

@@ -15,7 +15,7 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.util.DateValueFormatUtils;
-import com.zrlog.model.*;
+import com.zrlog.data.repository.*;
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;
@@ -33,25 +33,25 @@ import java.util.stream.Collectors;
 public class BaseDataDbService {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(BaseDataDbService.class);
-    private final jakarta.inject.Provider<Link> linkProvider;
-    private final jakarta.inject.Provider<Log> logProvider;
-    private final jakarta.inject.Provider<LogNav> logNavProvider;
-    private final jakarta.inject.Provider<Plugin> pluginProvider;
-    private final jakarta.inject.Provider<Tag> tagProvider;
-    private final jakarta.inject.Provider<Type> typeProvider;
-    private final jakarta.inject.Provider<User> userProvider;
-    private final jakarta.inject.Provider<WebSite> webSiteProvider;
+    private final jakarta.inject.Provider<LinkRepository> linkProvider;
+    private final jakarta.inject.Provider<LogRepository> logProvider;
+    private final jakarta.inject.Provider<LogNavRepository> logNavProvider;
+    private final jakarta.inject.Provider<PluginRepository> pluginProvider;
+    private final jakarta.inject.Provider<TagRepository> tagProvider;
+    private final jakarta.inject.Provider<TypeRepository> typeProvider;
+    private final jakarta.inject.Provider<UserRepository> userProvider;
+    private final jakarta.inject.Provider<WebSiteRepository> webSiteProvider;
 
     @Inject
     public BaseDataDbService(
-            jakarta.inject.Provider<Link> linkProvider,
-            jakarta.inject.Provider<Log> logProvider,
-            jakarta.inject.Provider<LogNav> logNavProvider,
-            jakarta.inject.Provider<Plugin> pluginProvider,
-            jakarta.inject.Provider<Tag> tagProvider,
-            jakarta.inject.Provider<Type> typeProvider,
-            jakarta.inject.Provider<User> userProvider,
-            jakarta.inject.Provider<WebSite> webSiteProvider) {
+            jakarta.inject.Provider<LinkRepository> linkProvider,
+            jakarta.inject.Provider<LogRepository> logProvider,
+            jakarta.inject.Provider<LogNavRepository> logNavProvider,
+            jakarta.inject.Provider<PluginRepository> pluginProvider,
+            jakarta.inject.Provider<TagRepository> tagProvider,
+            jakarta.inject.Provider<TypeRepository> typeProvider,
+            jakarta.inject.Provider<UserRepository> userProvider,
+            jakarta.inject.Provider<WebSiteRepository> webSiteProvider) {
         this.linkProvider = Objects.requireNonNull(linkProvider);
         this.logProvider = Objects.requireNonNull(logProvider);
         this.logNavProvider = Objects.requireNonNull(logNavProvider);

@@ -19,7 +19,7 @@ import static org.junit.Assert.*;
 public class PluginGhostWatcherTest {
 
     @Test(timeout = 3000)
-    public void closeReleasesAWatcherBlockedOnSocketRead() throws Exception {
+    public void closeReleasesAWatcherDuringSocketConnectionOrRead() throws Exception {
         try (ServerSocket server = new ServerSocket(0)) {
             server.setSoTimeout(1000);
             PluginGhostWatcher watcher = new PluginGhostWatcher("127.0.0.1", server.getLocalPort(), 0);
@@ -28,7 +28,9 @@ public class PluginGhostWatcherTest {
             thread.start();
             try (Socket peer = server.accept()) {
                 watcher.close();
-                assertTrue(result.get(1, TimeUnit.SECONDS));
+                // accept() may finish before the client returns from connect(). Either
+                // connection result is valid; cancellation must release both endpoints.
+                result.get(1, TimeUnit.SECONDS);
                 peer.setSoTimeout(1000);
                 assertEquals(-1, peer.getInputStream().read());
             } finally { watcher.close(); thread.join(1000); }

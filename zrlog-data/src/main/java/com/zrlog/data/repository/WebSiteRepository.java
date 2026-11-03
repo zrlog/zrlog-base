@@ -123,6 +123,27 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
         return fillToMap(lw, names);
     }
 
+    /** A new row or an explicit conditional-write template; no persisted metadata is fabricated. */
+    public static WebSite entry(String name, String value, String remark) {
+        WebSite row = new WebSite();
+        row.setName(name);
+        row.setValue(value);
+        row.setRemark(remark);
+        return row;
+    }
+
+    public int updateValueWhere(String value, String predicate, Object... params) throws SQLException {
+        return updateWhere(entry(null, value, null), List.of("value"), predicate, params);
+    }
+
+    public int updateRemarkWhere(String remark, String predicate, Object... params) throws SQLException {
+        return updateWhere(entry(null, null, remark), List.of("remark"), predicate, params);
+    }
+
+    public int updateContentWhere(String value, String remark, String predicate, Object... params) throws SQLException {
+        return updateWhere(entry(null, value, remark), List.of("value", "remark"), predicate, params);
+    }
+
     public boolean updateByKV(String name, Object value) throws SQLException {
         WebSite row = findByName(name);
         if (row != null) {

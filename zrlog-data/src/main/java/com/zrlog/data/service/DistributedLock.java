@@ -72,10 +72,9 @@ public class DistributedLock implements Lock {
     @Override
     public boolean tryLock() {
         try {
-            return websites.get().execute(
-                    "INSERT INTO website(name,value,remark,createdAt,updatedAt,version) VALUES(?,?,?,?,?,0)",
-                    lockKey, "locked", "Created at " + ResultValueConvertUtils.formatDate(new Date(), "yyyy-MM-dd HH:mm:ss"),
-                    new java.sql.Timestamp(System.currentTimeMillis()).toString(), new java.sql.Timestamp(System.currentTimeMillis()).toString());
+            websites.get().insert(WebSiteRepository.entry(lockKey, "locked",
+                    "Created at " + ResultValueConvertUtils.formatDate(new Date(), "yyyy-MM-dd HH:mm:ss")));
+            return true;
         } catch (SQLException e) {
             LOGGER.warning("tryLock " + rawLockKey + " error " + e.getMessage());
             //throw new RuntimeException(e);
@@ -86,7 +85,7 @@ public class DistributedLock implements Lock {
     @Override
     public void unlock() {
         try {
-            websites.get().execute("DELETE FROM website WHERE name=?", lockKey);
+            websites.get().deleteWhere("name=?", lockKey);
         } catch (SQLException e) {
             throw new DAOException(e);
         }

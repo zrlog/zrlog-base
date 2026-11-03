@@ -1085,9 +1085,10 @@ public class ServiceUtilityFallbackTest {
             assertEquals(1, pluginCorePlugin.startCount);
             assertEquals(2, pluginCorePlugin.refreshCacheCount);
             assertEquals("static-version", pluginCorePlugin.lastCacheVersion);
-            assertEquals("update website set value=?,updatedAt=?,version=version+1 where name=?", queryRunner.sql);
+            assertTrue(queryRunner.sql.startsWith("UPDATE `website` SET `value`=?"));
             assertEquals("static-version", queryRunner.params[0]);
-            assertEquals("test.static.version", queryRunner.params[2]);
+            assertEquals(1L, queryRunner.params[3]);
+            assertEquals(9L, queryRunner.params[4]);
             assertTrue(com.hibegin.common.dao.ResultValueConvertUtils.parseDate(queryRunner.params[1]) > 0);
         } finally {
             restoreQueryDataSource(previousDataSource);
@@ -1310,6 +1311,13 @@ public class ServiceUtilityFallbackTest {
         public <T> T query(String sql, ResultSetHandler<T> rsh, Object... params) {
             this.sql = sql;
             this.params = Arrays.copyOf(params, params.length);
+            if (rsh instanceof org.apache.commons.dbutils.handlers.MapListHandler) {
+                Map<String, Object> row = new HashMap<>();
+                row.put("siteId", 1L); row.put("version", 9L);
+                row.put("createdAt", null); row.put("updatedAt", null);
+                row.put("name", params[0]); row.put("value", "previous"); row.put("remark", null);
+                return (T) List.of(row);
+            }
             return (T) Integer.valueOf(1);
         }
     }

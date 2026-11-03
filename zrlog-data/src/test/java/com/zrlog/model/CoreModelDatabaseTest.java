@@ -223,8 +223,8 @@ public class CoreModelDatabaseTest {
             CommentRepository comment = new CommentRepository(db.dataSource());
 
             PageData<CommentDTO> page = comment.find(page());
-            List<Map<String, Object>> unread = comment.findHaveReadIsFalse();
-            List<Map<String, Object>> byLog = comment.findAllByLogId(1);
+            List<Comment> unread = comment.findHaveReadIsFalse();
+            List<Comment> byLog = comment.findAllByLogId(1);
             List<VisitorCommentDTO> visitorComments = comment.visitorFindAllByLogId(1);
             comment.doRead(1);
 
@@ -234,7 +234,7 @@ public class CoreModelDatabaseTest {
             assertFalse(page.getRows().get(0).getCommTime().isEmpty());
             assertEquals(1, unread.size());
             assertEquals(1, byLog.size());
-            assertEquals("Reader", byLog.get(0).get("userName"));
+            assertEquals("Reader", byLog.get(0).getUserName());
             assertEquals(1, visitorComments.size());
             assertFalse(visitorComments.get(0).getGravatarId().isEmpty());
             assertTrue(ResultValueConvertUtils.toBoolean(
@@ -262,14 +262,14 @@ public class CoreModelDatabaseTest {
             assertEquals("Tech", types.get(0).getTypeName());
             assertEquals(2L, types.get(0).getTypeamount().longValue());
             assertEquals(1L, new TypeRepository(db.dataSource()).find(page()).getTotalElements());
-            assertEquals("tech", new TypeRepository(db.dataSource()).findByAlias("tech").get("alias"));
+            assertEquals("tech", new TypeRepository(db.dataSource()).findByAlias("tech").getAlias());
             assertEquals("admin", users.get(0).getUserName());
             assertNotNull(new UserRepository(db.dataSource()).getUserByUserName("admin"));
             assertEquals("password", new UserRepository(db.dataSource()).getPasswordByUserId(1));
             assertTrue(new UserRepository(db.dataSource()).updatePassword(1, "new-password"));
             new UserRepository(db.dataSource()).updateEmailUserNameHeaderByUserId("new@example.com", "new-admin", "/new.png", 1);
             assertEquals("new-password", new UserRepository(db.dataSource()).getPasswordByUserId(1));
-            assertEquals("new-admin", new UserRepository(db.dataSource()).getUserByUserName("new-admin").get("userName"));
+            assertEquals("new-admin", new UserRepository(db.dataSource()).getUserByUserName("new-admin").getUserName());
             assertEquals(1, plugins.size());
             assertEquals("Plugin", plugins.get(0).getPluginName());
             assertTrue(tagTexts.contains("java"));

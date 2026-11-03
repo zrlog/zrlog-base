@@ -23,7 +23,7 @@ public class LogNavRepository extends BaseRepository<LogNav, Long> {
     }
 
     public List<LogNavDTO> findAll() throws SQLException {
-        return doConvertList(queryListWithParams("select l.navId as id,l.navName,l.url,l.sort,l.icon from " + tableName + " l where l.url is not null and l.navName is not null order by sort"), LogNavDTO.class);
+        return queryList("select l.navId as id,l.navName,l.url,l.sort,l.icon from " + tableName + " l where l.url is not null and l.navName is not null order by sort", LogNavDTO.class);
     }
 
     public PageData<LogNavDTO> find(PageRequest page) {

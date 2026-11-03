@@ -110,7 +110,7 @@ public class AdminTokenServiceTest {
 
             @Override
             protected com.zrlog.data.security.AccountAccess loadAccount(int userId) {
-                return com.zrlog.data.security.AccountAccess.from(Map.of("userId", userId, "role", "owner", "enabled", true, "authVersion", 0));
+                return com.zrlog.data.security.AccountAccess.fromRow(Map.of("userId", userId, "role", "owner", "enabled", true, "authVersion", 0));
             }
         };
     }

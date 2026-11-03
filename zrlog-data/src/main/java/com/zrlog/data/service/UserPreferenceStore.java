@@ -7,6 +7,8 @@ import jakarta.inject.Inject;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
+import com.zrlog.model.User;
+import com.hibegin.common.dao.entity.OptimisticLockException;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -69,28 +71,21 @@ public class UserPreferenceStore {
         long deadline = System.nanoTime() + UPDATE_RETRY_TIMEOUT_NANOS;
         long backoffMillis = 1;
         do {
-            String previous = raw(userId);
+            User user = userProvider.get().loadById((long) userId);
+            if (user == null) throw new SQLException("Account no longer exists");
+            String previous = user.getPreferences();
             JsonObject root = parseStored(previous);
             change.accept(root);
             String updated = GSON.toJson(root);
             if (updated.getBytes(StandardCharsets.UTF_8).length > 60000) throw new ArgsException("preferences");
             if (updated.equals(previous)) return;
-            boolean saved =
-                    previous == null
-                            ? userProvider
-                            .get()
-                            .execute(
-                                    "update user set updatedAt=?,version=version+1,preferences=? where userId=? and preferences is null", new java.sql.Timestamp(System.currentTimeMillis()).toString(),
-                                    updated,
-                                    userId)
-                            : userProvider
-                            .get()
-                            .execute(
-                                    "update user set updatedAt=?,version=version+1,preferences=? where userId=? and preferences=?", new java.sql.Timestamp(System.currentTimeMillis()).toString(),
-                                    updated,
-                                    userId,
-                                    previous);
-            if (saved) return;
+            user.setPreferences(updated);
+            try {
+                userProvider.get().update(user, java.util.Collections.singletonMap("preferences", previous));
+                return;
+            } catch (OptimisticLockException conflict) {
+                // Retry only a confirmed conflict; an uncertain database failure must propagate.
+            }
             // A burst of writes can exhaust a small attempt count before the other writer finishes.
             // Back off, then read and merge again; the conditional write also protects other instances.
             long remaining = deadline - System.nanoTime();

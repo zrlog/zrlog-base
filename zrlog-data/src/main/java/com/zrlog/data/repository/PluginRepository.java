@@ -21,6 +21,17 @@ public class PluginRepository extends BaseRepository<Plugin, Long> {
     }
 
     public List<PluginDTO> findAll() throws SQLException {
-        return doConvertList(queryListWithParams("select * from " + tableName + " where level>?", 0), PluginDTO.class);
+        List<PluginDTO> result = new java.util.ArrayList<>();
+        for (Plugin row : select("WHERE level>?", 0)) {
+            PluginDTO item = new PluginDTO();
+            item.setId(row.getId());
+            item.setPluginName(row.getPluginName());
+            item.setSystem(row.getIsSystem());
+            item.setLevel(row.getLevel() == null ? null : row.getLevel().longValue());
+            item.setContent(row.getContent());
+            item.setpTitle(row.getPTitle());
+            result.add(item);
+        }
+        return result;
     }
 }

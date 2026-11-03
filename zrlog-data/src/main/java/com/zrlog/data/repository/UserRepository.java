@@ -16,32 +16,56 @@ import java.util.Map;
  */
 public class UserRepository extends BaseRepository<User, Long> {
 
-    private final DataSourceWrapper dataSource;
 
     @Inject
     public UserRepository(DataSourceWrapper dataSource) {
         super(User.class, dataSource);
-        this.dataSource = dataSource;
     }
 
     public List<UserBasicDTO> findBasicAll() throws SQLException {
-        return doConvertList(
-                new UserRepository(dataSource).queryList("userName", "userId", "header"), UserBasicDTO.class);
+        return queryList("select userName,userId,header from user", UserBasicDTO.class);
     }
 
-    public Map<String, Object> getUserByUserName(String userName) throws SQLException {
-        return queryFirstWithParams("select * from " + tableName + " where userName=?", userName);
+    public User getUserByUserName(String userName) throws SQLException {
+        return findMatching(Map.of("userName", userName), 1).stream().findFirst().orElse(null);
+    }
+
+    public UserBasicDTO findBasicById(long id) throws SQLException {
+        return queryOne("select userName,userId,header from user where userId=?", UserBasicDTO.class, id);
+    }
+
+    public com.zrlog.data.security.AccountAccess ownerAccess() throws SQLException {
+        return com.zrlog.data.security.AccountAccess.fromSnapshot(queryOne(
+                "SELECT userId,role,enabled,authVersion FROM user WHERE role=? AND enabled=? ORDER BY userId LIMIT 1",
+                com.zrlog.data.security.AccountAccess.Snapshot.class, "owner", true));
+    }
+
+    public static UserBasicDTO toBasic(User user) {
+        if (user == null) return null;
+        UserBasicDTO result = new UserBasicDTO();
+        result.setUserId(user.getId());
+        result.setUserName(user.getUserName());
+        result.setHeader(user.getHeader());
+        return result;
     }
 
     public String getPasswordByUserId(int userId) throws SQLException {
-        return (String) queryFirstWithParams("select password from " + tableName + " where userId=?", userId).get("password");
+        return (String) queryFirstObj("select password from " + tableName + " where userId=?", userId);
     }
 
     public boolean updatePassword(int userId, String password) throws SQLException {
-        return execute("update " + tableName + " set password=?,updatedAt=?,version=version+1 where userId=?", password, new java.sql.Timestamp(System.currentTimeMillis()).toString(), userId);
+        User user = loadById((long) userId);
+        if (user == null) return false;
+        user.setPassword(password);
+        return update(user);
     }
 
     public void updateEmailUserNameHeaderByUserId(String email, String userName, String header, int userId) throws SQLException {
-        execute("update " + tableName + " set header=?,email=?,userName=?,updatedAt=?,version=version+1 where userId=?", header, email, userName, new java.sql.Timestamp(System.currentTimeMillis()).toString(), userId);
+        User user = loadById((long) userId);
+        if (user == null) return;
+        user.setHeader(header);
+        user.setEmail(email);
+        user.setUserName(userName);
+        update(user);
     }
 }

@@ -7,7 +7,6 @@ import jakarta.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -27,14 +26,14 @@ public class DistributedLockManager {
 
     public List<LockVO> getLocks() throws Exception {
         List<LockVO> lockList = new ArrayList<>();
-        for (Map<String, Object> stringObjectMap :
+        for (com.zrlog.model.WebSite row :
                 websites.get()
-                        .queryListWithParams(
-                                "select * from website where name like ?",
+                        .select(
+                                "WHERE name LIKE ?",
                                 DistributedLock.LOCK_PREFIX + "%")) {
             LockVO lockVO = new LockVO();
-            lockVO.setName(((String) stringObjectMap.get("name")).replaceFirst(DistributedLock.LOCK_PREFIX, ""));
-            lockVO.setRemark((String) stringObjectMap.get("remark"));
+            lockVO.setName(row.getName().replaceFirst(DistributedLock.LOCK_PREFIX, ""));
+            lockVO.setRemark(row.getRemark());
             lockList.add(lockVO);
         }
         return lockList;

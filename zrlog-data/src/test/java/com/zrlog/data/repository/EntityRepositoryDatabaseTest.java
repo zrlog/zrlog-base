@@ -25,6 +25,18 @@ public class EntityRepositoryDatabaseTest {
     }
 
     @Test
+    public void projectionsCannotBeUsedToLoadPartialEntitiesOrUntypedRows() throws Exception {
+        try (ZrLogTestDatabase db = open()) {
+            LogRepository repository = new LogRepository(db.dataSource());
+            assertThrows(IllegalArgumentException.class,
+                    () -> repository.queryOne("SELECT title FROM log", Log.class));
+            assertThrows(IllegalArgumentException.class,
+                    () -> repository.queryList("SELECT title FROM log", java.util.Map.class));
+            assertNull(repository.loadById(-1L));
+        }
+    }
+
+    @Test
     public void articleWritesPreservePublicationTimeAndRejectConcurrentChanges() throws Exception {
         try (ZrLogTestDatabase db = open()) {
             LogRepository repository = new LogRepository(db.dataSource());
@@ -36,14 +48,14 @@ public class EntityRepositoryDatabaseTest {
             repository.insert(article);
             assertEquals(Long.valueOf(0), article.getVersion());
             assertTrue(article.getCreatedAt().getTime() > article.getReleaseTime().getTime());
-            Log first = repository.findById(7L).orElseThrow();
-            Log stale = repository.findById(7L).orElseThrow();
+            Log first = repository.loadById(7L);
+            Log stale = repository.loadById(7L);
             first.setTitle("saved");
             assertTrue(repository.update(first));
             assertEquals(Long.valueOf(1), first.getVersion());
             stale.setContent("stale body");
             assertThrows(OptimisticLockException.class, () -> repository.update(stale));
-            Log saved = repository.findById(7L).orElseThrow();
+            Log saved = repository.loadById(7L);
             assertEquals("saved", saved.getTitle());
             assertEquals("body", saved.getContent());
             assertEquals(article.getReleaseTime(), saved.getReleaseTime());
@@ -83,7 +95,7 @@ public class EntityRepositoryDatabaseTest {
         try (ZrLogTestDatabase db = open()) {
             db.update("INSERT INTO user(userId,userName,authVersion) VALUES(?,?,?)", 1, "existing", 7);
             UserRepository repository = new UserRepository(db.dataSource());
-            var row = repository.findById(1L).orElseThrow();
+            var row = repository.loadById(1L);
             row.setEmail("saved@example.com");
             repository.update(row);
             assertNull(row.getCreatedAt());
@@ -91,7 +103,7 @@ public class EntityRepositoryDatabaseTest {
             repository.updatePassword(1, "new-password");
             row.setEmail("stale@example.com");
             assertThrows(OptimisticLockException.class, () -> repository.update(row));
-            var saved = repository.findById(1L).orElseThrow();
+            var saved = repository.loadById(1L);
             assertEquals("saved@example.com", saved.getEmail());
             assertEquals("new-password", saved.getPassword());
             assertEquals(Integer.valueOf(7), saved.getAuthVersion());

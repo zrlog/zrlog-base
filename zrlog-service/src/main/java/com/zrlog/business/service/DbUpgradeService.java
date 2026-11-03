@@ -25,7 +25,7 @@ import java.util.logging.Logger;
 /**
  * 程序升级设计到数据表结构变更，数据的更新
  */
-public class DbUpgradeService {
+public class DbUpgradeService implements AutoCloseable {
 
 
     private static final Logger LOGGER = LoggerUtil.getLogger(DbUpgradeService.class);
@@ -34,6 +34,10 @@ public class DbUpgradeService {
     private final DataSourceWrapper dataSource;
     private final String dbName;
     private final long currentSqlVersion;
+    private volatile boolean cancelled;
+    private final Object migrationMonitor = new Object();
+    private Thread migrationThread;
+    private SchemaUpgradeLock acquiredLock;
 
     public DbUpgradeService(DataSourceWrapper dataSource,
                             long currentSqlVersion) {
@@ -120,49 +124,108 @@ public class DbUpgradeService {
      * 来达到系统无需手动执行数据库脚本文件。
      */
     public void tryDoUpgrade() {
+        synchronized (migrationMonitor) {
+            if (migrationThread != null) { throw new IllegalStateException("Schema migration is already running"); }
+            if (cancelled) { throw new IllegalStateException("Application is stopping"); }
+            migrationThread = Thread.currentThread();
+        }
+        try {
+            doUpgrade();
+        } finally {
+            synchronized (migrationMonitor) {
+                migrationThread = null;
+                migrationMonitor.notifyAll();
+            }
+        }
+    }
+
+    private void doUpgrade() {
         if (currentSqlVersion < 0) {
             return;
         }
         if (getExecSqlList(currentSqlVersion).isEmpty()) {
             return;
         }
-        try (SchemaUpgradeLock ignored = SchemaUpgradeLock.acquire(dataSource)) {
-            // Another instance may have completed migration since this instance read the cache.
-            Object stored = dao.queryFirstObj("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY);
-            long version = stored == null ? currentSqlVersion : Long.parseLong(stored.toString());
-            LOGGER.info("Db " + dbName + " connect success");
-            for (Map.Entry<Integer, List<String>> entry : getExecSqlList(version)) {
-                for (String sql : entry.getValue()) {
-                    if (StringUtils.isEmpty(sql.trim())) {
-                        continue;
-                    }
-                    try {
-                        dao.execute(sql);
-                    } catch (Exception e) {
-                        if (!isAlreadyAppliedSqliteSchemaChange(sql, e)) {
-                            throw e;
+        try {
+            // The startup version may be stale by the time this instance reaches migration.
+            if (getExecSqlList(storedSqlVersion()).isEmpty()) {
+                return;
+            }
+            try (SchemaUpgradeLock lock = SchemaUpgradeLock.acquire(dataSource, () -> cancelled)) {
+                acquiredLock = lock;
+                // Another instance may have completed migration since this instance read the cache.
+                long version = storedSqlVersion();
+                LOGGER.info("Db " + dbName + " connect success");
+                for (Map.Entry<Integer, List<String>> entry : getExecSqlList(version)) {
+                    for (String sql : entry.getValue()) {
+                        checkRunning();
+                        if (StringUtils.isEmpty(sql.trim())) {
+                            continue;
                         }
-                        LOGGER.info("Skip already applied SQLite schema migration: " + sql);
+                        try {
+                            dao.execute(sql);
+                        } catch (Exception e) {
+                            if (!isAlreadyAppliedSqliteSchemaChange(sql, e)) {
+                                throw e;
+                            }
+                            LOGGER.info("Skip already applied SQLite schema migration: " + sql);
+                        }
                     }
-                }
-                if (entry.getKey() == 31) {
-                    new V31EntityMetadataUpgrade(dataSource).run();
-                }
-                UpgradeVersionHandler handler = UpgradeVersionHandlerHelpers.getUpgradeVersionHandler(entry.getKey());
-                if (handler != null) {
-                    handler.doUpgrade(dao);
-                }
-                // Bootstrap SQL must work before the Entity metadata columns exist.
-                if (dao.queryFirstObj("SELECT siteId FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY) == null) {
-                    dao.execute("INSERT INTO website(name,value) VALUES(?,?)", CacheService.ZRLOG_SQL_VERSION_KEY, entry.getKey().toString());
-                } else {
-                    dao.execute("UPDATE website SET value=? WHERE name=?", entry.getKey().toString(), CacheService.ZRLOG_SQL_VERSION_KEY);
+                    if (entry.getKey() == 31) {
+                        new V31EntityMetadataUpgrade(dataSource, () -> cancelled).run();
+                    }
+                    checkRunning();
+                    UpgradeVersionHandler handler = UpgradeVersionHandlerHelpers.getUpgradeVersionHandler(entry.getKey());
+                    if (handler != null) {
+                        handler.doUpgrade(dao);
+                    }
+                    // Bootstrap SQL must work before the Entity metadata columns exist.
+                    checkRunning();
+                    Object versionRow = dao.queryFirstObj("SELECT siteId FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY);
+                    checkRunning();
+                    if (versionRow == null) {
+                        dao.execute("INSERT INTO website(name,value) VALUES(?,?)", CacheService.ZRLOG_SQL_VERSION_KEY, entry.getKey().toString());
+                    } else {
+                        dao.execute("UPDATE website SET value=? WHERE name=?", entry.getKey().toString(), CacheService.ZRLOG_SQL_VERSION_KEY);
+                    }
                 }
             }
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Database migration failed; application startup stopped", e);
             throw new IllegalStateException("Database migration failed; application startup stopped", e);
         }
+    }
+
+    private long storedSqlVersion() throws java.sql.SQLException {
+        checkRunning();
+        Object stored = dao.queryFirstObj("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY);
+        return stored == null ? currentSqlVersion : Long.parseLong(stored.toString());
+    }
+
+    @Override
+    public void close() throws java.sql.SQLException {
+        cancelled = true;
+        boolean interrupted = Thread.interrupted();
+        try {
+            synchronized (migrationMonitor) {
+                if (migrationThread == Thread.currentThread()) {
+                    throw new IllegalStateException("Cannot close the datasource from inside a running schema migration");
+                }
+                // Let the current SQL finish; interrupting HTTP can leave its remote outcome unknown.
+                while (migrationThread != null) {
+                    try { migrationMonitor.wait(); }
+                    catch (InterruptedException e) { interrupted = true; }
+                }
+                // Retry a failed release from the migration's try-with-resources before datasource shutdown.
+                if (acquiredLock != null) { acquiredLock.close(); }
+            }
+        } finally {
+            if (interrupted) { Thread.currentThread().interrupt(); }
+        }
+    }
+
+    private void checkRunning() throws java.sql.SQLException {
+        if (cancelled) { throw new java.sql.SQLException("Schema migration cancelled because the application is stopping"); }
     }
 
     private boolean usesMysqlDialect() {

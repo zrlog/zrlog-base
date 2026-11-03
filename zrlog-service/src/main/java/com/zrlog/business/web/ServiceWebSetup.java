@@ -23,6 +23,9 @@ public final class ServiceWebSetup implements WebSetup {
     private final ZrLogConfig config;
     private final File dbPropertiesFile;
     private final String contextPath;
+    private final Object migrationMonitor = new Object();
+    private boolean stopping;
+    private DbUpgradeService migration;
 
     public ServiceWebSetup(WebSetupContext context) {
         this.config = context.getZrLogConfig();
@@ -80,8 +83,29 @@ public final class ServiceWebSetup implements WebSetup {
                 "SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY);
         long sqlVersion = stored == null ? -1 : Long.parseLong(stored.toString());
         if (sqlVersion >= 0) {
-            config.getServerConfig().getBindings().build().get(ServiceComponent.class)
-                    .databaseUpgrades().create(sqlVersion).tryDoUpgrade();
+            DbUpgradeService upgrade;
+            synchronized (migrationMonitor) {
+                if (stopping) { throw new java.sql.SQLException("Application stopped before schema migration"); }
+                upgrade = config.getServerConfig().getBindings().build().get(ServiceComponent.class)
+                        .databaseUpgrades().create(sqlVersion);
+                migration = upgrade;
+            }
+            upgrade.tryDoUpgrade();
+        }
+    }
+
+    @Override
+    public void stop() {
+        DbUpgradeService current;
+        synchronized (migrationMonitor) {
+            stopping = true;
+            current = migration;
+        }
+        if (current != null) {
+            try { current.close(); }
+            catch (java.sql.SQLException failure) {
+                throw new IllegalStateException("Cannot release schema migration lock during application stop", failure);
+            }
         }
     }
 }

@@ -16,6 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.BooleanSupplier;
 
 /** The explicit version-31 migration. This is not runtime Entity schema synchronization. */
 public final class V31EntityMetadataUpgrade {
@@ -27,9 +28,15 @@ public final class V31EntityMetadataUpgrade {
     private final DAO dao;
     private final boolean sqlite;
     private final boolean mysql;
+    private final BooleanSupplier cancelled;
 
     public V31EntityMetadataUpgrade(DataSourceWrapper source) {
+        this(source, () -> false);
+    }
+
+    public V31EntityMetadataUpgrade(DataSourceWrapper source, BooleanSupplier cancelled) {
         this.source = source;
+        this.cancelled = cancelled;
         this.dao = new DAO(source);
         String url = source.getDataSourceProperties().getProperty("jdbcUrl", "").toLowerCase(Locale.ROOT);
         sqlite = source.isWebApi() || url.startsWith("jdbc:sqlite:");
@@ -39,50 +46,53 @@ public final class V31EntityMetadataUpgrade {
     public void run() throws SQLException {
         for (Map.Entry<String, String> table : TABLES.entrySet()) {
             String name = table.getKey();
-            if (INTEGER_CREATION.contains(name)) { migrateCreationTime(name, table.getValue()); }
+            // This snapshot belongs to this table and run only. Successful DDL updates it;
+            // uncertain DDL refreshes it from the database before any subsequent step.
+            Map<String, String> columns = columns(name);
+            if (INTEGER_CREATION.contains(name)) { migrateCreationTime(name, table.getValue(), columns); }
             String created = name.equals("log_version") ? "created_at" : name.equals("comment") ? "td" : "createdAt";
             String updated = name.equals("log") ? "last_update_date" : "updatedAt";
-            ensureColumn(name, created, "DATETIME(3) DEFAULT NULL", false);
-            ensureColumn(name, updated, "DATETIME(3) DEFAULT NULL", false);
-            ensureColumn(name, "version", "BIGINT NOT NULL DEFAULT 0", true);
-            // Existing log.version may be NULL; preserve every known revision.
-            dao.execute("UPDATE " + q(name) + " SET version=0 WHERE version IS NULL");
-            if (((Number) dao.queryFirstObj("SELECT count(*) FROM " + q(name) + " WHERE version<0")).longValue() != 0) {
-                throw new SQLException("Negative row version in " + name + "; migration stopped");
+            ensureColumn(name, created, "DATETIME(3) DEFAULT NULL", false, columns);
+            ensureColumn(name, updated, "DATETIME(3) DEFAULT NULL", false, columns);
+            if (!ensureColumn(name, "version", "BIGINT NOT NULL DEFAULT 0", true, columns)) {
+                // A newly added NOT NULL DEFAULT 0 column needs no full-table repair or scan.
+                // Existing log.version may be NULL; preserve every known revision.
+                execute("UPDATE " + q(name) + " SET version=0 WHERE version IS NULL");
+                checkRunning();
+                if (((Number) dao.queryFirstObj("SELECT count(*) FROM " + q(name) + " WHERE version<0")).longValue() != 0) {
+                    throw new SQLException("Negative row version in " + name + "; migration stopped");
+                }
             }
         }
     }
 
-    private void migrateCreationTime(String table, String key) throws SQLException {
+    private void migrateCreationTime(String table, String key, Map<String, String> columns) throws SQLException {
         String column = "createdAt";
         String staging = "createdAt_v31";
         String backup = "createdAt_epoch_v31";
-        Map<String, String> columns = columns(table);
         if (!columns.containsKey(column) && !columns.containsKey(backup)) {
             throw new SQLException("Missing historical creation time in " + table);
         }
         if (columns.containsKey(column) && integer(columns.get(column))) {
             if (columns.containsKey(backup)) { throw new SQLException("Ambiguous migration columns in " + table); }
-            ensureColumn(table, staging, "DATETIME(3) DEFAULT NULL", false);
+            ensureColumn(table, staging, "DATETIME(3) DEFAULT NULL", false, columns);
             copyEpochTimes(table, key, column, staging);
             verifyTimes(table, key, column, staging);
-            rename(table, column, backup, "BIGINT NULL");
+            rename(table, column, backup, "BIGINT NULL", columns);
         }
-        columns = columns(table);
         if (!columns.containsKey(column) && columns.containsKey(backup)) {
             if (!dateTime(columns.get(staging)) || !integer(columns.get(backup))) {
                 throw new SQLException("Incomplete date migration in " + table);
             }
-            rename(table, staging, column, "DATETIME(3) DEFAULT NULL");
+            rename(table, staging, column, "DATETIME(3) DEFAULT NULL", columns);
         }
-        columns = columns(table);
         if (!dateTime(columns.get(column))) { throw new SQLException("Unexpected creation time type in " + table); }
         if (columns.containsKey(backup)) {
             // Keep the original integers until every converted value has been checked.
             verifyTimes(table, key, backup, column);
-            drop(table, backup);
+            drop(table, backup, columns);
         }
-        if (columns(table).containsKey(staging)) { throw new SQLException("Unexpected staging column in " + table); }
+        if (columns.containsKey(staging)) { throw new SQLException("Unexpected staging column in " + table); }
     }
 
     private void copyEpochTimes(String table, String key, String original, String target) throws SQLException {
@@ -109,7 +119,7 @@ public final class V31EntityMetadataUpgrade {
             }
             if (!keys.isEmpty()) {
                 values.addAll(keys);
-                dao.execute("UPDATE " + q(table) + " SET " + q(target) + "=CASE " + q(key) + cases
+                execute("UPDATE " + q(table) + " SET " + q(target) + "=CASE " + q(key) + cases
                                 + " END WHERE " + q(target) + " IS NULL AND " + q(key) + " IN ("
                                 + String.join(",", java.util.Collections.nCopies(keys.size(), "?")) + ")",
                         values.toArray());
@@ -134,6 +144,7 @@ public final class V31EntityMetadataUpgrade {
     }
 
     private List<Map<String, Object>> page(String table, String key, String old, String current, Object after) throws SQLException {
+        checkRunning();
         String original = source.isWebApi() ? "CAST(" + q(old) + " AS TEXT)" : q(old);
         String sql = "SELECT " + q(key) + " AS row_id," + original + " AS old_time," + q(current)
                 + " AS new_time FROM " + q(table) + (after == null ? "" : " WHERE " + q(key) + ">?")
@@ -146,40 +157,64 @@ public final class V31EntityMetadataUpgrade {
         catch (RuntimeException e) { throw new SQLException("Invalid historical millisecond time", e); }
     }
 
-    private void ensureColumn(String table, String column, String definition, boolean numeric) throws SQLException {
-        Map<String, String> columns = columns(table);
+    private boolean ensureColumn(String table, String column, String definition, boolean numeric,
+                                 Map<String, String> columns) throws SQLException {
+        boolean added = false;
         if (!columns.containsKey(column)) {
-            try { dao.execute("ALTER TABLE " + q(table) + " ADD COLUMN " + q(column) + " " + definition); }
-            catch (SQLException failure) {
+            try {
+                execute("ALTER TABLE " + q(table) + " ADD COLUMN " + q(column) + " " + definition);
+                columns.put(column, definition.split(" ", 2)[0]);
+                added = true;
+            } catch (SQLException failure) {
                 // A driver may report an error after a DDL statement was already committed.
-                if (!columns(table).containsKey(column)) { throw failure; }
+                refreshColumns(table, columns, failure);
+                if (!columns.containsKey(column)) { throw failure; }
             }
-            columns = columns(table);
         }
         String type = columns.get(column);
         if (!(numeric ? integer(type) : dateTime(type))) {
             throw new SQLException("Unexpected type for " + table + "." + column + "; migration stopped");
         }
+        return added;
     }
 
-    private void rename(String table, String from, String to, String definition) throws SQLException {
+    private void rename(String table, String from, String to, String definition,
+                        Map<String, String> columns) throws SQLException {
         String sql = mysql ? "ALTER TABLE " + q(table) + " CHANGE COLUMN " + q(from) + " " + q(to) + " " + definition
                 : "ALTER TABLE " + q(table) + " RENAME COLUMN " + q(from) + " TO " + q(to);
-        try { dao.execute(sql); }
-        catch (SQLException failure) {
-            Map<String, String> actual = columns(table);
-            if (actual.containsKey(from) || !actual.containsKey(to)) { throw failure; }
+        try {
+            execute(sql);
+            columns.remove(from);
+            columns.put(to, definition.split(" ", 2)[0]);
+        } catch (SQLException failure) {
+            refreshColumns(table, columns, failure);
+            if (columns.containsKey(from) || !columns.containsKey(to)) { throw failure; }
         }
     }
 
-    private void drop(String table, String column) throws SQLException {
-        try { dao.execute("ALTER TABLE " + q(table) + " DROP COLUMN " + q(column)); }
-        catch (SQLException failure) {
-            if (columns(table).containsKey(column)) { throw failure; }
+    private void drop(String table, String column, Map<String, String> columns) throws SQLException {
+        try {
+            execute("ALTER TABLE " + q(table) + " DROP COLUMN " + q(column));
+            columns.remove(column);
+        } catch (SQLException failure) {
+            refreshColumns(table, columns, failure);
+            if (columns.containsKey(column)) { throw failure; }
+        }
+    }
+
+    private void refreshColumns(String table, Map<String, String> columns, SQLException failure) throws SQLException {
+        try {
+            Map<String, String> actual = columns(table);
+            columns.clear();
+            columns.putAll(actual);
+        } catch (SQLException readFailure) {
+            failure.addSuppressed(readFailure);
+            throw failure;
         }
     }
 
     private Map<String, String> columns(String table) throws SQLException {
+        checkRunning();
         Map<String, String> result = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         if (sqlite) {
             for (Map<String, Object> row : dao.queryListWithParams("PRAGMA table_info(" + q(table) + ")")) {
@@ -195,6 +230,17 @@ public final class V31EntityMetadataUpgrade {
         }
         if (result.isEmpty()) { throw new SQLException("Expected installed table is missing: " + table); }
         return result;
+    }
+
+    private void checkRunning() throws SQLException {
+        if (cancelled.getAsBoolean()) {
+            throw new SQLException("Schema migration cancelled because the application is stopping");
+        }
+    }
+
+    private void execute(String sql, Object... params) throws SQLException {
+        checkRunning();
+        dao.execute(sql, params);
     }
 
     private static boolean integer(String type) { return type != null && type.contains("INT"); }

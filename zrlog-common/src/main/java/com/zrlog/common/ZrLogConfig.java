@@ -28,6 +28,7 @@ import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.util.*;
 import java.util.concurrent.Executor;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -57,7 +58,7 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
     protected DataSourceWrapper dataSource;
     protected ZrLogHttpRequestListener zrLogHttpRequestListener = new ZrLogHttpRequestListener();
     private final Object stopMonitor = new Object();
-    private boolean stopped;
+    private volatile boolean stopped;
     private boolean webSetupsInitialized;
     private volatile boolean databaseInitialized;
 
@@ -65,7 +66,7 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         NetworkProxy.initialize();
         this.createdDate = ManagementFactory.getRuntimeMXBean().getStartTime();
         this.plugins = new Plugins();
-        this.webSetups = new ArrayList<>();
+        this.webSetups = new CopyOnWriteArrayList<>();
         this.updater = updater;
         this.serverConfig = initServerConfig(contextPath, port);
         UpdaterHosts.bindLifecycle(updater, serverConfig::getPort, this::stop);
@@ -107,9 +108,11 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         if (webSetupsInitialized && !databaseInitialized) {
             try {
                 for (WebSetup webSetup : webSetups) {
+                    if (stopped) { throw new IllegalStateException("Application stopped during database initialization"); }
                     webSetup.beforeDatabaseReady(dataSource);
                 }
                 for (WebSetup webSetup : webSetups) {
+                    if (stopped) { throw new IllegalStateException("Application stopped during database initialization"); }
                     webSetup.onDatabaseReady(dataSource);
                 }
             } catch (Exception failure) {
@@ -231,6 +234,9 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
 
     private void stopSharedResources() {
         try {
+            for (WebSetup webSetup : webSetups) {
+                webSetup.stop();
+            }
             plugins.forEach(IPlugin::stop);
             plugins.clear();
             if (Objects.nonNull(dataSource)) {

@@ -56,8 +56,11 @@ public class PluginCoreScheduledStartupTest {
     public void concurrentWaiterExpiryDoesNotCancelTheStartupOwner() throws Exception {
         try (Fixture fixture = new Fixture()) {
             CompletableFuture<PluginSchedulerTickResult> owner = CompletableFuture.supplyAsync(() -> {
-                try { return fixture.plugin.tickScheduledTasks("owner", 1, 20000); }
-                catch (Exception failure) { throw new RuntimeException(failure); }
+                try {
+                    return fixture.plugin.tickScheduledTasks("owner", 1, 20000);
+                } catch (Exception failure) {
+                    throw new RuntimeException(failure);
+                }
             });
             try {
                 assertTrue(fixture.statusRead.await(1, TimeUnit.SECONDS));
@@ -82,8 +85,12 @@ public class PluginCoreScheduledStartupTest {
             AtomicReference<Throwable> failure = new AtomicReference<>();
             AtomicBoolean interrupted = new AtomicBoolean();
             Thread owner = new Thread(() -> {
-                try { fixture.plugin.tickScheduledTasks("interrupted", 1, 20000); }
-                catch (Throwable error) { failure.set(error); interrupted.set(Thread.currentThread().isInterrupted()); }
+                try {
+                    fixture.plugin.tickScheduledTasks("interrupted", 1, 20000);
+                } catch (Throwable error) {
+                    failure.set(error);
+                    interrupted.set(Thread.currentThread().isInterrupted());
+                }
             });
             try {
                 owner.start();
@@ -96,7 +103,10 @@ public class PluginCoreScheduledStartupTest {
                 assertFalse(fixture.plugin.isStarted());
                 assertEquals(1, fixture.cancellations.get());
                 assertEquals(0, fixture.ticks.get());
-            } finally { owner.interrupt(); owner.join(1500); }
+            } finally {
+                owner.interrupt();
+                owner.join(1500);
+            }
         }
     }
 
@@ -140,24 +150,32 @@ public class PluginCoreScheduledStartupTest {
                         public int pluginServerStart(String db, String args, String path, String version, String token) {
                             throw new AssertionError("scheduled startup must carry a deadline");
                         }
+
                         public int pluginServerStart(String db, String args, String path, String version, String token,
                                                      ExecutionDeadline deadline) {
                             starts.incrementAndGet();
                             startBudget.set(deadline.remainingMillis());
                             return server.getAddress().getPort();
                         }
+
                         public boolean confirmStarted(int port, ExecutionDeadline deadline) {
                             confirmations.incrementAndGet();
                             return ready.get();
                         }
+
                         public void cancelStartup(int port, ExecutionDeadline deadline) {
                             cancellations.incrementAndGet();
                             cleanupBudget.set(deadline.remainingMillis());
                         }
-                        public void stopPluginCore() { }
+
+                        public void stopPluginCore() {
+                        }
                     });
         }
 
-        public void close() { plugin.stop(); server.stop(0); }
+        public void close() {
+            plugin.stop();
+            server.stop(0);
+        }
     }
 }

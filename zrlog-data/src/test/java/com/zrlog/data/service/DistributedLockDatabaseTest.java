@@ -11,7 +11,9 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.*;
 
@@ -89,14 +91,20 @@ public class DistributedLockDatabaseTest {
             ExecutorService waiter = Executors.newSingleThreadExecutor();
             try {
                 assertFalse(waiter.submit(() -> {
-                    try { return lock.tryLock(1, TimeUnit.MILLISECONDS); }
-                    finally { lock.unlock(); }
+                    try {
+                        return lock.tryLock(1, TimeUnit.MILLISECONDS);
+                    } finally {
+                        lock.unlock();
+                    }
                 }).get(5, TimeUnit.SECONDS));
                 assertEquals(owner, db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.LOCK_PREFIX + "shared"));
                 lock.unlock();
                 assertTrue(waiter.submit(() -> {
-                    try { return lock.tryLock(1, TimeUnit.SECONDS); }
-                    finally { lock.unlock(); }
+                    try {
+                        return lock.tryLock(1, TimeUnit.SECONDS);
+                    } finally {
+                        lock.unlock();
+                    }
                 }).get(5, TimeUnit.SECONDS));
                 assertNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.LOCK_PREFIX + "shared"));
             } finally {

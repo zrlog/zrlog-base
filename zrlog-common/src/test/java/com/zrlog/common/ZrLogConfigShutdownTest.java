@@ -8,7 +8,6 @@ import org.junit.rules.TemporaryFolder;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -49,6 +48,25 @@ public class ZrLogConfigShutdownTest {
     }
 
     public static class Scenarios {
+        private static void await(CountDownLatch latch) {
+            try {
+                if (!latch.await(5, TimeUnit.SECONDS)) {
+                    throw new AssertionError("Timed out waiting for test work");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError(e);
+            }
+        }
+
+        private static void awaitShutdown(ExecutorService executor) throws InterruptedException {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+            while (!executor.isShutdown() && System.nanoTime() < deadline) {
+                Thread.sleep(5);
+            }
+            assertTrue(executor.isShutdown());
+        }
+
         @Test(timeout = 15000)
         public void shouldDrainDecodeHandoffBeforeStoppingPluginsAndWaitForHostCleanup() throws Exception {
             TestConfig config = new TestConfig();
@@ -199,7 +217,9 @@ public class ZrLogConfigShutdownTest {
         public void shouldStillCloseOwnedResourcesWhenEitherHostHookFails() {
             for (boolean failBefore : new boolean[]{true, false}) {
                 TestConfig config = new TestConfig();
-                Runnable fail = () -> { throw new IllegalStateException("host cleanup failure"); };
+                Runnable fail = () -> {
+                    throw new IllegalStateException("host cleanup failure");
+                };
                 if (failBefore) {
                     config.before = fail;
                 } else {
@@ -217,47 +237,67 @@ public class ZrLogConfigShutdownTest {
             }
         }
 
-        private static void await(CountDownLatch latch) {
-            try {
-                if (!latch.await(5, TimeUnit.SECONDS)) {
-                    throw new AssertionError("Timed out waiting for test work");
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new AssertionError(e);
-            }
-        }
-
-        private static void awaitShutdown(ExecutorService executor) throws InterruptedException {
-            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
-            while (!executor.isShutdown() && System.nanoTime() < deadline) {
-                Thread.sleep(5);
-            }
-            assertTrue(executor.isShutdown());
-        }
-
         private static class TestConfig extends ZrLogConfig {
             private final AtomicInteger beforeCalls = new AtomicInteger();
             private final AtomicInteger afterCalls = new AtomicInteger();
             private final AtomicInteger pluginStops = new AtomicInteger();
-            private Runnable before = () -> { };
-            private Runnable after = () -> { };
+            private Runnable before = () -> {
+            };
+            private Runnable after = () -> {
+            };
 
             TestConfig() {
                 super(0, null, "");
                 plugins.add(new IPlugin() {
-                    @Override public boolean start() { return true; }
-                    @Override public boolean autoStart() { return false; }
-                    @Override public boolean isStarted() { return true; }
-                    @Override public boolean stop() { pluginStops.incrementAndGet(); return true; }
+                    @Override
+                    public boolean start() {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean autoStart() {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean isStarted() {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean stop() {
+                        pluginStops.incrementAndGet();
+                        return true;
+                    }
                 });
             }
 
-            @Override public boolean isInstalled() { return false; }
-            @Override public DataSourceWrapper configDatabase() { return null; }
-            @Override public List<IPlugin> getBasePluginList() { return Collections.emptyList(); }
-            @Override protected void beforeStop() { beforeCalls.incrementAndGet(); before.run(); }
-            @Override protected void afterStop() { afterCalls.incrementAndGet(); after.run(); }
+            @Override
+            public boolean isInstalled() {
+                return false;
+            }
+
+            @Override
+            public DataSourceWrapper configDatabase() {
+                return null;
+            }
+
+            @Override
+            public List<IPlugin> getBasePluginList() {
+                return Collections.emptyList();
+            }
+
+            @Override
+            protected void beforeStop() {
+                beforeCalls.incrementAndGet();
+                before.run();
+            }
+
+            @Override
+            protected void afterStop() {
+                afterCalls.incrementAndGet();
+                after.run();
+            }
         }
     }
 }

@@ -36,10 +36,20 @@ public class DistributedLock implements Lock, AutoCloseable {
         this.lockKey = storageKey(lockKey);
     }
 
-    /** Preserve the migration key so older and newer application versions exclude each other. */
+    /**
+     * Preserve the migration key so older and newer application versions exclude each other.
+     */
     public static String storageKey(String lockKey) {
         Objects.requireNonNull(lockKey);
         return SCHEMA_UPGRADE_KEY.equals(lockKey) ? lockKey : LOCK_PREFIX + lockKey;
+    }
+
+    private static boolean isDuplicateKey(SQLException failure) {
+        String message = failure.getMessage();
+        return "23505".equals(failure.getSQLState())
+                || ("23000".equals(failure.getSQLState()) && failure.getErrorCode() == 1062)
+                || (message != null && (message.contains("SQLITE_CONSTRAINT_UNIQUE")
+                || message.contains("UNIQUE constraint failed: website.name")));
     }
 
     @Override
@@ -47,7 +57,9 @@ public class DistributedLock implements Lock, AutoCloseable {
         return tryLock(time, unit, () -> false);
     }
 
-    /** Cancellation stops waiting; it never releases another caller's lock. */
+    /**
+     * Cancellation stops waiting; it never releases another caller's lock.
+     */
     public boolean tryLock(long time, TimeUnit unit, BooleanSupplier cancelled) throws InterruptedException {
         long waitNanos = unit.toNanos(time);
         if (waitNanos <= 0 || waitNanos > TimeUnit.MINUTES.toNanos(10)) {
@@ -57,40 +69,62 @@ public class DistributedLock implements Lock, AutoCloseable {
         long started = System.nanoTime();
         boolean available = true;
         while (true) {
-            if (Thread.interrupted()) { throw new InterruptedException("Interrupted while waiting for database lock"); }
-            if (cancelled.getAsBoolean()) { return false; }
-            if (available && tryLock()) { return true; }
+            if (Thread.interrupted()) {
+                throw new InterruptedException("Interrupted while waiting for database lock");
+            }
+            if (cancelled.getAsBoolean()) {
+                return false;
+            }
+            if (available && tryLock()) {
+                return true;
+            }
             long remaining = waitNanos - (System.nanoTime() - started);
-            if (remaining <= 0) { return false; }
+            if (remaining <= 0) {
+                return false;
+            }
             TimeUnit.NANOSECONDS.sleep(Math.min(POLL_NANOS, remaining));
-            if (cancelled.getAsBoolean()) { return false; }
-            if (System.nanoTime() - started >= waitNanos) { return false; }
+            if (cancelled.getAsBoolean()) {
+                return false;
+            }
+            if (System.nanoTime() - started >= waitNanos) {
+                return false;
+            }
             // Poll with reads while another owner exists, avoiding repeated failed INSERTs on D1.
             synchronized (this) {
-                try { available = owner == null && currentOwner() == null; }
-                catch (SQLException failure) { throw new DAOException(failure); }
+                try {
+                    available = owner == null && currentOwner() == null;
+                } catch (SQLException failure) {
+                    throw new DAOException(failure);
+                }
             }
-            if (System.nanoTime() - started >= waitNanos) { return false; }
+            if (System.nanoTime() - started >= waitNanos) {
+                return false;
+            }
         }
     }
 
     @Override
     public synchronized boolean tryLock() {
-        if (owner != null) { return false; }
+        if (owner != null) {
+            return false;
+        }
         String token = UUID.randomUUID().toString();
         try {
             websites.get().insertLock(lockKey, token,
                     "Created at " + ResultValueConvertUtils.formatDate(new Date(), "yyyy-MM-dd HH:mm:ss"));
         } catch (SQLException failure) {
             String current;
-            try { current = currentOwner(); }
-            catch (SQLException readFailure) {
+            try {
+                current = currentOwner();
+            } catch (SQLException readFailure) {
                 failure.addSuppressed(readFailure);
                 throw new DAOException(failure);
             }
             // A lost D1 response can hide a committed INSERT. Only our own token proves ownership.
             if (!token.equals(current)) {
-                if (isDuplicateKey(failure)) { return false; }
+                if (isDuplicateKey(failure)) {
+                    return false;
+                }
                 throw new DAOException(failure);
             }
         }
@@ -103,20 +137,17 @@ public class DistributedLock implements Lock, AutoCloseable {
         return websites.get().findValueByName(lockKey);
     }
 
-    private static boolean isDuplicateKey(SQLException failure) {
-        String message = failure.getMessage();
-        return "23505".equals(failure.getSQLState())
-                || ("23000".equals(failure.getSQLState()) && failure.getErrorCode() == 1062)
-                || (message != null && (message.contains("SQLITE_CONSTRAINT_UNIQUE")
-                || message.contains("UNIQUE constraint failed: website.name")));
-    }
-
     @Override
     public synchronized void unlock() {
         // A timed-out caller sharing this Lock (e.g. cache refresh) must not release the holder.
-        if (ownerThread != Thread.currentThread()) { return; }
-        try { close(); }
-        catch (SQLException failure) { throw new DAOException(failure); }
+        if (ownerThread != Thread.currentThread()) {
+            return;
+        }
+        try {
+            close();
+        } catch (SQLException failure) {
+            throw new DAOException(failure);
+        }
     }
 
     /**
@@ -125,31 +156,42 @@ public class DistributedLock implements Lock, AutoCloseable {
      */
     @Override
     public synchronized void close() throws SQLException {
-        if (owner == null) { return; }
+        if (owner == null) {
+            return;
+        }
         try {
             websites.get().deleteLock(lockKey, owner);
         } catch (SQLException failure) {
             String current;
-            try { current = currentOwner(); }
-            catch (SQLException readFailure) {
+            try {
+                current = currentOwner();
+            } catch (SQLException readFailure) {
                 failure.addSuppressed(readFailure);
                 throw failure;
             }
             // The DELETE may also have committed before the response was lost.
-            if (owner.equals(current)) { throw failure; }
+            if (owner.equals(current)) {
+                throw failure;
+            }
         }
         owner = null;
         ownerThread = null;
     }
 
     @Override
-    public void lock() { throw new UnsupportedOperationException(); }
+    public void lock() {
+        throw new UnsupportedOperationException();
+    }
 
     @Override
-    public void lockInterruptibly() { throw new UnsupportedOperationException(); }
+    public void lockInterruptibly() {
+        throw new UnsupportedOperationException();
+    }
 
     @Override
-    public Condition newCondition() { throw new UnsupportedOperationException(); }
+    public Condition newCondition() {
+        throw new UnsupportedOperationException();
+    }
 
     @AssistedFactory
     public interface Factory {

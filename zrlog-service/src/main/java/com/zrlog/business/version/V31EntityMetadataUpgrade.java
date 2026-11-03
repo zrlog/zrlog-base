@@ -9,16 +9,12 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.function.BooleanSupplier;
 
-/** The explicit version-31 migration. This is not runtime Entity schema synchronization. */
+/**
+ * The explicit version-31 migration. This is not runtime Entity schema synchronization.
+ */
 public final class V31EntityMetadataUpgrade {
     private static final int BATCH_SIZE = 20; // CASE update stays below D1's parameter limit.
     private static final Map<String, String> TABLES = tables();
@@ -43,13 +39,57 @@ public final class V31EntityMetadataUpgrade {
         mysql = url.startsWith("jdbc:mysql:") || url.startsWith("jdbc:mariadb:");
     }
 
+    private static long epoch(Object value) throws SQLException {
+        try {
+            return new BigDecimal(value.toString()).longValueExact();
+        } catch (RuntimeException e) {
+            throw new SQLException("Invalid historical millisecond time", e);
+        }
+    }
+
+    private static boolean integer(String type) {
+        return type != null && type.contains("INT");
+    }
+
+    private static boolean dateTime(String type) {
+        return type != null && (type.startsWith("DATETIME") || type.startsWith("TIMESTAMP"));
+    }
+
+    private static String q(String name) {
+        return "`" + name + "`";
+    }
+
+    private static Map<String, String> tables() {
+        Map<String, String> tables = new LinkedHashMap<>();
+        tables.put("link", "linkId");
+        tables.put("lognav", "navId");
+        tables.put("plugin", "pluginId");
+        tables.put("tag", "tagId");
+        tables.put("type", "typeId");
+        tables.put("user", "userId");
+        tables.put("user_passkey", "id");
+        tables.put("user_passkey_challenge", "id");
+        tables.put("log", "logId");
+        tables.put("log_extension_index", "id");
+        tables.put("comment", "commentId");
+        tables.put("log_version", "id");
+        tables.put("website", "siteId");
+        tables.put("oauth_client", "clientId");
+        tables.put("oauth_grant", "id");
+        tables.put("oauth_credential", "hash");
+        tables.put("user_access_token", "id");
+        return tables;
+    }
+
     public void run() throws SQLException {
         for (Map.Entry<String, String> table : TABLES.entrySet()) {
             String name = table.getKey();
             // This snapshot belongs to this table and run only. Successful DDL updates it;
             // uncertain DDL refreshes it from the database before any subsequent step.
             Map<String, String> columns = columns(name);
-            if (INTEGER_CREATION.contains(name)) { migrateCreationTime(name, table.getValue(), columns); }
+            if (INTEGER_CREATION.contains(name)) {
+                migrateCreationTime(name, table.getValue(), columns);
+            }
             String created = name.equals("log_version") ? "created_at" : name.equals("comment") ? "td" : "createdAt";
             String updated = name.equals("log") ? "last_update_date" : "updatedAt";
             ensureColumn(name, created, "DATETIME(3) DEFAULT NULL", false, columns);
@@ -74,7 +114,9 @@ public final class V31EntityMetadataUpgrade {
             throw new SQLException("Missing historical creation time in " + table);
         }
         if (columns.containsKey(column) && integer(columns.get(column))) {
-            if (columns.containsKey(backup)) { throw new SQLException("Ambiguous migration columns in " + table); }
+            if (columns.containsKey(backup)) {
+                throw new SQLException("Ambiguous migration columns in " + table);
+            }
             ensureColumn(table, staging, "DATETIME(3) DEFAULT NULL", false, columns);
             copyEpochTimes(table, key, column, staging);
             verifyTimes(table, key, column, staging);
@@ -86,31 +128,41 @@ public final class V31EntityMetadataUpgrade {
             }
             rename(table, staging, column, "DATETIME(3) DEFAULT NULL", columns);
         }
-        if (!dateTime(columns.get(column))) { throw new SQLException("Unexpected creation time type in " + table); }
+        if (!dateTime(columns.get(column))) {
+            throw new SQLException("Unexpected creation time type in " + table);
+        }
         if (columns.containsKey(backup)) {
             // Keep the original integers until every converted value has been checked.
             verifyTimes(table, key, backup, column);
             drop(table, backup, columns);
         }
-        if (columns.containsKey(staging)) { throw new SQLException("Unexpected staging column in " + table); }
+        if (columns.containsKey(staging)) {
+            throw new SQLException("Unexpected staging column in " + table);
+        }
     }
 
     private void copyEpochTimes(String table, String key, String original, String target) throws SQLException {
         Object after = null;
         while (true) {
             List<Map<String, Object>> rows = page(table, key, original, target, after);
-            if (rows.isEmpty()) { return; }
+            if (rows.isEmpty()) {
+                return;
+            }
             List<Object> values = new ArrayList<>();
             List<Object> keys = new ArrayList<>();
             StringBuilder cases = new StringBuilder();
             for (Map<String, Object> row : rows) {
                 after = row.get("row_id");
                 Object old = row.get("old_time");
-                if (old == null || row.get("new_time") != null) { continue; }
+                if (old == null || row.get("new_time") != null) {
+                    continue;
+                }
                 long epoch = epoch(old);
                 Timestamp time = new Timestamp(epoch);
                 int year = time.toLocalDateTime().getYear();
-                if (year < 1000 || year > 9999) { throw new SQLException("Creation time outside SQL DATETIME range in " + table); }
+                if (year < 1000 || year > 9999) {
+                    throw new SQLException("Creation time outside SQL DATETIME range in " + table);
+                }
                 cases.append(" WHEN ? THEN ?");
                 values.add(after);
                 // Explicit SQL date/time text keeps milliseconds through the legacy WebAPI runner.
@@ -131,7 +183,9 @@ public final class V31EntityMetadataUpgrade {
         Object after = null;
         while (true) {
             List<Map<String, Object>> rows = page(table, key, original, target, after);
-            if (rows.isEmpty()) { return; }
+            if (rows.isEmpty()) {
+                return;
+            }
             for (Map<String, Object> row : rows) {
                 after = row.get("row_id");
                 Object old = row.get("old_time");
@@ -152,11 +206,6 @@ public final class V31EntityMetadataUpgrade {
         return after == null ? dao.queryListWithParams(sql) : dao.queryListWithParams(sql, after);
     }
 
-    private static long epoch(Object value) throws SQLException {
-        try { return new BigDecimal(value.toString()).longValueExact(); }
-        catch (RuntimeException e) { throw new SQLException("Invalid historical millisecond time", e); }
-    }
-
     private boolean ensureColumn(String table, String column, String definition, boolean numeric,
                                  Map<String, String> columns) throws SQLException {
         boolean added = false;
@@ -168,7 +217,9 @@ public final class V31EntityMetadataUpgrade {
             } catch (SQLException failure) {
                 // A driver may report an error after a DDL statement was already committed.
                 refreshColumns(table, columns, failure);
-                if (!columns.containsKey(column)) { throw failure; }
+                if (!columns.containsKey(column)) {
+                    throw failure;
+                }
             }
         }
         String type = columns.get(column);
@@ -188,7 +239,9 @@ public final class V31EntityMetadataUpgrade {
             columns.put(to, definition.split(" ", 2)[0]);
         } catch (SQLException failure) {
             refreshColumns(table, columns, failure);
-            if (columns.containsKey(from) || !columns.containsKey(to)) { throw failure; }
+            if (columns.containsKey(from) || !columns.containsKey(to)) {
+                throw failure;
+            }
         }
     }
 
@@ -198,7 +251,9 @@ public final class V31EntityMetadataUpgrade {
             columns.remove(column);
         } catch (SQLException failure) {
             refreshColumns(table, columns, failure);
-            if (columns.containsKey(column)) { throw failure; }
+            if (columns.containsKey(column)) {
+                throw failure;
+            }
         }
     }
 
@@ -228,7 +283,9 @@ public final class V31EntityMetadataUpgrade {
                 }
             }
         }
-        if (result.isEmpty()) { throw new SQLException("Expected installed table is missing: " + table); }
+        if (result.isEmpty()) {
+            throw new SQLException("Expected installed table is missing: " + table);
+        }
         return result;
     }
 
@@ -241,31 +298,5 @@ public final class V31EntityMetadataUpgrade {
     private void execute(String sql, Object... params) throws SQLException {
         checkRunning();
         dao.execute(sql, params);
-    }
-
-    private static boolean integer(String type) { return type != null && type.contains("INT"); }
-    private static boolean dateTime(String type) { return type != null && (type.startsWith("DATETIME") || type.startsWith("TIMESTAMP")); }
-    private static String q(String name) { return "`" + name + "`"; }
-
-    private static Map<String, String> tables() {
-        Map<String, String> tables = new LinkedHashMap<>();
-        tables.put("link", "linkId");
-        tables.put("lognav", "navId");
-        tables.put("plugin", "pluginId");
-        tables.put("tag", "tagId");
-        tables.put("type", "typeId");
-        tables.put("user", "userId");
-        tables.put("user_passkey", "id");
-        tables.put("user_passkey_challenge", "id");
-        tables.put("log", "logId");
-        tables.put("log_extension_index", "id");
-        tables.put("comment", "commentId");
-        tables.put("log_version", "id");
-        tables.put("website", "siteId");
-        tables.put("oauth_client", "clientId");
-        tables.put("oauth_grant", "id");
-        tables.put("oauth_credential", "hash");
-        tables.put("user_access_token", "id");
-        return tables;
     }
 }

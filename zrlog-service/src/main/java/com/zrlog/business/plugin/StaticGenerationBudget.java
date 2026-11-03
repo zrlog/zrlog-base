@@ -7,7 +7,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Objects;
 
-/** Shared deadline and authority fence for synchronous static generation. */
+/**
+ * Shared deadline and authority fence for synchronous static generation.
+ */
 public final class StaticGenerationBudget {
     public static final String REQUEST_ATTRIBUTE = StaticGenerationBudget.class.getName();
     private final ExecutionDeadline deadline;
@@ -26,8 +28,13 @@ public final class StaticGenerationBudget {
         this.actorId = actorId;
     }
 
-    public String executionId() { return executionId; }
-    public int actorId() { return actorId; }
+    public String executionId() {
+        return executionId;
+    }
+
+    public int actorId() {
+        return actorId;
+    }
 
     public void check() {
         fence.run();

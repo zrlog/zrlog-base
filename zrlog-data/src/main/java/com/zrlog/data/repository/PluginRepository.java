@@ -1,10 +1,8 @@
 package com.zrlog.data.repository;
 
-import com.zrlog.model.Plugin;
-
-
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.common.cache.dto.PluginDTO;
+import com.zrlog.model.Plugin;
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;

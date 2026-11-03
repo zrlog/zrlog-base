@@ -7,8 +7,8 @@ import com.hibegin.http.server.config.ConfigKit;
 import com.hibegin.http.server.util.PathUtil;
 import com.zrlog.business.util.PluginCoreUtils;
 import com.zrlog.util.BlogBuildInfoUtil;
-import com.zrlog.util.ThreadUtils;
 import com.zrlog.util.ExecutionDeadline;
+import com.zrlog.util.ThreadUtils;
 import com.zrlog.util.ZrLogUtil;
 
 import java.io.File;
@@ -66,11 +66,6 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
         } else {
             this.pluginsFolder = PathUtil.getConfFile("/plugins/");
         }
-    }
-
-    @Override
-    public void setExternallyScheduled(boolean externallyScheduled) {
-        this.externallyScheduled = externallyScheduled;
     }
 
     static List<String> jvmLaunchArguments(File pluginCoreFile, String dbProperties, String pluginJvmArgs) {
@@ -168,6 +163,15 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
         return Math.min(MAX_RESTART_BACKOFF_MILLIS, previousBackoffMillis * 2L);
     }
 
+    private static long waitWithin(long maximum, ExecutionDeadline deadline) {
+        return deadline == null ? maximum : Math.min(maximum, deadline.remainingMillis());
+    }
+
+    @Override
+    public void setExternallyScheduled(boolean externallyScheduled) {
+        this.externallyScheduled = externallyScheduled;
+    }
+
     private File getLogFile(boolean error) {
         File logFile = new File(PathUtil.getLogPath() + "/plugin-core-" + (error ? "error" : "info") + "." + new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()) + ".log");
         logFile.getParentFile().mkdirs();
@@ -196,7 +200,8 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
             String zipFile = ZrLogUtil.getFaaSRoot() + "/conf/plugins.zip";
             if (new File(zipFile).exists()) {
                 if (deadline == null) ZipUtil.unZip(zipFile, PathUtil.getConfPath());
-                else PluginCoreUtils.unpackPlugins(new File(zipFile).toPath(), new File(PathUtil.getConfPath()).toPath(), deadline);
+                else
+                    PluginCoreUtils.unpackPlugins(new File(zipFile).toPath(), new File(PathUtil.getConfPath()).toPath(), deadline);
             }
             unzipped = true;
         } catch (IOException e) {
@@ -281,7 +286,7 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
 
     @Override
     public int pluginServerStart(final String dbProperties, final String pluginJvmArgs, final String runtimePath,
-                                  final String runTimeVersion, String token, final ExecutionDeadline deadline) {
+                                 final String runTimeVersion, String token, final ExecutionDeadline deadline) {
         if (deadline != null && (deadline.remainingMillis() == 0 || Thread.currentThread().isInterrupted())) return -1;
         //简单处理，为了能在一个服务器上面启动多个ZrLog程序，使用Random端口的方式，（感兴趣可以算算概率）
         final int randomServerPort = new Random().nextInt(10000) + 20000;
@@ -492,9 +497,13 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                                     break;
                                 }
                                 boolean connected;
-                                try { connected = startupDeadline == null ? currentWatcher.doWatch()
-                                        : currentWatcher.doWatch(() -> startupDeadline); }
-                                finally { currentWatcher.close(); watcher = null; }
+                                try {
+                                    connected = startupDeadline == null ? currentWatcher.doWatch()
+                                            : currentWatcher.doWatch(() -> startupDeadline);
+                                } finally {
+                                    currentWatcher.close();
+                                    watcher = null;
+                                }
                                 if (connected) {
                                     watcherConnected = true;
                                 }
@@ -633,11 +642,14 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
 
     @Override
     public boolean confirmStarted(int port, ExecutionDeadline deadline) {
-        if (deadline != null && (deadline.remainingMillis() == 0 || Thread.currentThread().isInterrupted())) return false;
+        if (deadline != null && (deadline.remainingMillis() == 0 || Thread.currentThread().isInterrupted()))
+            return false;
         if (!lockWithin(deadline)) return false;
         try {
             return pluginCoreProcessHandle != null && pluginCoreProcessHandle.confirmStarted(port);
-        } finally { processLifecycleLock.unlock(); }
+        } finally {
+            processLifecycleLock.unlock();
+        }
     }
 
     @Override
@@ -649,7 +661,9 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
                 handle.cancelStartup();
                 if (handle.close(deadline)) pluginCoreProcessHandle = null;
             }
-        } finally { processLifecycleLock.unlock(); }
+        } finally {
+            processLifecycleLock.unlock();
+        }
     }
 
     private boolean lockWithin(ExecutionDeadline deadline) {
@@ -664,10 +678,6 @@ public class PluginCoreProcessImpl implements PluginCoreProcess {
             Thread.currentThread().interrupt();
             return false;
         }
-    }
-
-    private static long waitWithin(long maximum, ExecutionDeadline deadline) {
-        return deadline == null ? maximum : Math.min(maximum, deadline.remainingMillis());
     }
 
     private void prepareProcessLogs() {

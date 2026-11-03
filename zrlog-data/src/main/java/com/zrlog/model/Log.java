@@ -34,66 +34,171 @@ public class Log extends BaseEntity<Long> {
     private String arrangePlugin;
     private String extensions;
 
-    public String getAlias() { return alias; }
-    public void setAlias(String alias) { this.alias = alias; }
+    public String getAlias() {
+        return alias;
+    }
 
-    public Boolean getCanComment() { return canComment; }
-    public void setCanComment(Boolean canComment) { this.canComment = canComment; }
+    public void setAlias(String alias) {
+        this.alias = alias;
+    }
 
-    public Integer getClick() { return click; }
-    public void setClick(Integer click) { this.click = click; }
+    public Boolean getCanComment() {
+        return canComment;
+    }
 
-    public String getContent() { return content; }
-    public void setContent(String content) { this.content = content; }
+    public void setCanComment(Boolean canComment) {
+        this.canComment = canComment;
+    }
 
-    public String getPlainContent() { return plainContent; }
-    public void setPlainContent(String plainContent) { this.plainContent = plainContent; }
+    public Integer getClick() {
+        return click;
+    }
 
-    public String getMarkdown() { return markdown; }
-    public void setMarkdown(String markdown) { this.markdown = markdown; }
+    public void setClick(Integer click) {
+        this.click = click;
+    }
 
-    public String getDigest() { return digest; }
-    public void setDigest(String digest) { this.digest = digest; }
+    public String getContent() {
+        return content;
+    }
 
-    public String getKeywords() { return keywords; }
-    public void setKeywords(String keywords) { this.keywords = keywords; }
+    public void setContent(String content) {
+        this.content = content;
+    }
 
-    public String getThumbnail() { return thumbnail; }
-    public void setThumbnail(String thumbnail) { this.thumbnail = thumbnail; }
+    public String getPlainContent() {
+        return plainContent;
+    }
 
-    public Boolean getRecommended() { return recommended; }
-    public void setRecommended(Boolean recommended) { this.recommended = recommended; }
+    public void setPlainContent(String plainContent) {
+        this.plainContent = plainContent;
+    }
 
-    public Integer getSticky() { return sticky; }
-    public void setSticky(Integer sticky) { this.sticky = sticky; }
+    public String getMarkdown() {
+        return markdown;
+    }
 
-    public Timestamp getReleaseTime() { return releaseTime; }
-    public void setReleaseTime(Timestamp releaseTime) { this.releaseTime = releaseTime; }
+    public void setMarkdown(String markdown) {
+        this.markdown = markdown;
+    }
 
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
+    public String getDigest() {
+        return digest;
+    }
 
-    public Integer getTypeId() { return typeId; }
-    public void setTypeId(Integer typeId) { this.typeId = typeId; }
+    public void setDigest(String digest) {
+        this.digest = digest;
+    }
 
-    public Integer getUserId() { return userId; }
-    public void setUserId(Integer userId) { this.userId = userId; }
+    public String getKeywords() {
+        return keywords;
+    }
 
-    public Boolean getHot() { return hot; }
-    public void setHot(Boolean hot) { this.hot = hot; }
+    public void setKeywords(String keywords) {
+        this.keywords = keywords;
+    }
 
-    public Boolean getRubbish() { return rubbish; }
-    public void setRubbish(Boolean rubbish) { this.rubbish = rubbish; }
+    public String getThumbnail() {
+        return thumbnail;
+    }
 
-    public Boolean getPrivacy() { return privacy; }
-    public void setPrivacy(Boolean privacy) { this.privacy = privacy; }
+    public void setThumbnail(String thumbnail) {
+        this.thumbnail = thumbnail;
+    }
 
-    public String getEditorType() { return editorType; }
-    public void setEditorType(String editorType) { this.editorType = editorType; }
+    public Boolean getRecommended() {
+        return recommended;
+    }
 
-    public String getArrangePlugin() { return arrangePlugin; }
-    public void setArrangePlugin(String arrangePlugin) { this.arrangePlugin = arrangePlugin; }
+    public void setRecommended(Boolean recommended) {
+        this.recommended = recommended;
+    }
 
-    public String getExtensions() { return extensions; }
-    public void setExtensions(String extensions) { this.extensions = extensions; }
+    public Integer getSticky() {
+        return sticky;
+    }
+
+    public void setSticky(Integer sticky) {
+        this.sticky = sticky;
+    }
+
+    public Timestamp getReleaseTime() {
+        return releaseTime;
+    }
+
+    public void setReleaseTime(Timestamp releaseTime) {
+        this.releaseTime = releaseTime;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public Integer getTypeId() {
+        return typeId;
+    }
+
+    public void setTypeId(Integer typeId) {
+        this.typeId = typeId;
+    }
+
+    public Integer getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Integer userId) {
+        this.userId = userId;
+    }
+
+    public Boolean getHot() {
+        return hot;
+    }
+
+    public void setHot(Boolean hot) {
+        this.hot = hot;
+    }
+
+    public Boolean getRubbish() {
+        return rubbish;
+    }
+
+    public void setRubbish(Boolean rubbish) {
+        this.rubbish = rubbish;
+    }
+
+    public Boolean getPrivacy() {
+        return privacy;
+    }
+
+    public void setPrivacy(Boolean privacy) {
+        this.privacy = privacy;
+    }
+
+    public String getEditorType() {
+        return editorType;
+    }
+
+    public void setEditorType(String editorType) {
+        this.editorType = editorType;
+    }
+
+    public String getArrangePlugin() {
+        return arrangePlugin;
+    }
+
+    public void setArrangePlugin(String arrangePlugin) {
+        this.arrangePlugin = arrangePlugin;
+    }
+
+    public String getExtensions() {
+        return extensions;
+    }
+
+    public void setExtensions(String extensions) {
+        this.extensions = extensions;
+    }
 }

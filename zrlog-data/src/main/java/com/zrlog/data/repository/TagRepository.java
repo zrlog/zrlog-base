@@ -1,8 +1,5 @@
 package com.zrlog.data.repository;
 
-import com.zrlog.model.Tag;
-
-
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequest;
@@ -10,6 +7,7 @@ import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.StringUtils;
 import com.zrlog.common.cache.dto.TagDTO;
 import com.zrlog.data.exception.DAOException;
+import com.zrlog.model.Tag;
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;

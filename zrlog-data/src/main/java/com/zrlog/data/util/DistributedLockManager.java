@@ -2,8 +2,8 @@ package com.zrlog.data.util;
 
 import com.zrlog.common.vo.LockVO;
 import com.zrlog.data.exception.DAOException;
-import com.zrlog.data.service.DistributedLock;
 import com.zrlog.data.repository.WebSiteRepository;
+import com.zrlog.data.service.DistributedLock;
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;
@@ -39,11 +39,15 @@ public class DistributedLockManager {
         return lockList;
     }
 
-    /** Acquire a closeable handle for lifecycle work such as startup migration. */
+    /**
+     * Acquire a closeable handle for lifecycle work such as startup migration.
+     */
     public DistributedLock acquire(String lockKey, long time, TimeUnit unit, BooleanSupplier cancelled) throws SQLException {
         DistributedLock lock = locks.create(lockKey);
         try {
-            if (lock.tryLock(time, unit, cancelled)) { return lock; }
+            if (lock.tryLock(time, unit, cancelled)) {
+                return lock;
+            }
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new SQLException("Interrupted while waiting for database lock '" + lockKey + "'", interrupted);
@@ -58,12 +62,16 @@ public class DistributedLockManager {
                 + "instances have stopped before removing website row '" + DistributedLock.storageKey(lockKey) + "'.");
     }
 
-    /** Administrative force release: callers must first stop work protected by this lock. */
+    /**
+     * Administrative force release: callers must first stop work protected by this lock.
+     */
     public void releaseLock(String lockKey) {
         String storedKey = DistributedLock.storageKey(lockKey);
         try {
             String owner = websites.get().findValueByName(storedKey);
-            if (owner != null) { websites.get().deleteLock(storedKey, owner); }
+            if (owner != null) {
+                websites.get().deleteLock(storedKey, owner);
+            }
         } catch (SQLException failure) {
             throw new DAOException(failure);
         }

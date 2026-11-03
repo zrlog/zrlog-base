@@ -14,8 +14,8 @@ import com.zrlog.common.cache.vo.HotTypeLogInfo;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.exception.DAOException;
-import com.zrlog.data.util.DateValueFormatUtils;
 import com.zrlog.data.repository.*;
+import com.zrlog.data.util.DateValueFormatUtils;
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;
@@ -132,17 +132,17 @@ public class BaseDataDbService {
                         executor));
         futures.put("types-and-category-articles",
                 CompletableFuture.supplyAsync(
-                        () -> {
-                            try {
-                                List<TypeDTO> types = typeProvider.get().findAll();
-                                cacheInit.setTypes(types);
-                                statistics.setTotalTypeSize((long) types.size());
-                                return types;
-                            } catch (SQLException e) {
-                                throw new DAOException(e);
-                            }
-                        },
-                        executor)
+                                () -> {
+                                    try {
+                                        List<TypeDTO> types = typeProvider.get().findAll();
+                                        cacheInit.setTypes(types);
+                                        statistics.setTotalTypeSize((long) types.size());
+                                        return types;
+                                    } catch (SQLException e) {
+                                        throw new DAOException(e);
+                                    }
+                                },
+                                executor)
                         .thenCompose(types -> loadTypeHotLogs(types, executor))
                         .thenAccept(cacheInit::setTypeHotLogs));
         futures.put("recent-articles",

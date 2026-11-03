@@ -1,6 +1,5 @@
 package com.zrlog.data.repository;
 
-import com.zrlog.model.Log;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.hibegin.common.dao.dto.PageData;
@@ -10,6 +9,7 @@ import com.hibegin.common.util.StringUtils;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
 import com.zrlog.data.exception.DAOException;
+import com.zrlog.model.Log;
 import com.zrlog.util.ParseUtil;
 import com.zrlog.util.ThreadUtils;
 import jakarta.inject.Inject;

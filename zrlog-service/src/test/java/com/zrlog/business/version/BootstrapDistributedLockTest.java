@@ -1,8 +1,8 @@
 package com.zrlog.business.version;
 
-import com.zrlog.test.support.ZrLogTestDatabase;
-import com.zrlog.data.service.DistributedLock;
 import com.zrlog.data.di.DaggerDataComponent;
+import com.zrlog.data.service.DistributedLock;
+import com.zrlog.test.support.ZrLogTestDatabase;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -20,19 +20,23 @@ public class BootstrapDistributedLockTest {
     private static final String V30 = "/schema/v30-install-e8d8c9d.sql";
     private final String backend;
 
-    public BootstrapDistributedLockTest(String backend) { this.backend = backend; }
+    public BootstrapDistributedLockTest(String backend) {
+        this.backend = backend;
+    }
 
     @Parameterized.Parameters(name = "{0}")
-    public static Object[] backends() { return new Object[]{"H2", "SQLITE", "WEB_API"}; }
-
-    private ZrLogTestDatabase open() throws Exception {
-        return backend.equals("WEB_API") ? ZrLogTestDatabase.openWebApi(V30)
-                : ZrLogTestDatabase.open(ZrLogTestDatabase.DatabaseType.valueOf(backend), V30);
+    public static Object[] backends() {
+        return new Object[]{"H2", "SQLITE", "WEB_API"};
     }
 
     private static DistributedLock acquire(ZrLogTestDatabase db, long waitMillis) throws SQLException {
         return DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).lockManager()
                 .acquire(DistributedLock.SCHEMA_UPGRADE_KEY, waitMillis, TimeUnit.MILLISECONDS, () -> false);
+    }
+
+    private ZrLogTestDatabase open() throws Exception {
+        return backend.equals("WEB_API") ? ZrLogTestDatabase.openWebApi(V30)
+                : ZrLogTestDatabase.open(ZrLogTestDatabase.DatabaseType.valueOf(backend), V30);
     }
 
     @Test
@@ -43,7 +47,9 @@ public class BootstrapDistributedLockTest {
             var manager = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).lockManager();
             var locks = manager.getLocks();
             assertEquals(2, locks.size());
-            for (var lock : locks) { manager.releaseLock(lock.getName()); }
+            for (var lock : locks) {
+                manager.releaseLock(lock.getName());
+            }
             assertTrue(manager.getLocks().isEmpty());
             try (DistributedLock acquired = acquire(db, 30000)) {
                 assertNotEquals("previous-migration", db.scalar("SELECT value FROM website WHERE name=?",
@@ -133,10 +139,13 @@ public class BootstrapDistributedLockTest {
         try (ZrLogTestDatabase db = open()) {
             DistributedLock lock = acquire(db, 30000);
             SQLException unavailable = new SQLException("D1 unavailable");
-            db.beforeWebApiUpdate((sql, params) -> { throw unavailable; });
+            db.beforeWebApiUpdate((sql, params) -> {
+                throw unavailable;
+            });
             assertSame(unavailable, assertThrows(SQLException.class, lock::close));
             assertNotNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
-            db.beforeWebApiUpdate((sql, params) -> {});
+            db.beforeWebApiUpdate((sql, params) -> {
+            });
             lock.close();
             assertNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
         }
@@ -149,7 +158,9 @@ public class BootstrapDistributedLockTest {
             db.putWebsite(DistributedLock.SCHEMA_UPGRADE_KEY, "other-instance");
             SQLException d1 = new SQLException("Error: D1_ERROR: UNIQUE constraint failed: website.name: "
                     + "SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_UNIQUE)");
-            db.beforeWebApiUpdate((sql, params) -> { throw d1; });
+            db.beforeWebApiUpdate((sql, params) -> {
+                throw d1;
+            });
             SQLException timeout = assertThrows(SQLException.class, () -> acquire(db, 1));
             assertTrue(timeout.getMessage().contains("Timed out waiting"));
             assertEquals("other-instance", db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
@@ -162,7 +173,9 @@ public class BootstrapDistributedLockTest {
         try (ZrLogTestDatabase db = open()) {
             db.putWebsite(DistributedLock.SCHEMA_UPGRADE_KEY, "other-instance");
             SQLException denied = new SQLException("INSERT permission denied", "42000");
-            db.beforeWebApiUpdate((sql, params) -> { throw denied; });
+            db.beforeWebApiUpdate((sql, params) -> {
+                throw denied;
+            });
             assertSame(denied, assertThrows(SQLException.class, () -> acquire(db, 30000)).getCause());
             assertEquals("other-instance", db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
         }

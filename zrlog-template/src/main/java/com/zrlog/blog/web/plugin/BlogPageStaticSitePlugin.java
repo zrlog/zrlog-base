@@ -4,9 +4,9 @@ import com.hibegin.common.BaseLockObject;
 import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.hibegin.common.util.*;
 import com.hibegin.http.server.util.PathUtil;
+import com.zrlog.business.plugin.StaticGenerationBudget;
 import com.zrlog.business.plugin.StaticSitePlugin;
 import com.zrlog.business.plugin.StaticSiteRenderer;
-import com.zrlog.business.plugin.StaticGenerationBudget;
 import com.zrlog.business.plugin.type.StaticSiteType;
 import com.zrlog.business.service.TemplateInfoHelper;
 import com.zrlog.business.template.util.BlogResourceUtils;
@@ -235,7 +235,9 @@ public class BlogPageStaticSitePlugin extends BaseLockObject implements StaticSi
                     .getBytes(java.nio.charset.StandardCharsets.UTF_8)), "/_redirects", budget);
             doFetchWithinBudget(renderer, budget);
             return true;
-        } finally { lock.unlock(); }
+        } finally {
+            lock.unlock();
+        }
     }
 
     private void copyTemplateWithinBudget(String templatePath, StaticGenerationBudget budget) throws Exception {

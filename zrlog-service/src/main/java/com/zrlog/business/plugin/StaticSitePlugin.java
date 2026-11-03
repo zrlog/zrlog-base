@@ -30,7 +30,20 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
 
     Logger LOGGER = LoggerUtil.getLogger(StaticSitePlugin.class);
 
-    /** Implementations must complete their owned work before returning and propagate failures. */
+    static String getSuffix(HttpRequest request, boolean staticHtml) {
+        if (isStaticPluginRequest(request) || staticHtml) {
+            return ".html";
+        }
+        return "";
+    }
+
+    static boolean isDisabled(boolean staticHtml, String host) {
+        return !staticHtml || StringUtils.isEmpty(host);
+    }
+
+    /**
+     * Implementations must complete their owned work before returning and propagate failures.
+     */
     default boolean startWithinBudget(StaticGenerationBudget budget) throws Exception {
         throw new UnsupportedOperationException("Static generation does not support an execution budget");
     }
@@ -63,8 +76,11 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
             return;
         }
         byte[] bytes;
-        try { bytes = Base64.getDecoder().decode(value.contains(",") ? value.substring(value.indexOf(',') + 1) : value); }
-        catch (IllegalArgumentException error) { throw new IOException("Invalid favicon data", error); }
+        try {
+            bytes = Base64.getDecoder().decode(value.contains(",") ? value.substring(value.indexOf(',') + 1) : value);
+        } catch (IllegalArgumentException error) {
+            throw new IOException("Invalid favicon data", error);
+        }
         File file = PathUtil.getStaticFile(path);
         java.nio.file.Files.createDirectories(file.toPath().getParent());
         try (OutputStream output = new FileOutputStream(file)) {
@@ -79,8 +95,11 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
         for (File file : new TreeSet<>(getCacheFiles())) {
             budget.check();
             java.security.MessageDigest digest;
-            try { digest = java.security.MessageDigest.getInstance("MD5"); }
-            catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+            try {
+                digest = java.security.MessageDigest.getInstance("MD5");
+            } catch (java.security.NoSuchAlgorithmException impossible) {
+                throw new IllegalStateException(impossible);
+            }
             try (InputStream input = new FileInputStream(file);
                  OutputStream output = new java.security.DigestOutputStream(OutputStream.nullOutputStream(), digest)) {
                 budget.copy(input, output);
@@ -89,17 +108,6 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
         }
         budget.check();
         return Math.abs(hashes.toString().hashCode()) + "";
-    }
-
-    static String getSuffix(HttpRequest request, boolean staticHtml) {
-        if (isStaticPluginRequest(request) || staticHtml) {
-            return ".html";
-        }
-        return "";
-    }
-
-    static boolean isDisabled(boolean staticHtml, String host) {
-        return !staticHtml || StringUtils.isEmpty(host);
     }
 
     default void faviconHandle(String faviconIconBase64, String saveFilePath, Boolean saveToCache) {
@@ -176,14 +184,17 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
         return false;
     }
 
-    /** A scheduled caller must not enter an unbounded network wait. */
+    /**
+     * A scheduled caller must not enter an unbounded network wait.
+     */
     default boolean isSynchronizedWithinBudget(String scheme, long remainingMillis) throws IOException, InterruptedException {
         if (isDisabled()) return true;
         if (remainingMillis < 1) return false;
         String url = (scheme == null ? "https" : scheme) + "://" + getSiteInfo().getHost()
                 + getContextPath() + "/" + getVersionFileName() + "?_t=" + System.currentTimeMillis();
         var deadline = com.zrlog.util.ExecutionDeadline.afterMillis(remainingMillis).capMillis(10000);
-        var budget = new StaticGenerationBudget(deadline, () -> {});
+        var budget = new StaticGenerationBudget(deadline, () -> {
+        });
         String expected = getSiteVersionWithinBudget(budget);
         var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url))
                 .timeout(Duration.ofMillis(Math.min(remainingMillis, 10000))).GET().build();
@@ -317,7 +328,9 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
         }
     }
 
-    /** Request-lifetime generation never submits page work to the legacy executor. */
+    /**
+     * Request-lifetime generation never submits page work to the legacy executor.
+     */
     default void doFetchWithinBudget(StaticSiteRenderer renderer, StaticGenerationBudget budget) throws Exception {
         while (true) {
             budget.check();
@@ -329,7 +342,8 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
             try {
                 StaticSiteRenderer.RenderedPage page = renderer.render(key, getSiteInfo().getHost(), this, budget);
                 budget.check();
-                if (page.file == null || !page.file.isFile()) throw new IOException("Static page generation produced no file");
+                if (page.file == null || !page.file.isFile())
+                    throw new IOException("Static page generation produced no file");
                 getCacheFiles().add(page.file);
                 if (!page.uri.startsWith(Constants.ADMIN_URI_BASE_PATH + "/") && !Objects.equals(key, notFindFile())) {
                     Lock parse = getParseLock();
@@ -338,7 +352,9 @@ public interface StaticSitePlugin extends BaseStaticSitePlugin {
                     try {
                         budget.check();
                         StaticSiteHtmlLinks.parseInto(page.file, getSiteInfo().getHost(), getHandleStatusPageMap());
-                    } finally { parse.unlock(); }
+                    } finally {
+                        parse.unlock();
+                    }
                 }
                 budget.check();
                 getHandleStatusPageMap().put(key, HandleState.HANDLED);

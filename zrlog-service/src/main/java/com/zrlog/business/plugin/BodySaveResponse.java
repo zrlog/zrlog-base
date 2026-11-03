@@ -18,9 +18,9 @@ public class BodySaveResponse extends SimpleHttpResponse implements AutoCloseabl
     private final Lock initLock = new ReentrantLock();
     private final boolean requiredStatusCodeSuccess;
     private final int additionalAcceptedStatusCode;
+    private final StaticGenerationBudget budget;
     private OutputStream outputStream;
     private int statusCode;
-    private final StaticGenerationBudget budget;
     private RuntimeException generationFailure;
 
     public BodySaveResponse(HttpRequest request, ResponseConfig responseConfig, boolean requiredStatusCodeSuccess,

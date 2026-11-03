@@ -85,7 +85,9 @@ public final class ServiceWebSetup implements WebSetup {
         if (sqlVersion >= 0) {
             DbUpgradeService upgrade;
             synchronized (migrationMonitor) {
-                if (stopping) { throw new java.sql.SQLException("Application stopped before schema migration"); }
+                if (stopping) {
+                    throw new java.sql.SQLException("Application stopped before schema migration");
+                }
                 upgrade = config.getServerConfig().getBindings().build().get(ServiceComponent.class)
                         .databaseUpgrades().create(sqlVersion);
                 migration = upgrade;
@@ -102,8 +104,9 @@ public final class ServiceWebSetup implements WebSetup {
             current = migration;
         }
         if (current != null) {
-            try { current.close(); }
-            catch (java.sql.SQLException failure) {
+            try {
+                current.close();
+            } catch (java.sql.SQLException failure) {
                 throw new IllegalStateException("Cannot release schema migration lock during application stop", failure);
             }
         }

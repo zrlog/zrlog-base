@@ -18,11 +18,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -37,19 +33,6 @@ public class PluginCoreProcessImplTest {
     private Field proxyPolicy;
     private Object previousProxyPolicy;
 
-    @Before
-    public void isolateLaunchPolicyFromRunnerProxyEnvironment() throws Exception {
-        proxyPolicy = NetworkProxy.class.getDeclaredField("effective");
-        proxyPolicy.setAccessible(true);
-        previousProxyPolicy = proxyPolicy.get(null);
-        proxyPolicy.set(null, proxySettings(null, null));
-    }
-
-    @After
-    public void restoreLaunchPolicy() throws Exception {
-        proxyPolicy.set(null, previousProxyPolicy);
-    }
-
     private static NetworkProxy.Settings proxySettings(String url, String noProxy) throws Exception {
         // These process-argument fixtures specify their policy; environment precedence has its own tests.
         var resolve = NetworkProxy.class.getDeclaredMethod("resolve", Map.class, Properties.class);
@@ -58,115 +41,6 @@ public class PluginCoreProcessImplTest {
         if (url != null) values.setProperty(NetworkProxy.URL_KEY, url);
         if (noProxy != null) values.setProperty(NetworkProxy.NO_PROXY_KEY, noProxy);
         return (NetworkProxy.Settings) resolve.invoke(null, Map.of(), values);
-    }
-
-    @Test(timeout = 4000)
-    public void expiredInitialLaunchStopsItsChildWithoutRestarting() throws Exception {
-        try (BoundedLaunchFixture fixture = new BoundedLaunchFixture(false)) {
-            int port = fixture.start(400);
-            assertTrue(port > 0);
-            assertTrue(fixture.spawned.await(1, TimeUnit.SECONDS));
-            fixture.thread.get().join(1500);
-            assertFalse(fixture.thread.get().isAlive());
-            assertFalse(fixture.child.isAlive());
-            assertEquals(1, fixture.launches.get());
-            assertFalse(fixture.runtime.confirmStarted(port, com.zrlog.util.ExecutionDeadline.afterMillis(100)));
-        }
-    }
-
-    @Test(timeout = 4000)
-    public void confirmedCoreSurvivesStartupDeadlineAndRejectsLateStartupCancellation() throws Exception {
-        try (BoundedLaunchFixture fixture = new BoundedLaunchFixture(false)) {
-            int port = fixture.start(500);
-            assertTrue(fixture.spawned.await(1, TimeUnit.SECONDS));
-            assertTrue(fixture.runtime.confirmStarted(port, com.zrlog.util.ExecutionDeadline.afterMillis(300)));
-            new java.util.concurrent.CountDownLatch(1).await(650, TimeUnit.MILLISECONDS);
-            fixture.runtime.cancelStartup(port, com.zrlog.util.ExecutionDeadline.afterMillis(100));
-            assertTrue(fixture.child.isAlive());
-            assertEquals(1, fixture.launches.get());
-            fixture.runtime.stopPluginCore();
-            fixture.thread.get().join(1000);
-            assertFalse(fixture.child.isAlive());
-            assertFalse(fixture.thread.get().isAlive());
-        }
-    }
-
-    @Test(timeout = 5000)
-    public void expiredBlockedSpawnCannotBeReplacedAndLateProcessIsStopped() throws Exception {
-        try (BoundedLaunchFixture fixture = new BoundedLaunchFixture(true)) {
-            int port = fixture.start(300);
-            assertTrue(fixture.spawned.await(1, TimeUnit.SECONDS));
-            fixture.runtime.cancelStartup(port, com.zrlog.util.ExecutionDeadline.afterMillis(100));
-            assertEquals(-1, fixture.start(100));
-            assertEquals(1, fixture.launches.get());
-            new java.util.concurrent.CountDownLatch(1).await(150, TimeUnit.MILLISECONDS);
-            fixture.releaseSpawn.countDown();
-            fixture.thread.get().join(1000);
-            assertFalse(fixture.thread.get().isAlive());
-            assertFalse(fixture.child.isAlive());
-            assertEquals(1, fixture.launches.get());
-        }
-    }
-
-    private static final class BoundedLaunchFixture implements AutoCloseable {
-        final Path root;
-        final String previousRoot;
-        final String previousArch;
-        final ControlledProcess child = new ControlledProcess(true, true);
-        final java.util.concurrent.CountDownLatch spawned = new java.util.concurrent.CountDownLatch(1);
-        final java.util.concurrent.CountDownLatch releaseSpawn = new java.util.concurrent.CountDownLatch(1);
-        final AtomicInteger launches = new AtomicInteger();
-        final AtomicReference<Thread> thread = new AtomicReference<>();
-        final PluginCoreProcessImpl runtime;
-
-        BoundedLaunchFixture(boolean blockSpawn) throws Exception {
-            root = Files.createTempDirectory("zrlog-bounded-core");
-            Path core = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
-            Files.createDirectories(core.getParent());
-            Files.write(core, minimalElfExecutable());
-            previousRoot = System.getProperty("sws.root.path");
-            previousArch = setFileArch("Linux-x86_64");
-            System.setProperty("sws.root.path", root.toString());
-            ImageInfo.setInImageRuntimeCode(true);
-            runtime = new PluginCoreProcessImpl(null, "/blog", () -> 19084) {
-                @Override
-                Process startPluginCore(File file, String db, String args, String path, String version,
-                                        String token, int httpPort, int masterPort, int watcherPort) throws IOException {
-                    launches.incrementAndGet();
-                    spawned.countDown();
-                    if (blockSpawn) {
-                        try { releaseSpawn.await(); }
-                        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IOException(interrupted); }
-                    }
-                    return child;
-                }
-                @Override
-                Thread startPluginCoreHandle(AbstractPluginCoreProcessHandle handle) {
-                    Thread worker = new Thread(handle);
-                    thread.set(worker);
-                    worker.start();
-                    return worker;
-                }
-            };
-        }
-
-        int start(long budget) {
-            return runtime.pluginServerStart("unused", "-Xmx64m", root.toString(), "test", "fixture-token",
-                    com.zrlog.util.ExecutionDeadline.afterMillis(budget));
-        }
-
-        public void close() throws Exception {
-            releaseSpawn.countDown();
-            try {
-                runtime.stopPluginCore();
-                if (thread.get() != null) thread.get().join(1000);
-            } finally {
-                ImageInfo.setInImageRuntimeCode(false);
-                setFileArch(previousArch);
-                restoreProperty("sws.root.path", previousRoot);
-                delete(root);
-            }
-        }
     }
 
     private static void restoreProperty(String key, String value) {
@@ -241,6 +115,67 @@ public class PluginCoreProcessImplTest {
         Field field = PluginCoreProcessImpl.class.getDeclaredField(name);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    @Before
+    public void isolateLaunchPolicyFromRunnerProxyEnvironment() throws Exception {
+        proxyPolicy = NetworkProxy.class.getDeclaredField("effective");
+        proxyPolicy.setAccessible(true);
+        previousProxyPolicy = proxyPolicy.get(null);
+        proxyPolicy.set(null, proxySettings(null, null));
+    }
+
+    @After
+    public void restoreLaunchPolicy() throws Exception {
+        proxyPolicy.set(null, previousProxyPolicy);
+    }
+
+    @Test(timeout = 4000)
+    public void expiredInitialLaunchStopsItsChildWithoutRestarting() throws Exception {
+        try (BoundedLaunchFixture fixture = new BoundedLaunchFixture(false)) {
+            int port = fixture.start(400);
+            assertTrue(port > 0);
+            assertTrue(fixture.spawned.await(1, TimeUnit.SECONDS));
+            fixture.thread.get().join(1500);
+            assertFalse(fixture.thread.get().isAlive());
+            assertFalse(fixture.child.isAlive());
+            assertEquals(1, fixture.launches.get());
+            assertFalse(fixture.runtime.confirmStarted(port, com.zrlog.util.ExecutionDeadline.afterMillis(100)));
+        }
+    }
+
+    @Test(timeout = 4000)
+    public void confirmedCoreSurvivesStartupDeadlineAndRejectsLateStartupCancellation() throws Exception {
+        try (BoundedLaunchFixture fixture = new BoundedLaunchFixture(false)) {
+            int port = fixture.start(500);
+            assertTrue(fixture.spawned.await(1, TimeUnit.SECONDS));
+            assertTrue(fixture.runtime.confirmStarted(port, com.zrlog.util.ExecutionDeadline.afterMillis(300)));
+            new java.util.concurrent.CountDownLatch(1).await(650, TimeUnit.MILLISECONDS);
+            fixture.runtime.cancelStartup(port, com.zrlog.util.ExecutionDeadline.afterMillis(100));
+            assertTrue(fixture.child.isAlive());
+            assertEquals(1, fixture.launches.get());
+            fixture.runtime.stopPluginCore();
+            fixture.thread.get().join(1000);
+            assertFalse(fixture.child.isAlive());
+            assertFalse(fixture.thread.get().isAlive());
+        }
+    }
+
+    @Test(timeout = 5000)
+    public void expiredBlockedSpawnCannotBeReplacedAndLateProcessIsStopped() throws Exception {
+        try (BoundedLaunchFixture fixture = new BoundedLaunchFixture(true)) {
+            int port = fixture.start(300);
+            assertTrue(fixture.spawned.await(1, TimeUnit.SECONDS));
+            fixture.runtime.cancelStartup(port, com.zrlog.util.ExecutionDeadline.afterMillis(100));
+            assertEquals(-1, fixture.start(100));
+            assertEquals(1, fixture.launches.get());
+            new java.util.concurrent.CountDownLatch(1).await(150, TimeUnit.MILLISECONDS);
+            fixture.releaseSpawn.countDown();
+            fixture.thread.get().join(1000);
+            assertFalse(fixture.thread.get().isAlive());
+            assertFalse(fixture.child.isAlive());
+            assertEquals(1, fixture.launches.get());
+        }
     }
 
     @Test
@@ -464,7 +399,10 @@ public class PluginCoreProcessImplTest {
         try {
             System.setProperty("sws.root.path", root.toString());
             PluginCoreProcessImpl process = new PluginCoreProcessImpl(null, "/sub", () -> 19084) {
-                @Override String programName(File file) { return launcher.toString(); }
+                @Override
+                String programName(File file) {
+                    return launcher.toString();
+                }
             };
             for (boolean owned : new boolean[]{false, true}) {
                 process.setExternallyScheduled(owned);
@@ -478,7 +416,10 @@ public class PluginCoreProcessImplTest {
                 assertTrue(args.indexOf("/sub") > args.indexOf("fixture-token"));
                 if (owned) assertEquals("--host-scheduler", args.get(args.size() - 1));
             }
-        } finally { restoreProperty("sws.root.path", previousRoot); delete(root); }
+        } finally {
+            restoreProperty("sws.root.path", previousRoot);
+            delete(root);
+        }
     }
 
     @Test
@@ -946,6 +887,72 @@ public class PluginCoreProcessImplTest {
         assertEquals(2, handle.closeCount);
         assertEquals(1, stopCallbacks.get());
         assertEquals(null, field.get(process));
+    }
+
+    private static final class BoundedLaunchFixture implements AutoCloseable {
+        final Path root;
+        final String previousRoot;
+        final String previousArch;
+        final ControlledProcess child = new ControlledProcess(true, true);
+        final java.util.concurrent.CountDownLatch spawned = new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch releaseSpawn = new java.util.concurrent.CountDownLatch(1);
+        final AtomicInteger launches = new AtomicInteger();
+        final AtomicReference<Thread> thread = new AtomicReference<>();
+        final PluginCoreProcessImpl runtime;
+
+        BoundedLaunchFixture(boolean blockSpawn) throws Exception {
+            root = Files.createTempDirectory("zrlog-bounded-core");
+            Path core = root.resolve("conf/plugins/plugin-core-Linux-x86_64.bin");
+            Files.createDirectories(core.getParent());
+            Files.write(core, minimalElfExecutable());
+            previousRoot = System.getProperty("sws.root.path");
+            previousArch = setFileArch("Linux-x86_64");
+            System.setProperty("sws.root.path", root.toString());
+            ImageInfo.setInImageRuntimeCode(true);
+            runtime = new PluginCoreProcessImpl(null, "/blog", () -> 19084) {
+                @Override
+                Process startPluginCore(File file, String db, String args, String path, String version,
+                                        String token, int httpPort, int masterPort, int watcherPort) throws IOException {
+                    launches.incrementAndGet();
+                    spawned.countDown();
+                    if (blockSpawn) {
+                        try {
+                            releaseSpawn.await();
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            throw new IOException(interrupted);
+                        }
+                    }
+                    return child;
+                }
+
+                @Override
+                Thread startPluginCoreHandle(AbstractPluginCoreProcessHandle handle) {
+                    Thread worker = new Thread(handle);
+                    thread.set(worker);
+                    worker.start();
+                    return worker;
+                }
+            };
+        }
+
+        int start(long budget) {
+            return runtime.pluginServerStart("unused", "-Xmx64m", root.toString(), "test", "fixture-token",
+                    com.zrlog.util.ExecutionDeadline.afterMillis(budget));
+        }
+
+        public void close() throws Exception {
+            releaseSpawn.countDown();
+            try {
+                runtime.stopPluginCore();
+                if (thread.get() != null) thread.get().join(1000);
+            } finally {
+                ImageInfo.setInImageRuntimeCode(false);
+                setFileArch(previousArch);
+                restoreProperty("sws.root.path", previousRoot);
+                delete(root);
+            }
+        }
     }
 
     private static class TestPluginCoreProcessHandle extends AbstractPluginCoreProcessHandle {

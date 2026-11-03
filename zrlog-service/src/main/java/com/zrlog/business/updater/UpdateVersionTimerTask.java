@@ -35,6 +35,7 @@ public class UpdateVersionTimerTask extends TimerTask {
     private final Consumer<UpdateVersionCheckResult> checkResultConsumer;
     private Version version;
     private volatile boolean lastCheckFailed;
+
     public UpdateVersionTimerTask(boolean previewAble, String lang) {
         this(previewAble, lang, version -> {
         });

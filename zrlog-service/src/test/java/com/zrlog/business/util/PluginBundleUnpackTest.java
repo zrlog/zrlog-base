@@ -19,7 +19,31 @@ import java.util.zip.ZipOutputStream;
 import static org.junit.Assert.*;
 
 public class PluginBundleUnpackTest {
-    @Rule public TemporaryFolder temporary = new TemporaryFolder();
+    @Rule
+    public TemporaryFolder temporary = new TemporaryFolder();
+
+    private static byte[] storedArchive(String name, byte[] data) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
+            ZipEntry entry = new ZipEntry(name);
+            CRC32 crc = new CRC32();
+            crc.update(data);
+            entry.setMethod(ZipEntry.STORED);
+            entry.setSize(data.length);
+            entry.setCompressedSize(data.length);
+            entry.setCrc(crc.getValue());
+            zip.putNextEntry(entry);
+            zip.write(data);
+            zip.closeEntry();
+        }
+        return bytes.toByteArray();
+    }
+
+    private static void assertNoParts(Path target) throws IOException {
+        try (Stream<Path> files = Files.walk(target)) {
+            assertFalse(files.anyMatch(path -> path.getFileName().toString().endsWith(".part")));
+        }
+    }
 
     @Test
     public void completeBundleReplacesEntriesAndPreservesUnrelatedFiles() throws Exception {
@@ -73,28 +97,5 @@ public class PluginBundleUnpackTest {
         assertThrows(IOException.class, () -> PluginCoreUtils.unpackPlugins(archive, target, ExecutionDeadline.afterMillis(2000)));
         assertFalse(Files.exists(target.getParent().resolve("outside.bin")));
         assertNoParts(target);
-    }
-
-    private static byte[] storedArchive(String name, byte[] data) throws IOException {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
-            ZipEntry entry = new ZipEntry(name);
-            CRC32 crc = new CRC32();
-            crc.update(data);
-            entry.setMethod(ZipEntry.STORED);
-            entry.setSize(data.length);
-            entry.setCompressedSize(data.length);
-            entry.setCrc(crc.getValue());
-            zip.putNextEntry(entry);
-            zip.write(data);
-            zip.closeEntry();
-        }
-        return bytes.toByteArray();
-    }
-
-    private static void assertNoParts(Path target) throws IOException {
-        try (Stream<Path> files = Files.walk(target)) {
-            assertFalse(files.anyMatch(path -> path.getFileName().toString().endsWith(".part")));
-        }
     }
 }

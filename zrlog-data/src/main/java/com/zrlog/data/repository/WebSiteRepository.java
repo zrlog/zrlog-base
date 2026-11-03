@@ -1,10 +1,7 @@
 package com.zrlog.data.repository;
 
-import com.zrlog.model.WebSite;
-
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.ResultBeanUtils;
 import com.hibegin.common.util.BeanUtil;
@@ -13,6 +10,7 @@ import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.dto.FaviconBase64DTO;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.util.WebSiteUtils;
+import com.zrlog.model.WebSite;
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;
@@ -82,6 +80,17 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
         this.dataSource = dataSource;
     }
 
+    /**
+     * A new row or an explicit conditional-write template; no persisted metadata is fabricated.
+     */
+    public static WebSite entry(String name, String value, String remark) {
+        WebSite row = new WebSite();
+        row.setName(name);
+        row.setValue(value);
+        row.setRemark(remark);
+        return row;
+    }
+
     public PublicWebSiteInfo getPublicWebSite() {
         return WebSiteUtils.fillDefaultInfo(ResultBeanUtils.convert(getWebSiteByNameIn(websitePublicQueryKeys), PublicWebSiteInfo.class));
     }
@@ -123,15 +132,6 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
         return fillToMap(lw, names);
     }
 
-    /** A new row or an explicit conditional-write template; no persisted metadata is fabricated. */
-    public static WebSite entry(String name, String value, String remark) {
-        WebSite row = new WebSite();
-        row.setName(name);
-        row.setValue(value);
-        row.setRemark(remark);
-        return row;
-    }
-
     public int updateValueWhere(String value, String predicate, Object... params) throws SQLException {
         return updateWhere(entry(null, value, null), List.of("value"), predicate, params);
     }
@@ -162,13 +162,17 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
         return findMatching(Collections.singletonMap("name", name), 1).stream().findFirst().orElse(null);
     }
 
-    /** Nullable scalar read, including before the entity metadata columns have been migrated. */
+    /**
+     * Nullable scalar read, including before the entity metadata columns have been migrated.
+     */
     public String findValueByName(String name) throws SQLException {
         Object value = queryFirstObj("SELECT value FROM " + tableName + " WHERE name=?", name);
         return value == null ? null : value.toString();
     }
 
-    /** Lock coordination must also work before the entity metadata columns exist. */
+    /**
+     * Lock coordination must also work before the entity metadata columns exist.
+     */
     public void insertLock(String name, String owner, String remark) throws SQLException {
         execute("INSERT INTO website(name,value,remark) VALUES(?,?,?)", name, owner, remark);
     }

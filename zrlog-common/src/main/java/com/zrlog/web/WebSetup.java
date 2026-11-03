@@ -11,7 +11,9 @@ public interface WebSetup {
 
     void setup();
 
-    /** Runs versioned schema preparation before any module initializes database-backed services. */
+    /**
+     * Runs versioned schema preparation before any module initializes database-backed services.
+     */
     default void beforeDatabaseReady(DataSourceWrapper dataSource) throws Exception {
     }
 
@@ -21,7 +23,9 @@ public interface WebSetup {
     default void onDatabaseReady(DataSourceWrapper dataSource) throws Exception {
     }
 
-    /** Stop module-owned work and release its database locks before the datasource closes. */
+    /**
+     * Stop module-owned work and release its database locks before the datasource closes.
+     */
     default void stop() {
     }
 

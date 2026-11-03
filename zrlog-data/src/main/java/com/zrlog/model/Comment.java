@@ -25,42 +25,107 @@ public class Comment extends BaseEntity<Long> {
     @Column("reply_id")
     private Integer replyId;
 
-    public Timestamp getCommTime() { return commTime; }
-    public void setCommTime(Timestamp commTime) { this.commTime = commTime; }
+    public Timestamp getCommTime() {
+        return commTime;
+    }
 
-    public Boolean getHide() { return hide; }
-    public void setHide(Boolean hide) { this.hide = hide; }
+    public void setCommTime(Timestamp commTime) {
+        this.commTime = commTime;
+    }
 
-    public Boolean getHaveRead() { return haveRead; }
-    public void setHaveRead(Boolean haveRead) { this.haveRead = haveRead; }
+    public Boolean getHide() {
+        return hide;
+    }
 
-    public String getUserComment() { return userComment; }
-    public void setUserComment(String userComment) { this.userComment = userComment; }
+    public void setHide(Boolean hide) {
+        this.hide = hide;
+    }
 
-    public String getUserHome() { return userHome; }
-    public void setUserHome(String userHome) { this.userHome = userHome; }
+    public Boolean getHaveRead() {
+        return haveRead;
+    }
 
-    public String getUserIp() { return userIp; }
-    public void setUserIp(String userIp) { this.userIp = userIp; }
+    public void setHaveRead(Boolean haveRead) {
+        this.haveRead = haveRead;
+    }
 
-    public String getUserMail() { return userMail; }
-    public void setUserMail(String userMail) { this.userMail = userMail; }
+    public String getUserComment() {
+        return userComment;
+    }
 
-    public String getUserName() { return userName; }
-    public void setUserName(String userName) { this.userName = userName; }
+    public void setUserComment(String userComment) {
+        this.userComment = userComment;
+    }
 
-    public Integer getLogId() { return logId; }
-    public void setLogId(Integer logId) { this.logId = logId; }
+    public String getUserHome() {
+        return userHome;
+    }
 
-    public String getPostId() { return postId; }
-    public void setPostId(String postId) { this.postId = postId; }
+    public void setUserHome(String userHome) {
+        this.userHome = userHome;
+    }
 
-    public String getHeader() { return header; }
-    public void setHeader(String header) { this.header = header; }
+    public String getUserIp() {
+        return userIp;
+    }
 
-    public String getUserAgent() { return userAgent; }
-    public void setUserAgent(String userAgent) { this.userAgent = userAgent; }
+    public void setUserIp(String userIp) {
+        this.userIp = userIp;
+    }
 
-    public Integer getReplyId() { return replyId; }
-    public void setReplyId(Integer replyId) { this.replyId = replyId; }
+    public String getUserMail() {
+        return userMail;
+    }
+
+    public void setUserMail(String userMail) {
+        this.userMail = userMail;
+    }
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
+    public Integer getLogId() {
+        return logId;
+    }
+
+    public void setLogId(Integer logId) {
+        this.logId = logId;
+    }
+
+    public String getPostId() {
+        return postId;
+    }
+
+    public void setPostId(String postId) {
+        this.postId = postId;
+    }
+
+    public String getHeader() {
+        return header;
+    }
+
+    public void setHeader(String header) {
+        this.header = header;
+    }
+
+    public String getUserAgent() {
+        return userAgent;
+    }
+
+    public void setUserAgent(String userAgent) {
+        this.userAgent = userAgent;
+    }
+
+    public Integer getReplyId() {
+        return replyId;
+    }
+
+    public void setReplyId(Integer replyId) {
+        this.replyId = replyId;
+    }
 }

@@ -138,7 +138,8 @@ public class BodySaveResponseTest {
     @Test
     public void rememberedWriteFailureCannotBeReportedAsCompleted() throws Exception {
         File cacheFile = tempFile("article.html");
-        StaticGenerationBudget budget = new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(5000), () -> {});
+        StaticGenerationBudget budget = new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(5000), () -> {
+        });
         try (BodySaveResponse response = new BodySaveResponse(request("/article.html"), new ResponseConfig(), true,
                 200, new TestStaticSitePlugin(cacheFile), budget)) {
             response.wrapperBaseResponseHeader(200);
@@ -153,7 +154,8 @@ public class BodySaveResponseTest {
     @Test
     public void expiredBudgetDoesNotDeleteExistingFile() throws Exception {
         File cacheFile = tempFile("article.html");
-        StaticGenerationBudget budget = new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(0), () -> {});
+        StaticGenerationBudget budget = new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(0), () -> {
+        });
         assertThrows(IllegalStateException.class, () -> new BodySaveResponse(request("/article.html"), new ResponseConfig(),
                 true, 200, new TestStaticSitePlugin(cacheFile), budget));
         assertEquals("stale", Files.readString(cacheFile.toPath()));
@@ -165,6 +167,7 @@ public class BodySaveResponseTest {
         private final Map<String, HandleState> handleStatusPageMap = new HashMap<>();
         private final Lock parseLock = new ReentrantLock();
         private final List<File> cacheFiles = new ArrayList<>();
+
         TestStaticSitePlugin(File cacheFile) {
             this.cacheFile = cacheFile;
         }

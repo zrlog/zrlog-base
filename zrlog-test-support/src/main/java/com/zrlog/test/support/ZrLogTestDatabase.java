@@ -33,6 +33,7 @@ public final class ZrLogTestDatabase implements AutoCloseable {
     };
     private volatile SqlHook afterWebApiQuery = (sql, params) -> {
     };
+
     private ZrLogTestDatabase(DatabaseType type, String schemaResource) throws Exception {
         sqliteFile = type == DatabaseType.SQLITE ? Files.createTempFile("zrlog-test-", ".db") : null;
         properties = sqliteFile == null ? InMemoryDatabase.h2Properties("zrlog_test_" + UUID.randomUUID())
@@ -77,7 +78,9 @@ public final class ZrLogTestDatabase implements AutoCloseable {
         return open(type, "/init-table-structure.sql");
     }
 
-    /** Loads an explicitly versioned historical schema for migration tests. */
+    /**
+     * Loads an explicitly versioned historical schema for migration tests.
+     */
     public static ZrLogTestDatabase open(DatabaseType type, String schemaResource) throws Exception {
         return new ZrLogTestDatabase(java.util.Objects.requireNonNull(type), java.util.Objects.requireNonNull(schemaResource));
     }
@@ -95,10 +98,14 @@ public final class ZrLogTestDatabase implements AutoCloseable {
         webApi.setProperty("jdbcUrl", "jdbc:https://fixture.invalid/query");
         QueryRunner runner = new WebApiQueryRunner(webApi, false, 1) {
             @Override
-            public int update(String sql) throws SQLException { return update(sql, new Object[0]); }
+            public int update(String sql) throws SQLException {
+                return update(sql, new Object[0]);
+            }
 
             @Override
-            public <T> T query(String sql, ResultSetHandler<T> handler) throws SQLException { return query(sql, handler, new Object[0]); }
+            public <T> T query(String sql, ResultSetHandler<T> handler) throws SQLException {
+                return query(sql, handler, new Object[0]);
+            }
 
             @Override
             public int updateEntity(String sql, Object... params) throws SQLException {

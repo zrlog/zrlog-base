@@ -18,21 +18,26 @@ import static org.junit.Assert.*;
 public class HtmlTemplateProcessorTest {
     @Test
     public void boundedViewsShareTheCallingThreadBudgetAndExecutionIdentity() {
-        StaticGenerationBudget budget = new StaticGenerationBudget(ExecutionDeadline.afterMillis(30000), () -> {}, "run-1", 7);
+        StaticGenerationBudget budget = new StaticGenerationBudget(ExecutionDeadline.afterMillis(30000), () -> {
+        }, "run-1", 7);
         HttpRequest request = boundedRequest(budget);
         Thread owner = Thread.currentThread();
         java.util.List<String> calls = new java.util.ArrayList<>();
         PluginCorePlugin plugin = (PluginCorePlugin) Proxy.newProxyInstance(getClass().getClassLoader(),
                 new Class[]{PluginCorePlugin.class}, (proxy, method, args) -> {
                     assertEquals("renderViewWithinBudget", method.getName());
-                    assertSame(owner, Thread.currentThread()); assertSame(request, args[1]); assertSame(budget, args[2]);
-                    calls.add((String) args[0]); return "<aside>插件内容</aside>";
+                    assertSame(owner, Thread.currentThread());
+                    assertSame(request, args[1]);
+                    assertSame(budget, args[2]);
+                    calls.add((String) args[0]);
+                    return "<aside>插件内容</aside>";
                 });
         String html = new HtmlTemplateProcessor(request, null, "/", plugin).transform(
                 "<plugin name=\"comment\" view=\"/index\" param=\"post=1&amp;tag=a\"></plugin>"
                         + "<plugin name=\"links\" view=\"/list\"></plugin>");
         assertEquals(java.util.List.of("/comment/index?post=1&tag=a", "/links/list"), calls);
-        assertTrue(html.contains("<aside>插件内容</aside>")); assertFalse(html.contains("<plugin"));
+        assertTrue(html.contains("<aside>插件内容</aside>"));
+        assertFalse(html.contains("<plugin"));
     }
 
     @Test
@@ -47,7 +52,8 @@ public class HtmlTemplateProcessorTest {
                     new Class[]{PluginCorePlugin.class}, (proxy, method, args) -> {
                         calls.incrementAndGet();
                         if (fail) throw new java.io.IOException("unconfirmed");
-                        authorized.set(false); return "partial";
+                        authorized.set(false);
+                        return "partial";
                     });
             HtmlTemplateProcessor processor = new HtmlTemplateProcessor(boundedRequest(budget), null, "/", plugin);
             assertThrows(IllegalStateException.class, () -> processor.transform(
@@ -59,7 +65,8 @@ public class HtmlTemplateProcessorTest {
     private HttpRequest boundedRequest(StaticGenerationBudget budget) {
         return (HttpRequest) Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{HttpRequest.class},
                 (proxy, method, args) -> {
-                    if (method.getName().equals("getAttr")) return java.util.Map.of(StaticGenerationBudget.REQUEST_ATTRIBUTE, budget);
+                    if (method.getName().equals("getAttr"))
+                        return java.util.Map.of(StaticGenerationBudget.REQUEST_ATTRIBUTE, budget);
                     if (method.getName().equals("getContextPath")) return "/blog";
                     if (method.getName().equals("getCreateTime")) return System.currentTimeMillis();
                     return null;

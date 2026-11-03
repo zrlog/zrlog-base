@@ -1,6 +1,8 @@
 package com.zrlog.business.plugin;
 
-/** Internal plugin-core completion receipt for one host refresh. */
+/**
+ * Internal plugin-core completion receipt for one host refresh.
+ */
 public final class PluginCacheRefreshResult {
     public String triggerId;
     public String cacheVersion;

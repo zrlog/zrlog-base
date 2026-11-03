@@ -9,30 +9,28 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Flow;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.function.Supplier;
 
-/** Keeps headers, the complete body and cancellation inside the caller's budget. */
+/**
+ * Keeps headers, the complete body and cancellation inside the caller's budget.
+ */
 public final class BoundedHttpExchange {
     private BoundedHttpExchange() {
     }
 
-    /** Keeps the caller's client configuration while bounding the complete buffered response. */
+    /**
+     * Keeps the caller's client configuration while bounding the complete buffered response.
+     */
     public static HttpResponse<byte[]> sendBytes(HttpClient client, HttpRequest request,
-                                                  ExecutionDeadline deadline, long maxBytes)
+                                                 ExecutionDeadline deadline, long maxBytes)
             throws IOException, InterruptedException {
         return send(client, request, HttpResponse.BodySubscribers::ofByteArray, maxBytes, deadline);
     }
 
     static <T> HttpResponse<T> send(HttpClient client, HttpRequest request,
-                                     Supplier<HttpResponse.BodySubscriber<T>> bodyFactory, long maxBytes,
-                                     ExecutionDeadline deadline) throws IOException, InterruptedException {
+                                    Supplier<HttpResponse.BodySubscriber<T>> bodyFactory, long maxBytes,
+                                    ExecutionDeadline deadline) throws IOException, InterruptedException {
         if (maxBytes <= 0) throw new IllegalArgumentException("Response size limit must be positive");
         if (request.timeout().isPresent()) {
             deadline = deadline.capMillis(Math.min(TimeUnit.DAYS.toMillis(1), request.timeout().get().toMillis()));
@@ -99,7 +97,9 @@ public final class BoundedHttpExchange {
             this.maxBytes = maxBytes;
         }
 
-        public CompletionStage<T> getBody() { return delegate.getBody(); }
+        public CompletionStage<T> getBody() {
+            return delegate.getBody();
+        }
 
         public synchronized void onSubscribe(Flow.Subscription subscription) {
             if (done) {

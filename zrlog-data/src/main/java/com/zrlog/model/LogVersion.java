@@ -18,21 +18,51 @@ public class LogVersion extends BaseEntity<Long> {
     @Column("user_id")
     private Integer userId;
 
-    public Integer getLogId() { return logId; }
-    public void setLogId(Integer logId) { this.logId = logId; }
+    public Integer getLogId() {
+        return logId;
+    }
 
-    public Integer getArticleVersion() { return articleVersion; }
-    public void setArticleVersion(Integer articleVersion) { this.articleVersion = articleVersion; }
+    public void setLogId(Integer logId) {
+        this.logId = logId;
+    }
 
-    public Integer getFromVersion() { return fromVersion; }
-    public void setFromVersion(Integer fromVersion) { this.fromVersion = fromVersion; }
+    public Integer getArticleVersion() {
+        return articleVersion;
+    }
 
-    public String getPatchJson() { return patchJson; }
-    public void setPatchJson(String patchJson) { this.patchJson = patchJson; }
+    public void setArticleVersion(Integer articleVersion) {
+        this.articleVersion = articleVersion;
+    }
 
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
+    public Integer getFromVersion() {
+        return fromVersion;
+    }
 
-    public Integer getUserId() { return userId; }
-    public void setUserId(Integer userId) { this.userId = userId; }
+    public void setFromVersion(Integer fromVersion) {
+        this.fromVersion = fromVersion;
+    }
+
+    public String getPatchJson() {
+        return patchJson;
+    }
+
+    public void setPatchJson(String patchJson) {
+        this.patchJson = patchJson;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public Integer getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Integer userId) {
+        this.userId = userId;
+    }
 }

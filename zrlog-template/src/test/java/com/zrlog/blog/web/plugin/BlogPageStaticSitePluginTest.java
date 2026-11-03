@@ -28,7 +28,8 @@ import java.util.concurrent.ExecutorService;
 import static org.junit.Assert.*;
 
 public class BlogPageStaticSitePluginTest {
-    @Rule public TemporaryFolder folder = new TemporaryFolder();
+    @Rule
+    public TemporaryFolder folder = new TemporaryFolder();
 
     @Test
     public void boundedGenerationCopiesTemplateAndRendersPagesBeforeVersion() throws Exception {
@@ -71,7 +72,8 @@ public class BlogPageStaticSitePluginTest {
     }
 
     private StaticGenerationBudget budget() {
-        return new StaticGenerationBudget(ExecutionDeadline.afterMillis(5000), () -> {});
+        return new StaticGenerationBudget(ExecutionDeadline.afterMillis(5000), () -> {
+        });
     }
 
     private void withPlugin(Scenario scenario) throws Exception {
@@ -109,12 +111,16 @@ public class BlogPageStaticSitePluginTest {
         }
     }
 
-    private interface Scenario { void run(BlogPageStaticSitePlugin plugin, PublicWebSiteInfo site) throws Exception; }
+    private interface Scenario {
+        void run(BlogPageStaticSitePlugin plugin, PublicWebSiteInfo site) throws Exception;
+    }
 
     public static class Pages implements Interceptor {
-        @Override public boolean doInterceptor(HttpRequest request, HttpResponse response) {
+        @Override
+        public boolean doInterceptor(HttpRequest request, HttpResponse response) {
             Object value = request.getAttr().get(StaticGenerationBudget.REQUEST_ATTRIBUTE);
-            if (!(value instanceof StaticGenerationBudget)) throw new IllegalStateException("Static generation lost its budget");
+            if (!(value instanceof StaticGenerationBudget))
+                throw new IllegalStateException("Static generation lost its budget");
             ((StaticGenerationBudget) value).check();
             if (request.getUri().equals("/error/404.html"))
                 response.write(new ByteArrayInputStream("missing".getBytes(StandardCharsets.UTF_8)), 404);

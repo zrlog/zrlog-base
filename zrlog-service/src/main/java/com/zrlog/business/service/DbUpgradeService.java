@@ -37,10 +37,10 @@ public class DbUpgradeService implements AutoCloseable {
     private final DataSourceWrapper dataSource;
     private final String dbName;
     private final long currentSqlVersion;
-    private volatile boolean cancelled;
     private final Object migrationMonitor = new Object();
-    private Thread migrationThread;
     private final DistributedLockManager locks;
+    private volatile boolean cancelled;
+    private Thread migrationThread;
     private DistributedLock acquiredLock;
 
     public DbUpgradeService(DataSourceWrapper dataSource,
@@ -135,8 +135,12 @@ public class DbUpgradeService implements AutoCloseable {
      */
     public void tryDoUpgrade() {
         synchronized (migrationMonitor) {
-            if (migrationThread != null) { throw new IllegalStateException("Schema migration is already running"); }
-            if (cancelled) { throw new IllegalStateException("Application is stopping"); }
+            if (migrationThread != null) {
+                throw new IllegalStateException("Schema migration is already running");
+            }
+            if (cancelled) {
+                throw new IllegalStateException("Application is stopping");
+            }
             migrationThread = Thread.currentThread();
         }
         try {
@@ -224,19 +228,28 @@ public class DbUpgradeService implements AutoCloseable {
                 }
                 // Let the current SQL finish; interrupting HTTP can leave its remote outcome unknown.
                 while (migrationThread != null) {
-                    try { migrationMonitor.wait(); }
-                    catch (InterruptedException e) { interrupted = true; }
+                    try {
+                        migrationMonitor.wait();
+                    } catch (InterruptedException e) {
+                        interrupted = true;
+                    }
                 }
                 // Retry a failed release from the migration's try-with-resources before datasource shutdown.
-                if (acquiredLock != null) { acquiredLock.close(); }
+                if (acquiredLock != null) {
+                    acquiredLock.close();
+                }
             }
         } finally {
-            if (interrupted) { Thread.currentThread().interrupt(); }
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
     private void checkRunning() throws java.sql.SQLException {
-        if (cancelled) { throw new java.sql.SQLException("Schema migration cancelled because the application is stopping"); }
+        if (cancelled) {
+            throw new java.sql.SQLException("Schema migration cancelled because the application is stopping");
+        }
     }
 
     private boolean usesMysqlDialect() {

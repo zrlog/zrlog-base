@@ -1,9 +1,8 @@
 package com.zrlog.model;
 
-import com.zrlog.data.repository.*;
-
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.dto.FaviconBase64DTO;
+import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import org.junit.Test;

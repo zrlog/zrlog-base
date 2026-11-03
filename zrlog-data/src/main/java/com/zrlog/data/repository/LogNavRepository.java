@@ -1,10 +1,8 @@
 package com.zrlog.data.repository;
 
-import com.zrlog.model.LogNav;
-
-
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.common.cache.dto.LogNavDTO;
+import com.zrlog.model.LogNav;
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;

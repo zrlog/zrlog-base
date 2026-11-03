@@ -14,15 +14,35 @@ public class LogExtensionIndex extends BaseEntity<Long> {
     @Column("extension_value")
     private String extensionValue;
 
-    public Integer getLogId() { return logId; }
-    public void setLogId(Integer logId) { this.logId = logId; }
+    public Integer getLogId() {
+        return logId;
+    }
 
-    public String getNamespace() { return namespace; }
-    public void setNamespace(String namespace) { this.namespace = namespace; }
+    public void setLogId(Integer logId) {
+        this.logId = logId;
+    }
 
-    public String getExtensionPath() { return extensionPath; }
-    public void setExtensionPath(String extensionPath) { this.extensionPath = extensionPath; }
+    public String getNamespace() {
+        return namespace;
+    }
 
-    public String getExtensionValue() { return extensionValue; }
-    public void setExtensionValue(String extensionValue) { this.extensionValue = extensionValue; }
+    public void setNamespace(String namespace) {
+        this.namespace = namespace;
+    }
+
+    public String getExtensionPath() {
+        return extensionPath;
+    }
+
+    public void setExtensionPath(String extensionPath) {
+        this.extensionPath = extensionPath;
+    }
+
+    public String getExtensionValue() {
+        return extensionValue;
+    }
+
+    public void setExtensionValue(String extensionValue) {
+        this.extensionValue = extensionValue;
+    }
 }

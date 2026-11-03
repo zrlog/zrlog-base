@@ -3,7 +3,9 @@ package com.zrlog.util;
 import java.net.http.HttpTimeoutException;
 import java.util.concurrent.TimeUnit;
 
-/** A monotonic budget shared by the stages of one synchronous operation. */
+/**
+ * A monotonic budget shared by the stages of one synchronous operation.
+ */
 public final class ExecutionDeadline {
     private static final long MAX_MILLIS = TimeUnit.DAYS.toMillis(1);
     private final long deadlineNanos;

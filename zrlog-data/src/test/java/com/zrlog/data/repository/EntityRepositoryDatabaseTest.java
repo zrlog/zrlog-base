@@ -15,11 +15,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
@@ -27,9 +23,16 @@ import static org.junit.Assert.*;
 @RunWith(Parameterized.class)
 public class EntityRepositoryDatabaseTest {
     private final String backend;
-    public EntityRepositoryDatabaseTest(String backend) { this.backend = backend; }
+
+    public EntityRepositoryDatabaseTest(String backend) {
+        this.backend = backend;
+    }
+
     @Parameterized.Parameters(name = "{0}")
-    public static Object[] backends() { return new Object[]{"H2", "SQLITE", "WEB_API"}; }
+    public static Object[] backends() {
+        return new Object[]{"H2", "SQLITE", "WEB_API"};
+    }
+
     private ZrLogTestDatabase open() throws Exception {
         return backend.equals("WEB_API") ? ZrLogTestDatabase.openWebApi()
                 : ZrLogTestDatabase.open(ZrLogTestDatabase.DatabaseType.valueOf(backend));

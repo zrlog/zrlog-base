@@ -24,6 +24,7 @@ public class UpgradeNoticeService {
     private final BooleanSupplier installed;
     private final Gson gson = new Gson();
     private final WebsiteKvService kvService;
+
     @Inject
     public UpgradeNoticeService(BooleanSupplier installed, WebsiteKvService kvService) {
         this.installed = Objects.requireNonNull(installed);

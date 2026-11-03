@@ -27,11 +27,7 @@ import javax.sql.DataSource;
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.util.*;
-import java.util.concurrent.Executor;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -55,9 +51,9 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
     protected final List<WebSetup> webSetups;
     protected final File dbPropertiesFile;
     protected final ServerConfig serverConfig;
+    private final Object stopMonitor = new Object();
     protected DataSourceWrapper dataSource;
     protected ZrLogHttpRequestListener zrLogHttpRequestListener = new ZrLogHttpRequestListener();
-    private final Object stopMonitor = new Object();
     private volatile boolean stopped;
     private boolean webSetupsInitialized;
     private volatile boolean databaseInitialized;
@@ -79,6 +75,16 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
 
     private static void disableHikariLogging() {
         System.setProperty("org.slf4j.simpleLogger.log.com.zaxxer.hikari", "off");
+    }
+
+    private static ExecutorService executorService(Executor executor) {
+        return executor instanceof ExecutorService ? (ExecutorService) executor : null;
+    }
+
+    private static void awaitExecutor(ExecutorService executor, long deadline) throws InterruptedException {
+        if (executor != null) {
+            executor.awaitTermination(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+        }
     }
 
     public long getCreatedDate() {
@@ -108,11 +114,15 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         if (webSetupsInitialized && !databaseInitialized) {
             try {
                 for (WebSetup webSetup : webSetups) {
-                    if (stopped) { throw new IllegalStateException("Application stopped during database initialization"); }
+                    if (stopped) {
+                        throw new IllegalStateException("Application stopped during database initialization");
+                    }
                     webSetup.beforeDatabaseReady(dataSource);
                 }
                 for (WebSetup webSetup : webSetups) {
-                    if (stopped) { throw new IllegalStateException("Application stopped during database initialization"); }
+                    if (stopped) {
+                        throw new IllegalStateException("Application stopped during database initialization");
+                    }
                     webSetup.onDatabaseReady(dataSource);
                 }
             } catch (Exception failure) {
@@ -224,11 +234,15 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
         }
     }
 
-    /** Stop the host from accepting new work before draining HTTP executors. */
+    /**
+     * Stop the host from accepting new work before draining HTTP executors.
+     */
     protected void beforeStop() {
     }
 
-    /** Release host-specific resources after HTTP work and shared resources close. */
+    /**
+     * Release host-specific resources after HTTP work and shared resources close.
+     */
     protected void afterStop() {
     }
 
@@ -246,16 +260,6 @@ public abstract class ZrLogConfig extends AbstractServerConfig {
             LOGGER.log(Level.SEVERE, "", e);
         } finally {
             HttpUtil.getInstance().closeHttpClient();
-        }
-    }
-
-    private static ExecutorService executorService(Executor executor) {
-        return executor instanceof ExecutorService ? (ExecutorService) executor : null;
-    }
-
-    private static void awaitExecutor(ExecutorService executor, long deadline) throws InterruptedException {
-        if (executor != null) {
-            executor.awaitTermination(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
         }
     }
 

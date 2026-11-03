@@ -288,6 +288,7 @@ public class ServiceWebAndNoticeTest {
         private int removeAttempts;
         private boolean throwOnPut;
         private boolean throwOnRemove;
+
         FakeWebsiteKvService() {
             super(() -> {
                 throw new AssertionError("Unexpected database access");

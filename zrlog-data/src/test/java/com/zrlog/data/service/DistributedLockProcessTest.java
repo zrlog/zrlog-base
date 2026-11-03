@@ -15,7 +15,8 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.*;
 
 public class DistributedLockProcessTest {
-    @Rule public TemporaryFolder temporary = new TemporaryFolder();
+    @Rule
+    public TemporaryFolder temporary = new TemporaryFolder();
 
     @Test(timeout = 30000)
     public void separateJvmCannotAcquireOrReleaseAnotherProcessesLock() throws Exception {
@@ -43,7 +44,10 @@ public class DistributedLockProcessTest {
             assertTrue("Lock contender did not finish", child.waitFor(10, TimeUnit.SECONDS));
             assertEquals(Files.readString(output), 0, child.exitValue());
         } finally {
-            if (child.isAlive()) { child.destroyForcibly(); child.waitFor(5, TimeUnit.SECONDS); }
+            if (child.isAlive()) {
+                child.destroyForcibly();
+                child.waitFor(5, TimeUnit.SECONDS);
+            }
         }
     }
 

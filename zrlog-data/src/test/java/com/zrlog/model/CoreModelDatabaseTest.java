@@ -1,13 +1,12 @@
 package com.zrlog.model;
 
-import com.zrlog.data.repository.*;
-
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequestImpl;
 import com.zrlog.common.cache.dto.*;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
 import com.zrlog.data.dto.VisitorCommentDTO;
+import com.zrlog.data.repository.*;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import org.junit.Test;

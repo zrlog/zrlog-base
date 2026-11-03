@@ -17,6 +17,15 @@ public class UserRepository extends BaseRepository<User, Long> {
         super(User.class, dataSource);
     }
 
+    public static UserBasicDTO toBasic(User user) {
+        if (user == null) return null;
+        UserBasicDTO result = new UserBasicDTO();
+        result.setUserId(user.getId());
+        result.setUserName(user.getUserName());
+        result.setHeader(user.getHeader());
+        return result;
+    }
+
     public List<UserBasicDTO> findBasicAll() throws SQLException {
         return queryList("select userName,userId,header from user", UserBasicDTO.class);
     }
@@ -29,14 +38,5 @@ public class UserRepository extends BaseRepository<User, Long> {
         return com.zrlog.data.security.AccountAccess.fromSnapshot(queryOne(
                 "SELECT userId,role,enabled,authVersion FROM user WHERE role=? AND enabled=? ORDER BY userId LIMIT 1",
                 com.zrlog.data.security.AccountAccess.Snapshot.class, "owner", true));
-    }
-
-    public static UserBasicDTO toBasic(User user) {
-        if (user == null) return null;
-        UserBasicDTO result = new UserBasicDTO();
-        result.setUserId(user.getId());
-        result.setUserName(user.getUserName());
-        result.setHeader(user.getHeader());
-        return result;
     }
 }

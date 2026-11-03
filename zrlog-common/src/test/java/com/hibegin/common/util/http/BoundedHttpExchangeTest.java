@@ -24,7 +24,38 @@ import java.util.stream.Stream;
 import static org.junit.Assert.*;
 
 public class BoundedHttpExchangeTest {
-    @Rule public TemporaryFolder temporary = new TemporaryFolder();
+    @Rule
+    public TemporaryFolder temporary = new TemporaryFolder();
+
+    private static HttpRequest request(HttpServer server) {
+        return HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/")).GET().build();
+    }
+
+    private static HttpServer stalledServer(boolean delayHeaders, CountDownLatch started,
+                                            CountDownLatch release, CountDownLatch finished) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            try {
+                if (!delayHeaders) {
+                    exchange.sendResponseHeaders(200, 0);
+                    exchange.getResponseBody().write("first".getBytes(StandardCharsets.UTF_8));
+                    exchange.getResponseBody().flush();
+                }
+                started.countDown();
+                release.await();
+                if (delayHeaders) exchange.sendResponseHeaders(200, 0);
+                exchange.getResponseBody().write("late".getBytes(StandardCharsets.UTF_8));
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } catch (
+                    IOException disconnected) { /* Expected when the client deadline closes the transfer. */ } finally {
+                exchange.close();
+                finished.countDown();
+            }
+        });
+        server.start();
+        return server;
+    }
 
     @Test(timeout = 5000)
     public void partialControlResponseCannotOutliveItsBudget() throws Exception {
@@ -36,7 +67,9 @@ public class BoundedHttpExchangeTest {
                 try {
                     HttpUtil.getInstance().sendDirectRequest(request(server), ExecutionDeadline.afterMillis(500), 1024);
                     return null;
-                } catch (Exception failure) { return failure; }
+                } catch (Exception failure) {
+                    return failure;
+                }
             });
             assertTrue(started.await(2, TimeUnit.SECONDS));
             assertTrue(response.get(2, TimeUnit.SECONDS) instanceof HttpTimeoutException);
@@ -62,16 +95,22 @@ public class BoundedHttpExchangeTest {
                     try {
                         HttpUtil.getInstance().downloadToFile(request(server), target, ExecutionDeadline.afterMillis(500), 1024);
                         return null;
-                    } catch (Exception failure) { return failure; }
+                    } catch (Exception failure) {
+                        return failure;
+                    }
                 });
                 assertTrue(started.await(2, TimeUnit.SECONDS));
                 assertTrue(response.get(2, TimeUnit.SECONDS) instanceof HttpTimeoutException);
                 assertArrayEquals(existing, Files.readAllBytes(target));
-                try (Stream<Path> files = Files.list(directory)) { assertEquals(1, files.count()); }
+                try (Stream<Path> files = Files.list(directory)) {
+                    assertEquals(1, files.count());
+                }
                 release.countDown();
                 assertTrue(finished.await(1, TimeUnit.SECONDS));
                 assertArrayEquals(existing, Files.readAllBytes(target));
-                try (Stream<Path> files = Files.list(directory)) { assertEquals(1, files.count()); }
+                try (Stream<Path> files = Files.list(directory)) {
+                    assertEquals(1, files.count());
+                }
             } finally {
                 release.countDown();
                 server.stop(0);
@@ -103,7 +142,9 @@ public class BoundedHttpExchangeTest {
             assertFalse(downloader.isAlive());
             assertTrue(failure.get() instanceof InterruptedException);
             assertEquals(Boolean.TRUE, interrupted.get());
-            try (Stream<Path> files = Files.list(target.getParent())) { assertEquals(0, files.count()); }
+            try (Stream<Path> files = Files.list(target.getParent())) {
+                assertEquals(0, files.count());
+            }
         } finally {
             downloader.interrupt();
             release.countDown();
@@ -150,32 +191,8 @@ public class BoundedHttpExchangeTest {
             assertThrows(IOException.class, () -> HttpUtil.getInstance().downloadToFile(redirect, target,
                     ExecutionDeadline.afterMillis(2000), 1024));
             assertEquals("keep", Files.readString(target));
-        } finally { server.stop(0); }
-    }
-
-    private static HttpRequest request(HttpServer server) {
-        return HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/")).GET().build();
-    }
-
-    private static HttpServer stalledServer(boolean delayHeaders, CountDownLatch started,
-                                            CountDownLatch release, CountDownLatch finished) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/", exchange -> {
-            try {
-                if (!delayHeaders) {
-                    exchange.sendResponseHeaders(200, 0);
-                    exchange.getResponseBody().write("first".getBytes(StandardCharsets.UTF_8));
-                    exchange.getResponseBody().flush();
-                }
-                started.countDown();
-                release.await();
-                if (delayHeaders) exchange.sendResponseHeaders(200, 0);
-                exchange.getResponseBody().write("late".getBytes(StandardCharsets.UTF_8));
-            } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
-            catch (IOException disconnected) { /* Expected when the client deadline closes the transfer. */ }
-            finally { exchange.close(); finished.countDown(); }
-        });
-        server.start();
-        return server;
+        } finally {
+            server.stop(0);
+        }
     }
 }

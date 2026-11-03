@@ -6,11 +6,18 @@ public abstract class AbstractPluginCoreProcessHandle implements Runnable {
 
     abstract boolean close();
 
-    boolean close(ExecutionDeadline deadline) { return false; }
+    boolean close(ExecutionDeadline deadline) {
+        return false;
+    }
 
-    boolean confirmStarted(int port) { return false; }
+    boolean confirmStarted(int port) {
+        return false;
+    }
 
-    boolean isPendingAt(int port) { return false; }
+    boolean isPendingAt(int port) {
+        return false;
+    }
 
-    void cancelStartup() { }
+    void cancelStartup() {
+    }
 }

@@ -1,7 +1,7 @@
 package com.zrlog.business.plugin;
 
-import org.junit.Test;
 import com.zrlog.util.ExecutionDeadline;
+import org.junit.Test;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -33,7 +33,10 @@ public class PluginGhostWatcherTest {
                 result.get(1, TimeUnit.SECONDS);
                 peer.setSoTimeout(1000);
                 assertEquals(-1, peer.getInputStream().read());
-            } finally { watcher.close(); thread.join(1000); }
+            } finally {
+                watcher.close();
+                thread.join(1000);
+            }
         }
     }
 
@@ -56,7 +59,10 @@ public class PluginGhostWatcherTest {
                     assertTrue(result.get(1, TimeUnit.SECONDS));
                     peer.setSoTimeout(1000);
                     assertEquals(-1, peer.getInputStream().read());
-                } finally { watcher.close(); thread.join(1000); }
+                } finally {
+                    watcher.close();
+                    thread.join(1000);
+                }
             }
         }
     }

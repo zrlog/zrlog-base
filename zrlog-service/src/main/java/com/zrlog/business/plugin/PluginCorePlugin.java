@@ -18,23 +18,36 @@ import java.util.Map;
  */
 public interface PluginCorePlugin extends IPlugin {
 
-    /** Only hosts implementing the launch ownership contract opt into schedule migration. */
-    default boolean supportsHostScheduler() { return false; }
+    /**
+     * Only hosts implementing the launch ownership contract opt into schedule migration.
+     */
+    default boolean supportsHostScheduler() {
+        return false;
+    }
 
-    /** Configure before start; plugin process maintenance remains owned by plugin-core. */
-    default void setExternallyScheduled(boolean externallyScheduled) { }
+    /**
+     * Configure before start; plugin process maintenance remains owned by plugin-core.
+     */
+    default void setExternallyScheduled(boolean externallyScheduled) {
+    }
 
-    default boolean startWithinBudget(long remainingMillis) throws InterruptedException { return false; }
+    default boolean startWithinBudget(long remainingMillis) throws InterruptedException {
+        return false;
+    }
 
     boolean refreshCache(String cacheVersion, HttpRequest request);
 
-    /** Bounded, single-attempt refresh for request-lifetime jobs. Unsupported hosts fail explicitly. */
+    /**
+     * Bounded, single-attempt refresh for request-lifetime jobs. Unsupported hosts fail explicitly.
+     */
     default boolean refreshCacheWithinBudget(String cacheVersion, String triggerId, int actorId, long remainingMillis)
             throws IOException, InterruptedException {
         return false;
     }
 
-    /** One authenticated tick, including bounded startup when needed. Null means unavailable before dispatch. */
+    /**
+     * One authenticated tick, including bounded startup when needed. Null means unavailable before dispatch.
+     */
     default PluginSchedulerTickResult tickScheduledTasks(String triggerId, int actorId, long remainingMillis)
             throws IOException, InterruptedException {
         return null;
@@ -42,7 +55,9 @@ public interface PluginCorePlugin extends IPlugin {
 
     CloseResponseHandle getContext(String uri, HttpMethod method, HttpRequest request, AdminTokenVO adminTokenVO) throws IOException, URISyntaxException, InterruptedException;
 
-    /** Public inline view rendering owned by the invoking static-generation request. */
+    /**
+     * Public inline view rendering owned by the invoking static-generation request.
+     */
     default String renderViewWithinBudget(String uri, HttpRequest request, StaticGenerationBudget budget)
             throws IOException, InterruptedException {
         throw new IOException("Plugin host does not support completed view rendering");

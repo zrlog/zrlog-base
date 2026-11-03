@@ -6,8 +6,8 @@ import com.hibegin.common.util.http.handle.HttpHandle;
 import com.hibegin.common.util.http.handle.HttpStringHandle;
 import com.zrlog.common.Constants;
 import com.zrlog.util.BlogBuildInfoUtil;
-import com.zrlog.util.ThreadUtils;
 import com.zrlog.util.ExecutionDeadline;
+import com.zrlog.util.ThreadUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -101,7 +101,9 @@ public class HttpUtil {
                 () -> HttpResponse.BodySubscribers.ofString(StandardCharsets.UTF_8), maxBytes, deadline);
     }
 
-    /** Downloads a complete successful response before replacing the target; failures preserve it. */
+    /**
+     * Downloads a complete successful response before replacing the target; failures preserve it.
+     */
     public void downloadToFile(HttpRequest request, Path target, ExecutionDeadline deadline, long maxBytes)
             throws IOException, InterruptedException {
         deadline.requireRemainingMillis();

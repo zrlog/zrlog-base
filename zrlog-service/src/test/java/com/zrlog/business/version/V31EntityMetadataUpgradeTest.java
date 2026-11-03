@@ -3,10 +3,10 @@ package com.zrlog.business.version;
 import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.zrlog.business.service.DbUpgradeService;
 import com.zrlog.common.CacheService;
-import com.zrlog.data.repository.WebSiteRepository;
-import com.zrlog.test.support.ZrLogTestDatabase;
-import com.zrlog.data.service.DistributedLock;
 import com.zrlog.data.di.DaggerDataComponent;
+import com.zrlog.data.repository.WebSiteRepository;
+import com.zrlog.data.service.DistributedLock;
+import com.zrlog.test.support.ZrLogTestDatabase;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -14,11 +14,7 @@ import org.junit.runners.Parameterized;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -30,18 +26,22 @@ public class V31EntityMetadataUpgradeTest {
     private static final String V30 = "/schema/v30-install-e8d8c9d.sql";
     private final String backend;
 
-    public V31EntityMetadataUpgradeTest(String backend) { this.backend = backend; }
+    public V31EntityMetadataUpgradeTest(String backend) {
+        this.backend = backend;
+    }
 
     @Parameterized.Parameters(name = "{0}")
-    public static Object[] backends() { return new Object[]{"H2", "SQLITE", "WEB_API"}; }
-
-    private ZrLogTestDatabase open() throws Exception {
-        return backend.equals("WEB_API") ? ZrLogTestDatabase.openWebApi(V30)
-                : ZrLogTestDatabase.open(ZrLogTestDatabase.DatabaseType.valueOf(backend), V30);
+    public static Object[] backends() {
+        return new Object[]{"H2", "SQLITE", "WEB_API"};
     }
 
     private static long time(Object value) {
         return ResultValueConvertUtils.parseDate(value).longValue();
+    }
+
+    private ZrLogTestDatabase open() throws Exception {
+        return backend.equals("WEB_API") ? ZrLogTestDatabase.openWebApi(V30)
+                : ZrLogTestDatabase.open(ZrLogTestDatabase.DatabaseType.valueOf(backend), V30);
     }
 
     @Test
@@ -175,7 +175,8 @@ public class V31EntityMetadataUpgradeTest {
                 });
                 assertThrows(SQLException.class, () -> new V31EntityMetadataUpgrade(db.dataSource()).run());
                 assertTrue(failed.get());
-                db.beforeWebApiUpdate((sql, params) -> {});
+                db.beforeWebApiUpdate((sql, params) -> {
+                });
                 new V31EntityMetadataUpgrade(db.dataSource()).run();
                 assertEquals(time, time(db.scalar("SELECT createdAt FROM user_passkey_challenge")));
                 assertEquals(1L, ((Number) db.scalar("SELECT count(*) FROM user_passkey_challenge")).longValue());

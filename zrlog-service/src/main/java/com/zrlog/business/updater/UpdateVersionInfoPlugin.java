@@ -133,13 +133,17 @@ public class UpdateVersionInfoPlugin implements IPlugin {
         return true;
     }
 
-    /** Keep on-demand version checks available when scheduling belongs to the host. */
+    public boolean isExternallyScheduled() {
+        return externallyScheduled;
+    }
+
+    /**
+     * Keep on-demand version checks available when scheduling belongs to the host.
+     */
     public synchronized void setExternallyScheduled(boolean value) {
         if (value) stop();
         externallyScheduled = value;
     }
-
-    public boolean isExternallyScheduled() { return externallyScheduled; }
 
     @Override
     public boolean isStarted() {

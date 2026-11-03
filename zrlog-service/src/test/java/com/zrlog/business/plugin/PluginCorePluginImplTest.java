@@ -35,67 +35,9 @@ import static org.junit.Assert.*;
 
 public class PluginCorePluginImplTest {
 
-    @Test
-    public void publicViewUriRejectsTraversalAndPreservesEncodedUnicodeAndQuery() {
-        var uri = PluginCorePluginImpl.parsePublicViewUri("/comment/内容?tag=a&tag=b");
-        assertEquals("/comment/内容", uri.getPath()); assertEquals("tag=a&tag=b", uri.getRawQuery());
-        assertEquals("/comment", PluginCorePluginImpl.parsePublicViewUri("/comment").getPath());
-        for (String invalid : new String[]{"https://host/comment", "//host/comment", "/comment/../admin",
-                "/comment/%2e%2e/admin", "/comment/%5cadmin", "/comment/%00", "/comment/#secret",
-                "/comment/%3fsecret", "/comment/%23secret", "/comment//index", "/comment/" + "x".repeat(1024)}) {
-            assertThrows(invalid, IllegalArgumentException.class, () -> PluginCorePluginImpl.parsePublicViewUri(invalid));
-        }
-    }
-
-    @Test
-    public void scheduledViewRequiresMatchingCompletionAndForwardsOnlyPublicHeaders() throws Exception {
-        AtomicInteger calls = new AtomicInteger();
-        AtomicReference<com.sun.net.httpserver.Headers> received = new AtomicReference<>();
-        AtomicReference<String> query = new AtomicReference<>();
-        AtomicReference<String> mode = new AtomicReference<>("success");
-        HttpServer server = localServer();
-        server.createContext("/internal/runtime-scheduler/render-view", exchange -> {
-            calls.incrementAndGet(); received.set(exchange.getRequestHeaders()); query.set(exchange.getRequestURI().getRawQuery());
-            var result = new com.google.gson.JsonObject();
-            result.addProperty("triggerId", mode.get().equals("wrong-trigger") ? "other" : "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b");
-            result.addProperty("requestId", mode.get().equals("wrong-request") ? "other" : received.get().getFirst("X-ZrLog-Request-Id"));
-            result.addProperty("completed", !mode.get().equals("unfinished"));
-            result.addProperty("outcomeUncertain", mode.get().equals("uncertain"));
-            if (!mode.get().equals("missing-content"))
-                result.addProperty("content", mode.get().equals("oversize") ? "x".repeat(2 * 1024 * 1024 + 1) : "<p>你好</p>");
-            byte[] bytes = (mode.get().equals("malformed") ? "invalid" : result.toString()).getBytes(StandardCharsets.UTF_8);
-            if (!mode.get().equals("legacy")) exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
-            exchange.sendResponseHeaders(mode.get().equals("unavailable") ? 503 : 200, bytes.length);
-            exchange.getResponseBody().write(bytes); exchange.close();
-        });
-        server.start();
-        try {
-            PluginCorePluginImpl plugin = startedPlugin(server);
-            HttpRequest source = request(Map.of("Authorization", "Bearer browser-secret", "Cookie", "session=private",
-                    "IsLogin", "true", "LoginUserId", "99", "User-Agent", "View fixture"));
-            assertEquals("<p>你好</p>", plugin.renderViewWithinBudget("/comment/内容?tag=a&tag=b", source, viewBudget()));
-            assertEquals("tag=a&tag=b&q=1", query.get());
-            assertEquals("/" + "%E5%86%85%E5%AE%B9", received.get().getFirst("X-ZrLog-View-Path"));
-            assertEquals("comment", received.get().getFirst("X-ZrLog-Plugin-Name"));
-            assertEquals("7", received.get().getFirst("X-ZrLog-Actor-Id"));
-            assertEquals("View fixture", received.get().getFirst("X-ZrLog-View-User-Agent"));
-            for (String secret : new String[]{"Authorization", "Cookie", "IsLogin", "LoginUserId"}) assertNull(received.get().getFirst(secret));
-            assertNotNull(received.get().getFirst("X-Plugin-Token"));
-            for (String failure : new String[]{"wrong-trigger", "wrong-request", "unfinished", "uncertain", "missing-content",
-                    "oversize", "malformed", "legacy", "unavailable"}) {
-                mode.set(failure); int before = calls.get();
-                assertThrows(failure, java.io.IOException.class, () -> plugin.renderViewWithinBudget("/comment/index", source, viewBudget()));
-                assertEquals("Uncertain requests must not retry", before + 1, calls.get());
-            }
-            int before = calls.get();
-            assertThrows(java.io.IOException.class, () -> plugin.renderViewWithinBudget("/comment/index", source,
-                    new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(11000), () -> {}, "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7)));
-            assertEquals(before, calls.get());
-        } finally { server.stop(0); }
-    }
-
     private static StaticGenerationBudget viewBudget() {
-        return new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(20000), () -> {}, "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7);
+        return new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(20000), () -> {
+        }, "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7);
     }
 
     @SuppressWarnings("unchecked")
@@ -227,17 +169,88 @@ public class PluginCorePluginImplTest {
     }
 
     @Test
+    public void publicViewUriRejectsTraversalAndPreservesEncodedUnicodeAndQuery() {
+        var uri = PluginCorePluginImpl.parsePublicViewUri("/comment/内容?tag=a&tag=b");
+        assertEquals("/comment/内容", uri.getPath());
+        assertEquals("tag=a&tag=b", uri.getRawQuery());
+        assertEquals("/comment", PluginCorePluginImpl.parsePublicViewUri("/comment").getPath());
+        for (String invalid : new String[]{"https://host/comment", "//host/comment", "/comment/../admin",
+                "/comment/%2e%2e/admin", "/comment/%5cadmin", "/comment/%00", "/comment/#secret",
+                "/comment/%3fsecret", "/comment/%23secret", "/comment//index", "/comment/" + "x".repeat(1024)}) {
+            assertThrows(invalid, IllegalArgumentException.class, () -> PluginCorePluginImpl.parsePublicViewUri(invalid));
+        }
+    }
+
+    @Test
+    public void scheduledViewRequiresMatchingCompletionAndForwardsOnlyPublicHeaders() throws Exception {
+        AtomicInteger calls = new AtomicInteger();
+        AtomicReference<com.sun.net.httpserver.Headers> received = new AtomicReference<>();
+        AtomicReference<String> query = new AtomicReference<>();
+        AtomicReference<String> mode = new AtomicReference<>("success");
+        HttpServer server = localServer();
+        server.createContext("/internal/runtime-scheduler/render-view", exchange -> {
+            calls.incrementAndGet();
+            received.set(exchange.getRequestHeaders());
+            query.set(exchange.getRequestURI().getRawQuery());
+            var result = new com.google.gson.JsonObject();
+            result.addProperty("triggerId", mode.get().equals("wrong-trigger") ? "other" : "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b");
+            result.addProperty("requestId", mode.get().equals("wrong-request") ? "other" : received.get().getFirst("X-ZrLog-Request-Id"));
+            result.addProperty("completed", !mode.get().equals("unfinished"));
+            result.addProperty("outcomeUncertain", mode.get().equals("uncertain"));
+            if (!mode.get().equals("missing-content"))
+                result.addProperty("content", mode.get().equals("oversize") ? "x".repeat(2 * 1024 * 1024 + 1) : "<p>你好</p>");
+            byte[] bytes = (mode.get().equals("malformed") ? "invalid" : result.toString()).getBytes(StandardCharsets.UTF_8);
+            if (!mode.get().equals("legacy")) exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
+            exchange.sendResponseHeaders(mode.get().equals("unavailable") ? 503 : 200, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        server.start();
+        try {
+            PluginCorePluginImpl plugin = startedPlugin(server);
+            HttpRequest source = request(Map.of("Authorization", "Bearer browser-secret", "Cookie", "session=private",
+                    "IsLogin", "true", "LoginUserId", "99", "User-Agent", "View fixture"));
+            assertEquals("<p>你好</p>", plugin.renderViewWithinBudget("/comment/内容?tag=a&tag=b", source, viewBudget()));
+            assertEquals("tag=a&tag=b&q=1", query.get());
+            assertEquals("/" + "%E5%86%85%E5%AE%B9", received.get().getFirst("X-ZrLog-View-Path"));
+            assertEquals("comment", received.get().getFirst("X-ZrLog-Plugin-Name"));
+            assertEquals("7", received.get().getFirst("X-ZrLog-Actor-Id"));
+            assertEquals("View fixture", received.get().getFirst("X-ZrLog-View-User-Agent"));
+            for (String secret : new String[]{"Authorization", "Cookie", "IsLogin", "LoginUserId"})
+                assertNull(received.get().getFirst(secret));
+            assertNotNull(received.get().getFirst("X-Plugin-Token"));
+            for (String failure : new String[]{"wrong-trigger", "wrong-request", "unfinished", "uncertain", "missing-content",
+                    "oversize", "malformed", "legacy", "unavailable"}) {
+                mode.set(failure);
+                int before = calls.get();
+                assertThrows(failure, java.io.IOException.class, () -> plugin.renderViewWithinBudget("/comment/index", source, viewBudget()));
+                assertEquals("Uncertain requests must not retry", before + 1, calls.get());
+            }
+            int before = calls.get();
+            assertThrows(java.io.IOException.class, () -> plugin.renderViewWithinBudget("/comment/index", source,
+                    new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(11000), () -> {
+                    }, "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7)));
+            assertEquals(before, calls.get());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     public void schedulerTickUsesMachineIdentityAndReturnsOnlyThisTriggerChildren() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicReference<com.sun.net.httpserver.Headers> received = new AtomicReference<>();
         AtomicInteger calls = new AtomicInteger();
         server.createContext("/internal/runtime-scheduler/tick", exchange -> {
-            calls.incrementAndGet(); received.set(exchange.getRequestHeaders());
+            calls.incrementAndGet();
+            received.set(exchange.getRequestHeaders());
             String response = "{\"triggerId\":\"parent-run\",\"executedCount\":1,\"failedCount\":0,\"uncertainCount\":0,"
                     + "\"children\":[{\"automationId\":\"child-task\",\"name\":\"Refresh RSS\",\"status\":\"success\",\"runId\":\"child-run\"}]}";
             exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
             byte[] body = response.getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, body.length); exchange.getResponseBody().write(body); exchange.close();
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
         });
         server.start();
         try {
@@ -255,7 +268,9 @@ public class PluginCorePluginImplTest {
             assertNull(received.get().getFirst("IsLogin"));
             assertNull(received.get().getFirst("Authorization"));
             assertEquals(1, calls.get());
-        } finally { server.stop(0); }
+        } finally {
+            server.stop(0);
+        }
     }
 
     @Test
@@ -264,16 +279,25 @@ public class PluginCorePluginImplTest {
         AtomicInteger calls = new AtomicInteger();
         AtomicInteger redirected = new AtomicInteger();
         server.createContext("/internal/runtime-scheduler/tick", exchange -> {
-            calls.incrementAndGet(); exchange.getResponseHeaders().add("Location", "/unexpected");
-            exchange.sendResponseHeaders(307, -1); exchange.close();
+            calls.incrementAndGet();
+            exchange.getResponseHeaders().add("Location", "/unexpected");
+            exchange.sendResponseHeaders(307, -1);
+            exchange.close();
         });
-        server.createContext("/unexpected", exchange -> { redirected.incrementAndGet(); exchange.sendResponseHeaders(200, -1); exchange.close(); });
+        server.createContext("/unexpected", exchange -> {
+            redirected.incrementAndGet();
+            exchange.sendResponseHeaders(200, -1);
+            exchange.close();
+        });
         server.start();
         try {
             PluginCorePluginImpl plugin = startedPlugin(server);
             assertThrows(java.io.IOException.class, () -> plugin.tickScheduledTasks("parent-run", 7, 650000));
-            assertEquals(1, calls.get()); assertEquals(0, redirected.get());
-        } finally { server.stop(0); }
+            assertEquals(1, calls.get());
+            assertEquals(0, redirected.get());
+        } finally {
+            server.stop(0);
+        }
     }
 
     @Test
@@ -284,13 +308,17 @@ public class PluginCorePluginImplTest {
             calls.incrementAndGet();
             exchange.getResponseHeaders().add("X-ZrLog-Scheduler-Protocol", "1");
             byte[] body = "{\"triggerId\":\"different-parent\",\"executedCount\":1}".getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, body.length); exchange.getResponseBody().write(body); exchange.close();
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
         });
         server.start();
         try {
             assertThrows(java.io.IOException.class, () -> startedPlugin(server).tickScheduledTasks("parent-run", 7, 650000));
             assertEquals(1, calls.get());
-        } finally { server.stop(0); }
+        } finally {
+            server.stop(0);
+        }
     }
 
     @Test(timeout = 12000)
@@ -308,8 +336,11 @@ public class PluginCorePluginImplTest {
                 exchange.getResponseBody().flush();
                 sent.countDown();
                 release.await();
-            } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
-            finally { exchange.close(); }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } finally {
+                exchange.close();
+            }
         });
         server.start();
         try {
@@ -318,7 +349,9 @@ public class PluginCorePluginImplTest {
                 try {
                     plugin.tickScheduledTasks("parent-run", 7, 7000);
                     return null;
-                } catch (Exception error) { return error; }
+                } catch (Exception error) {
+                    return error;
+                }
             });
             assertTrue(sent.await(2, TimeUnit.SECONDS));
             assertTrue("submitted tick must report unavailable outcome", result.get(9, TimeUnit.SECONDS)
@@ -783,7 +816,9 @@ public class PluginCorePluginImplTest {
             setPluginServerBaseUrl(plugin, null);
             assertFalse(plugin.refreshCacheWithinBudget("cache-1", "0000000001.00000001793297580247.94783943-99bf-4773-89bc-5883a479898b", 7, 20000));
             assertEquals(1, requests.get());
-        } finally { server.stop(0); }
+        } finally {
+            server.stop(0);
+        }
     }
 
     @Test
@@ -822,7 +857,9 @@ public class PluginCorePluginImplTest {
             assertEquals(5, calls.get());
             assertThrows(IllegalArgumentException.class, () -> plugin.refreshCacheWithinBudget("cache-1", "invalid id", 7, 20000));
             assertEquals(5, calls.get());
-        } finally { server.stop(0); }
+        } finally {
+            server.stop(0);
+        }
     }
 
     @Test

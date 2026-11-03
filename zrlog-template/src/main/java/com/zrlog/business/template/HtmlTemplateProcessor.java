@@ -81,7 +81,9 @@ public class HtmlTemplateProcessor {
                 } catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
                     throw new IllegalStateException("Plugin view rendering interrupted", interrupted);
-                } catch (java.io.IOException error) { throw new IllegalStateException("Plugin view rendering failed", error); }
+                } catch (java.io.IOException error) {
+                    throw new IllegalStateException("Plugin view rendering failed", error);
+                }
             }
             return;
         }

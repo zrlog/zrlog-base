@@ -170,7 +170,9 @@ public class UpgradeService {
         return doUpgradeVersion(version, progressListener, backend);
     }
 
-    /** Execute the exact version already checked and claimed by the caller. */
+    /**
+     * Execute the exact version already checked and claimed by the caller.
+     */
     public UpgradeProcessResponse doUpgradeVersion(Version version, UpgradeProgressListener progressListener,
                                                    Map<String, Object> backend) {
         if (Objects.isNull(version) || !ZrLogUtil.greatThenCurrentVersion(version.getBuildId(),

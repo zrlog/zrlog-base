@@ -11,8 +11,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.net.URI;
-import java.net.http.HttpTimeoutException;
 import java.net.http.HttpRequest;
+import java.net.http.HttpTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
@@ -47,7 +47,9 @@ public class PluginCoreUtils {
     private static final int MACH_O_CPU_X86_64 = 0x01000007;
     private static final int MACH_O_CPU_ARM64 = 0x0100000c;
 
-    /** Unpacks the FaaS bundle cooperatively; each entry is published only after it is complete. */
+    /**
+     * Unpacks the FaaS bundle cooperatively; each entry is published only after it is complete.
+     */
     public static void unpackPlugins(Path archive, Path target, ExecutionDeadline deadline)
             throws IOException, InterruptedException {
         Path root = target.toAbsolutePath().normalize();
@@ -61,7 +63,8 @@ public class PluginCoreUtils {
                 Path destination = root.resolve(entry.getName()).normalize();
                 if (!destination.startsWith(root)) throw new IOException("Plugin archive entry escapes its directory");
                 for (Path ancestor = destination; ancestor != null && ancestor.startsWith(root); ancestor = ancestor.getParent()) {
-                    if (Files.isSymbolicLink(ancestor)) throw new IOException("Plugin archive entry crosses a symbolic link");
+                    if (Files.isSymbolicLink(ancestor))
+                        throw new IOException("Plugin archive entry crosses a symbolic link");
                 }
                 if (entry.isDirectory()) {
                     Files.createDirectories(destination);
@@ -132,7 +135,7 @@ public class PluginCoreUtils {
     }
 
     private static File downloadPluginCoreFile(String pluginsFolder, boolean nativeImage, String fileArch,
-                                                ExecutionDeadline deadline) throws IOException, InterruptedException {
+                                               ExecutionDeadline deadline) throws IOException, InterruptedException {
         deadline.requireRemainingMillis();
         File pluginCoreFile = getPluginFileName(pluginsFolder, nativeImage, fileArch);
         Path pluginCorePath = pluginCoreFile.toPath();

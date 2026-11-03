@@ -5,9 +5,9 @@ import com.zrlog.common.CacheService;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.exception.DatabaseInitializationException;
+import com.zrlog.data.service.DistributedLock;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.test.support.ZrLogTestDatabase;
-import com.zrlog.data.service.DistributedLock;
 import com.zrlog.web.WebSetupContext;
 import com.zrlog.web.WebSetupLoader;
 import org.junit.Rule;
@@ -19,9 +19,12 @@ import java.util.List;
 
 import static org.junit.Assert.*;
 
-/** Historical-schema lifecycle fixture; fresh installation is covered by the install/main suites. */
+/**
+ * Historical-schema lifecycle fixture; fresh installation is covered by the install/main suites.
+ */
 public class DatabaseMigrationLifecycleTest {
-    @Rule public TemporaryFolder temporary = new TemporaryFolder();
+    @Rule
+    public TemporaryFolder temporary = new TemporaryFolder();
 
     @Test(timeout = 10000)
     public void migrationPrecedesCacheWritesAndFailureStopsModuleStartup() throws Exception {
@@ -62,7 +65,9 @@ public class DatabaseMigrationLifecycleTest {
     }
 
     private static final class TestConfig extends ZrLogConfig {
-        private TestConfig() { super(19089, null, ""); }
+        private TestConfig() {
+            super(19089, null, "");
+        }
 
         private void start(DataSourceWrapper database) {
             this.dataSource = database;
@@ -70,10 +75,24 @@ public class DatabaseMigrationLifecycleTest {
             initializeWebSetups();
         }
 
-        @Override public boolean isInstalled() { return dataSource != null; }
-        @Override protected TokenService initTokenService() { return null; }
-        @Override public List<IPlugin> getBasePluginList() { return Collections.emptyList(); }
+        @Override
+        public boolean isInstalled() {
+            return dataSource != null;
+        }
+
+        @Override
+        protected TokenService initTokenService() {
+            return null;
+        }
+
+        @Override
+        public List<IPlugin> getBasePluginList() {
+            return Collections.emptyList();
+        }
+
         // The fixture owns the datasource; no HTTP server or background plugins are started.
-        @Override public void stop() { }
+        @Override
+        public void stop() {
+        }
     }
 }

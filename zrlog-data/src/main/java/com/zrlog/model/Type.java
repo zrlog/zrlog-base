@@ -13,18 +13,43 @@ public class Type extends BaseEntity<Long> {
     @Column("arrange_plugin")
     private String arrangePlugin;
 
-    public String getAlias() { return alias; }
-    public void setAlias(String alias) { this.alias = alias; }
+    public String getAlias() {
+        return alias;
+    }
 
-    public String getRemark() { return remark; }
-    public void setRemark(String remark) { this.remark = remark; }
+    public void setAlias(String alias) {
+        this.alias = alias;
+    }
 
-    public String getTypeName() { return typeName; }
-    public void setTypeName(String typeName) { this.typeName = typeName; }
+    public String getRemark() {
+        return remark;
+    }
 
-    public Integer getPid() { return pid; }
-    public void setPid(Integer pid) { this.pid = pid; }
+    public void setRemark(String remark) {
+        this.remark = remark;
+    }
 
-    public String getArrangePlugin() { return arrangePlugin; }
-    public void setArrangePlugin(String arrangePlugin) { this.arrangePlugin = arrangePlugin; }
+    public String getTypeName() {
+        return typeName;
+    }
+
+    public void setTypeName(String typeName) {
+        this.typeName = typeName;
+    }
+
+    public Integer getPid() {
+        return pid;
+    }
+
+    public void setPid(Integer pid) {
+        this.pid = pid;
+    }
+
+    public String getArrangePlugin() {
+        return arrangePlugin;
+    }
+
+    public void setArrangePlugin(String arrangePlugin) {
+        this.arrangePlugin = arrangePlugin;
+    }
 }

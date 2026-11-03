@@ -6,10 +6,10 @@ import com.zrlog.common.CacheService;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.common.exception.DatabaseInitializationException;
+import com.zrlog.data.di.DaggerDataComponent;
+import com.zrlog.data.service.DistributedLock;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.test.support.ZrLogTestDatabase;
-import com.zrlog.data.service.DistributedLock;
-import com.zrlog.data.di.DaggerDataComponent;
 import com.zrlog.web.WebSetupContext;
 import com.zrlog.web.WebSetupLoader;
 import org.junit.Rule;
@@ -29,7 +29,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.Assert.*;
 
 public class SchemaMigrationStopTest {
-    @Rule public TemporaryFolder temporary = new TemporaryFolder();
+    @Rule
+    public TemporaryFolder temporary = new TemporaryFolder();
 
     @Test(timeout = 30000)
     public void applicationStopReleasesOnlyItsOwnMigrationLockBeforeClosingDatabase() throws Exception {
@@ -43,12 +44,31 @@ public class SchemaMigrationStopTest {
             assertTrue("Migration stop did not finish", child.waitFor(25, TimeUnit.SECONDS));
             assertEquals(Files.readString(output), 0, child.exitValue());
         } finally {
-            if (child.isAlive()) { child.destroyForcibly(); child.waitFor(5, TimeUnit.SECONDS); }
+            if (child.isAlive()) {
+                child.destroyForcibly();
+                child.waitFor(5, TimeUnit.SECONDS);
+            }
         }
     }
 
     public static class Scenarios {
-        @Rule public TemporaryFolder temporary = new TemporaryFolder();
+        @Rule
+        public TemporaryFolder temporary = new TemporaryFolder();
+
+        private static DataSourceWrapper borrowedSource(ZrLogTestDatabase db, AtomicBoolean closed) {
+            return (DataSourceWrapper) Proxy.newProxyInstance(DataSourceWrapper.class.getClassLoader(),
+                    new Class<?>[]{DataSourceWrapper.class}, (proxy, method, args) -> {
+                        if (method.getName().equals("close")) {
+                            closed.set(true);
+                            return null;
+                        }
+                        try {
+                            return method.invoke(db.dataSource(), args);
+                        } catch (InvocationTargetException e) {
+                            throw e.getCause();
+                        }
+                    });
+        }
 
         @Test(timeout = 10000)
         public void stopWaitsForInFlightDdlThenReleasesLockAndAllowsResume() throws Exception {
@@ -63,8 +83,11 @@ public class SchemaMigrationStopTest {
                     if (sql.startsWith("ALTER TABLE") && paused.compareAndSet(false, true)) {
                         executing.countDown();
                         try {
-                            if (!finishStatement.await(5, TimeUnit.SECONDS)) throw new SQLException("Test DDL timed out");
-                        } catch (InterruptedException e) { throw new SQLException(e); }
+                            if (!finishStatement.await(5, TimeUnit.SECONDS))
+                                throw new SQLException("Test DDL timed out");
+                        } catch (InterruptedException e) {
+                            throw new SQLException(e);
+                        }
                     }
                 });
                 StopConfig config = new StopConfig();
@@ -104,7 +127,7 @@ public class SchemaMigrationStopTest {
             System.setProperty("sws.root.path", temporary.getRoot().getAbsolutePath());
             try (ZrLogTestDatabase db = ZrLogTestDatabase.openWebApi("/schema/v30-install-e8d8c9d.sql");
                  DistributedLock owner = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true).lockManager()
-                        .acquire(DistributedLock.SCHEMA_UPGRADE_KEY, 30, TimeUnit.SECONDS, () -> false)) {
+                         .acquire(DistributedLock.SCHEMA_UPGRADE_KEY, 30, TimeUnit.SECONDS, () -> false)) {
                 db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "30");
                 Object token = db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY);
                 CountDownLatch waiting = new CountDownLatch(1);
@@ -130,15 +153,6 @@ public class SchemaMigrationStopTest {
             }
         }
 
-        private static DataSourceWrapper borrowedSource(ZrLogTestDatabase db, AtomicBoolean closed) {
-            return (DataSourceWrapper) Proxy.newProxyInstance(DataSourceWrapper.class.getClassLoader(),
-                    new Class<?>[]{DataSourceWrapper.class}, (proxy, method, args) -> {
-                        if (method.getName().equals("close")) { closed.set(true); return null; }
-                        try { return method.invoke(db.dataSource(), args); }
-                        catch (InvocationTargetException e) { throw e.getCause(); }
-                    });
-        }
-
         @Test(timeout = 10000)
         public void stopRetriesAnEarlierFailedLockReleaseBeforeClosingDatabase() throws Exception {
             System.setProperty("sws.root.path", temporary.getRoot().getAbsolutePath());
@@ -160,22 +174,44 @@ public class SchemaMigrationStopTest {
                     assertTrue(closed.get());
                     assertNull(db.scalar("SELECT value FROM website WHERE name=?", DistributedLock.SCHEMA_UPGRADE_KEY));
                     assertEquals("31", db.scalar("SELECT value FROM website WHERE name=?", CacheService.ZRLOG_SQL_VERSION_KEY));
-                } finally { config.stop(); }
+                } finally {
+                    config.stop();
+                }
             }
         }
 
         private static final class StopConfig extends ZrLogConfig {
             private final CountDownLatch stopping = new CountDownLatch(1);
-            private StopConfig() { super(0, null, ""); }
+
+            private StopConfig() {
+                super(0, null, "");
+            }
+
             private void start(DataSourceWrapper source) {
                 dataSource = source;
                 webSetups.addAll(WebSetupLoader.load(new WebSetupContext(this, dbPropertiesFile, installLockFile, "", null)));
                 initializeWebSetups();
             }
-            @Override protected void beforeStop() { stopping.countDown(); }
-            @Override public boolean isInstalled() { return dataSource != null; }
-            @Override protected TokenService initTokenService() { return null; }
-            @Override public List<IPlugin> getBasePluginList() { return Collections.emptyList(); }
+
+            @Override
+            protected void beforeStop() {
+                stopping.countDown();
+            }
+
+            @Override
+            public boolean isInstalled() {
+                return dataSource != null;
+            }
+
+            @Override
+            protected TokenService initTokenService() {
+                return null;
+            }
+
+            @Override
+            public List<IPlugin> getBasePluginList() {
+                return Collections.emptyList();
+            }
         }
     }
 }

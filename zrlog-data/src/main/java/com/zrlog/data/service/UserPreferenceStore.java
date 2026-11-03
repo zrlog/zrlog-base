@@ -1,14 +1,14 @@
 package com.zrlog.data.service;
 
 import com.google.gson.*;
+import com.hibegin.common.dao.entity.OptimisticLockException;
 import com.zrlog.common.exception.ArgsException;
 import com.zrlog.data.repository.UserRepository;
+import com.zrlog.model.User;
 import jakarta.inject.Inject;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
-import com.zrlog.model.User;
-import com.hibegin.common.dao.entity.OptimisticLockException;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -24,6 +24,7 @@ public class UserPreferenceStore {
     private static final Gson GSON = new Gson();
     private static final long UPDATE_RETRY_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(5);
     private final jakarta.inject.Provider<UserRepository> userProvider;
+
     @Inject
     public UserPreferenceStore(jakarta.inject.Provider<UserRepository> userProvider) {
         this.userProvider = Objects.requireNonNull(userProvider);

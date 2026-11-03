@@ -1,6 +1,7 @@
 package com.zrlog.data.security;
 
 import com.zrlog.model.User;
+
 import java.util.*;
 
 /**
@@ -30,14 +31,6 @@ public final class AccountAccess {
         if (user == null || user.getId() == null) return new AccountAccess(-1, "", false, -1);
         return new AccountAccess(Math.toIntExact(user.getId()), Objects.toString(user.getRole(), ""),
                 Boolean.TRUE.equals(user.getEnabled()), user.getAuthVersion() == null ? -1 : user.getAuthVersion());
-    }
-
-    /** Narrow authorization projection for joins and permission-only lookups. */
-    public static class Snapshot {
-        public Integer userId;
-        public String role;
-        public Boolean enabled;
-        public Integer authVersion;
     }
 
     public static AccountAccess fromSnapshot(Snapshot row) {
@@ -123,5 +116,15 @@ public final class AccountAccess {
         scopes.add("articles:read_private");
         if (managesAllArticles()) scopes.add("articles:all");
         return Collections.unmodifiableSet(scopes);
+    }
+
+    /**
+     * Narrow authorization projection for joins and permission-only lookups.
+     */
+    public static class Snapshot {
+        public Integer userId;
+        public String role;
+        public Boolean enabled;
+        public Integer authVersion;
     }
 }

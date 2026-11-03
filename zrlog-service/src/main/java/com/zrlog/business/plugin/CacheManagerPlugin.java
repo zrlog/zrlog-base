@@ -54,7 +54,9 @@ public class CacheManagerPlugin implements IPlugin {
         return true;
     }
 
-    /** The host's durable scheduler takes ownership while other deployments retain the legacy timer. */
+    /**
+     * The host's durable scheduler takes ownership while other deployments retain the legacy timer.
+     */
     public synchronized void setExternallyScheduled(boolean value) {
         if (value) stop();
         externallyScheduled = value;

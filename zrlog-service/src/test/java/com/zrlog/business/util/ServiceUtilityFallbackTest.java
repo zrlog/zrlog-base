@@ -465,8 +465,11 @@ public class ServiceUtilityFallbackTest {
                 entered.countDown();
                 release.await();
                 exchange.getResponseBody().write(jar, 2, jar.length - 2);
-            } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
-            finally { exchange.close(); }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } finally {
+                exchange.close();
+            }
         });
         server.start();
         String previous = setBlogBuildInfoString("resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
@@ -509,9 +512,11 @@ public class ServiceUtilityFallbackTest {
                 exchange.getResponseBody().flush();
                 Thread.sleep(600);
                 exchange.getResponseBody().write(exchange.getRequestURI().getPath().endsWith(".md5") ? checksum : artifact);
-            } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
-            catch (IOException disconnected) { /* The shared deadline closes the artifact transfer. */ }
-            finally { exchange.close(); }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } catch (IOException disconnected) { /* The shared deadline closes the artifact transfer. */ } finally {
+                exchange.close();
+            }
         });
         server.start();
         String previous = setBlogBuildInfoString("resourceDownloadUrl", "http://127.0.0.1:" + server.getAddress().getPort());
@@ -1313,9 +1318,13 @@ public class ServiceUtilityFallbackTest {
             this.params = Arrays.copyOf(params, params.length);
             if (rsh instanceof org.apache.commons.dbutils.handlers.MapListHandler) {
                 Map<String, Object> row = new HashMap<>();
-                row.put("siteId", 1L); row.put("version", 9L);
-                row.put("createdAt", null); row.put("updatedAt", null);
-                row.put("name", params[0]); row.put("value", "previous"); row.put("remark", null);
+                row.put("siteId", 1L);
+                row.put("version", 9L);
+                row.put("createdAt", null);
+                row.put("updatedAt", null);
+                row.put("name", params[0]);
+                row.put("value", "previous");
+                row.put("remark", null);
                 return (T) List.of(row);
             }
             return (T) Integer.valueOf(1);

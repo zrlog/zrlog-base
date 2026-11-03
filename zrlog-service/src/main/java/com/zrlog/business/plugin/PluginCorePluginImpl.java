@@ -20,8 +20,8 @@ import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.plugin.PluginAdminAppearance;
 import com.zrlog.util.BlogBuildInfoUtil;
-import com.zrlog.util.I18nUtil;
 import com.zrlog.util.ExecutionDeadline;
+import com.zrlog.util.I18nUtil;
 
 import java.io.File;
 import java.io.IOException;
@@ -117,8 +117,34 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
         return false;
     }
 
+    static java.net.URI parsePublicViewUri(String value) {
+        if (value == null || value.length() > 10000) throw new IllegalArgumentException("Invalid plugin view URI");
+        java.net.URI uri = java.net.URI.create(java.net.URI.create(value).toASCIIString());
+        String path = uri.getPath();
+        if (uri.isAbsolute() || uri.getRawAuthority() != null || uri.getRawFragment() != null || path == null
+                || !path.startsWith("/") || path.length() > 1153 || path.contains("\\")
+                || uri.getRawQuery() != null && uri.getRawQuery().length() > 8192)
+            throw new IllegalArgumentException("Invalid plugin view URI");
+        String[] segments = path.substring(1).split("/", -1);
+        if (segments.length == 0 || !segments[0].matches("[a-zA-Z0-9_-]{1,128}"))
+            throw new IllegalArgumentException("Invalid plugin view name");
+        String action = path.substring(segments[0].length() + 1);
+        if (action.length() > 1024 || action.startsWith("//") || action.contains("?") || action.contains("#"))
+            throw new IllegalArgumentException("Invalid plugin view path");
+        for (String segment : segments) {
+            if (".".equals(segment) || "..".equals(segment))
+                throw new IllegalArgumentException("Invalid plugin view path");
+            for (int i = 0; i < segment.length(); i++)
+                if (Character.isISOControl(segment.charAt(i)))
+                    throw new IllegalArgumentException("Invalid plugin view path");
+        }
+        return uri;
+    }
+
     @Override
-    public boolean supportsHostScheduler() { return true; }
+    public boolean supportsHostScheduler() {
+        return true;
+    }
 
     @Override
     public void setExternallyScheduled(boolean externallyScheduled) {
@@ -228,11 +254,15 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
         String name = slash < 0 ? path.substring(1) : path.substring(1, slash);
         String action = slash < 0 ? "/" : path.substring(slash);
         String encodedAction;
-        try { encodedAction = new java.net.URI(null, null, action, null).toASCIIString(); }
-        catch (URISyntaxException invalid) { throw new IOException("Invalid plugin view path", invalid); }
+        try {
+            encodedAction = new java.net.URI(null, null, action, null).toASCIIString();
+        } catch (URISyntaxException invalid) {
+            throw new IOException("Invalid plugin view path", invalid);
+        }
         String baseUrl = pluginServerBaseUrl;
         long requestMillis = Math.min(650000, budget.remainingMillis());
-        if (baseUrl == null || requestMillis < 12000) throw new IOException("Plugin view execution budget is unavailable");
+        if (baseUrl == null || requestMillis < 12000)
+            throw new IOException("Plugin view execution budget is unavailable");
         String invocationId = java.util.UUID.randomUUID().toString();
         String query = view.getRawQuery() == null ? "" : view.getRawQuery();
         if (source.getQueryStr() != null && !source.getQueryStr().isEmpty())
@@ -264,29 +294,9 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
                     || result.content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 2 * 1024 * 1024)
                 throw new IllegalArgumentException();
             return result.content;
-        } catch (RuntimeException invalid) { throw new IOException("Plugin view did not return confirmed content"); }
-    }
-
-    static java.net.URI parsePublicViewUri(String value) {
-        if (value == null || value.length() > 10000) throw new IllegalArgumentException("Invalid plugin view URI");
-        java.net.URI uri = java.net.URI.create(java.net.URI.create(value).toASCIIString());
-        String path = uri.getPath();
-        if (uri.isAbsolute() || uri.getRawAuthority() != null || uri.getRawFragment() != null || path == null
-                || !path.startsWith("/") || path.length() > 1153 || path.contains("\\")
-                || uri.getRawQuery() != null && uri.getRawQuery().length() > 8192)
-            throw new IllegalArgumentException("Invalid plugin view URI");
-        String[] segments = path.substring(1).split("/", -1);
-        if (segments.length == 0 || !segments[0].matches("[a-zA-Z0-9_-]{1,128}"))
-            throw new IllegalArgumentException("Invalid plugin view name");
-        String action = path.substring(segments[0].length() + 1);
-        if (action.length() > 1024 || action.startsWith("//") || action.contains("?") || action.contains("#"))
-            throw new IllegalArgumentException("Invalid plugin view path");
-        for (String segment : segments) {
-            if (".".equals(segment) || "..".equals(segment)) throw new IllegalArgumentException("Invalid plugin view path");
-            for (int i = 0; i < segment.length(); i++) if (Character.isISOControl(segment.charAt(i)))
-                throw new IllegalArgumentException("Invalid plugin view path");
+        } catch (RuntimeException invalid) {
+            throw new IOException("Plugin view did not return confirmed content");
         }
-        return uri;
     }
 
     @Override
@@ -452,7 +462,9 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
                     || result.completed && (result.outcomeUncertain || result.failedCount != 0 || result.unsupportedCount != 0))
                 throw new IllegalArgumentException();
             return result.completed;
-        } catch (RuntimeException malformed) { throw new IOException("Plugin cache refresh response is invalid"); }
+        } catch (RuntimeException malformed) {
+            throw new IOException("Plugin cache refresh response is invalid");
+        }
     }
 
     @Override
@@ -491,7 +503,8 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
                         || !java.util.Set.of("success", "error", "uncertain", "skipped").contains(child.status)) {
                     throw new IllegalArgumentException();
                 }
-                if (!"skipped".equals(child.status) && (child.runId == null || child.runId.isBlank())) throw new IllegalArgumentException();
+                if (!"skipped".equals(child.status) && (child.runId == null || child.runId.isBlank()))
+                    throw new IllegalArgumentException();
                 if ("success".equals(child.status)) completed++;
                 if ("error".equals(child.status) || "uncertain".equals(child.status)) failed++;
                 if ("uncertain".equals(child.status)) uncertain++;
@@ -537,7 +550,9 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
                 readinessDeadline = deadline.capMillis(Math.min(86400000, pendingStartupDeadline.remainingMillis()));
             }
             generation = pluginServerGeneration;
-        } finally { lock.unlock(); }
+        } finally {
+            lock.unlock();
+        }
         try {
             if (!waitToStarted(serverUrl, readinessDeadline)) return false;
             if (!lock.tryLock(deadline.remainingMillis(), TimeUnit.MILLISECONDS)) return false;
@@ -551,7 +566,9 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
                 pendingPluginServerBaseUrl = null;
                 pendingStartupDeadline = null;
                 return true;
-            } finally { lock.unlock(); }
+            } finally {
+                lock.unlock();
+            }
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw interrupted;
@@ -574,7 +591,9 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
                             pendingStartupDeadline = null;
                             pluginServerGeneration++;
                         }
-                    } finally { lock.unlock(); }
+                    } finally {
+                        lock.unlock();
+                    }
                 }
             }
         }

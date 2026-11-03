@@ -5,15 +5,15 @@ import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.StringUtils;
 import com.hibegin.http.server.api.HttpRequest;
 import com.zrlog.business.plugin.PluginCorePlugin;
-import com.zrlog.business.plugin.StaticSitePlugin;
 import com.zrlog.business.plugin.StaticGenerationBudget;
-import com.zrlog.util.ExecutionDeadline;
+import com.zrlog.business.plugin.StaticSitePlugin;
 import com.zrlog.business.plugin.type.StaticSiteType;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.repository.WebSiteRepository;
+import com.zrlog.util.ExecutionDeadline;
 import com.zrlog.util.ThreadUtils;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -92,8 +92,8 @@ public class CacheRefreshService {
      * unlike the interactive refresh this entry does not create detached executor tasks or retry forever.
      */
     public void updateCacheWithinBudget(HttpRequest request, List<StaticSiteType> types,
-                                      String executionId, int actorId,
-                                      java.util.function.LongSupplier remainingMillis, Runnable fence) throws Exception {
+                                        String executionId, int actorId,
+                                        java.util.function.LongSupplier remainingMillis, Runnable fence) throws Exception {
         if (executionId == null || !executionId.matches("[a-zA-Z0-9_.-]{1,128}") || actorId < 1)
             throw new IllegalArgumentException("Invalid cache refresh identity");
         StaticGenerationBudget budget = new StaticGenerationBudget(

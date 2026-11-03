@@ -18,8 +18,30 @@ import java.util.Properties;
 
 import static org.junit.Assert.*;
 
-/** Runs only against CI's explicitly provisioned, empty MySQL database. */
+/**
+ * Runs only against CI's explicitly provisioned, empty MySQL database.
+ */
 public class V31MySqlMetadataUpgradeTest {
+    private static List<Map<String, Object>> schema(InMemoryDatabase db) throws Exception {
+        return db.queryList("SELECT table_name,column_name,column_type,is_nullable,column_default,datetime_precision "
+                + "FROM information_schema.columns WHERE table_schema=database() ORDER BY table_name,column_name");
+    }
+
+    private static void load(InMemoryDatabase db, String resource) throws Exception {
+        try (InputStream input = V31MySqlMetadataUpgradeTest.class.getResourceAsStream(resource)) {
+            assertNotNull(resource, input);
+            db.executeStatements(SqlConvertUtils.extractExecutableSqlByInputStream(input));
+        }
+    }
+
+    private static void clear(InMemoryDatabase db) throws Exception {
+        for (Map<String, Object> row : db.queryList("SELECT table_name AS name FROM information_schema.tables WHERE table_schema=database()")) {
+            String name = row.get("name").toString();
+            if (!name.matches("[a-z_]+")) throw new IllegalStateException("Unexpected table in disposable database");
+            db.execute("DROP TABLE `" + name + "`");
+        }
+    }
+
     @Test
     public void historicalDataSurvivesMysqlDdlAndMatchesFreshInstallation() throws Exception {
         String url = System.getenv("ZRLOG_MYSQL_TEST_URL");
@@ -73,26 +95,6 @@ public class V31MySqlMetadataUpgradeTest {
             } finally {
                 clear(db);
             }
-        }
-    }
-
-    private static List<Map<String, Object>> schema(InMemoryDatabase db) throws Exception {
-        return db.queryList("SELECT table_name,column_name,column_type,is_nullable,column_default,datetime_precision "
-                + "FROM information_schema.columns WHERE table_schema=database() ORDER BY table_name,column_name");
-    }
-
-    private static void load(InMemoryDatabase db, String resource) throws Exception {
-        try (InputStream input = V31MySqlMetadataUpgradeTest.class.getResourceAsStream(resource)) {
-            assertNotNull(resource, input);
-            db.executeStatements(SqlConvertUtils.extractExecutableSqlByInputStream(input));
-        }
-    }
-
-    private static void clear(InMemoryDatabase db) throws Exception {
-        for (Map<String, Object> row : db.queryList("SELECT table_name AS name FROM information_schema.tables WHERE table_schema=database()")) {
-            String name = row.get("name").toString();
-            if (!name.matches("[a-z_]+")) throw new IllegalStateException("Unexpected table in disposable database");
-            db.execute("DROP TABLE `" + name + "`");
         }
     }
 }

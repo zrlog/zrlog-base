@@ -1,13 +1,13 @@
 package com.zrlog.business.plugin;
 
 import com.hibegin.common.util.LoggerUtil;
+import com.zrlog.util.ExecutionDeadline;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.Socket;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.SocketTimeoutException;
-import com.zrlog.util.ExecutionDeadline;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
@@ -89,8 +89,9 @@ class PluginGhostWatcher implements AutoCloseable {
         closed = true;
         Socket socket = activeSocket;
         if (socket != null) {
-            try { socket.close(); }
-            catch (IOException ignored) { /* Closing again is harmless. */ }
+            try {
+                socket.close();
+            } catch (IOException ignored) { /* Closing again is harmless. */ }
         }
     }
 }

@@ -14,9 +14,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
-/** Schema and Native Image registrations are consumer contracts of common-dao's mapping. */
+/**
+ * Schema and Native Image registrations are consumer contracts of common-dao's mapping.
+ */
 public class EntityMappingContractTest {
     private static final Class<?>[] ENTITIES = {Log.class, Comment.class, Link.class, LogNav.class,
             Plugin.class, Tag.class, Type.class, User.class, WebSite.class, LogVersion.class,

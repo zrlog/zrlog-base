@@ -71,6 +71,19 @@ public class StaticSitePluginTest {
         }
     }
 
+    private static StaticGenerationBudget budget(long millis) {
+        return new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(millis), () -> {
+        });
+    }
+
+    private static StaticSiteRenderer renderer(ServerConfig config, Class<? extends Interceptor> interceptor) {
+        config.addInterceptor(interceptor);
+        ApplicationContext context = new ApplicationContext(config);
+        context.init();
+        return new StaticSiteRenderer(new com.hibegin.http.server.config.RequestConfig(),
+                new com.hibegin.http.server.config.ResponseConfig(), context);
+    }
+
     @Test
     public void shouldParseOnlyRootHtmlLinksFromCachedPage() throws Exception {
         TestStaticSitePlugin plugin = new TestStaticSitePlugin();
@@ -411,26 +424,13 @@ public class StaticSitePluginTest {
         }
     }
 
-    private interface ThrowingRunnable {
-        void run() throws Exception;
-    }
-
-    private static StaticGenerationBudget budget(long millis) {
-        return new StaticGenerationBudget(com.zrlog.util.ExecutionDeadline.afterMillis(millis), () -> {});
-    }
-
-    private static StaticSiteRenderer renderer(ServerConfig config, Class<? extends Interceptor> interceptor) {
-        config.addInterceptor(interceptor);
-        ApplicationContext context = new ApplicationContext(config);
-        context.init();
-        return new StaticSiteRenderer(new com.hibegin.http.server.config.RequestConfig(),
-                new com.hibegin.http.server.config.ResponseConfig(), context);
-    }
-
     @Test
     public void boundedFetchCompletesDiscoveredPagesOnTheCallingThread() throws Exception {
         TestStaticSitePlugin plugin = new TestStaticSitePlugin() {
-            @Override public Executor getExecutorService() { throw new AssertionError("Detached page work"); }
+            @Override
+            public Executor getExecutorService() {
+                throw new AssertionError("Detached page work");
+            }
         };
         plugin.handleStatusPageMap.put("/index.html", StaticSitePlugin.HandleState.NEW);
         StaticFetchInterceptor.pages.put("/index.html", "<a href=\"/next.html\">next</a>");
@@ -509,9 +509,14 @@ public class StaticSitePluginTest {
         java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
         Thread owner = new Thread(() -> {
             plugin.parseLock.lock();
-            try { held.countDown(); release.await(); }
-            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
-            finally { plugin.parseLock.unlock(); }
+            try {
+                held.countDown();
+                release.await();
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } finally {
+                plugin.parseLock.unlock();
+            }
         });
         owner.start();
         try {
@@ -536,14 +541,19 @@ public class StaticSitePluginTest {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/static/version.txt", exchange -> {
             exchange.sendResponseHeaders(200, 4096);
-            try { exchange.getResponseBody().write(new byte[4096]); }
-            finally { exchange.close(); }
+            try {
+                exchange.getResponseBody().write(new byte[4096]);
+            } finally {
+                exchange.close();
+            }
         });
         server.start();
         try {
             withSite(plugin, true, "127.0.0.1:" + server.getAddress().getPort(), () ->
                     assertThrows(java.io.IOException.class, () -> plugin.isSynchronizedWithinBudget("http", 5000)));
-        } finally { server.stop(0); }
+        } finally {
+            server.stop(0);
+        }
     }
 
     @Test
@@ -555,9 +565,13 @@ public class StaticSitePluginTest {
             exchange.sendResponseHeaders(200, 10);
             exchange.getResponseBody().write('0');
             exchange.getResponseBody().flush();
-            try { release.await(3, java.util.concurrent.TimeUnit.SECONDS); }
-            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
-            finally { exchange.close(); }
+            try {
+                release.await(3, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } finally {
+                exchange.close();
+            }
         });
         server.start();
         try {
@@ -566,7 +580,14 @@ public class StaticSitePluginTest {
                 assertThrows(java.io.IOException.class, () -> plugin.isSynchronizedWithinBudget("http", 200));
                 assertTrue(java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < 2000);
             });
-        } finally { release.countDown(); server.stop(0); }
+        } finally {
+            release.countDown();
+            server.stop(0);
+        }
+    }
+
+    private interface ThrowingRunnable {
+        void run() throws Exception;
     }
 
     private interface ConfigThrowingRunnable {

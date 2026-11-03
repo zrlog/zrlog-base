@@ -54,12 +54,6 @@ public class WebsiteKvService {
         }
     }
 
-    public static final class Entry {
-        public String name;
-        public String value;
-        public long size;
-    }
-
     public List<Entry> listByPrefix(String prefix) {
         try {
             return websites.get()
@@ -111,5 +105,11 @@ public class WebsiteKvService {
         }
         upgrade.setUpgradePreview(Objects.equals(upgrade.getUpgradePreview(), true));
         return upgrade;
+    }
+
+    public static final class Entry {
+        public String name;
+        public String value;
+        public long size;
     }
 }

@@ -30,6 +30,7 @@ public class BaseDataInitVO implements Serializable {
     private Statistics statistics = new Statistics();
     private List<UserBasicDTO> users = new ArrayList<>();
     private Map<String, Map<String, Object>> templateConfigCacheMap = new ConcurrentHashMap<>();
+
     public BaseDataInitVO() {
     }
 
@@ -158,6 +159,7 @@ public class BaseDataInitVO implements Serializable {
         private Long totalArticleSize;
         private Long totalTagSize;
         private Long totalTypeSize;
+
         public Statistics() {
         }
 

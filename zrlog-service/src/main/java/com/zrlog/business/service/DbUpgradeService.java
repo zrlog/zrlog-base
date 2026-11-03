@@ -192,7 +192,9 @@ public class DbUpgradeService implements AutoCloseable {
                         try {
                             dao.execute(sql);
                         } catch (Exception e) {
-                            if (!isAlreadyAppliedSqliteSchemaChange(sql, e)) {
+                            if (!isAlreadyAppliedSqliteSchemaChange(sql, e)
+                                    && !(entry.getKey() == 32
+                                            && isExistingAssistantIndex(sql, e))) {
                                 throw e;
                             }
                             LOGGER.info("Skip already applied SQLite schema migration: " + sql);
@@ -298,6 +300,23 @@ public class DbUpgradeService implements AutoCloseable {
         String jdbcUrl = dataSource.getDataSourceProperties().getProperty("jdbcUrl");
         return jdbcUrl != null
                 && jdbcUrl.regionMatches(true, 0, "jdbc:sqlite:", 0, "jdbc:sqlite:".length());
+    }
+
+    /**
+     * Version 32 can resume after a partial DDL commit without touching existing assistant data.
+     */
+    private boolean isExistingAssistantIndex(String sql, Exception error) {
+        if (!sql.stripLeading().toLowerCase(Locale.ROOT).startsWith("create index `assistant_"))
+            return false;
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof java.sql.SQLException) {
+                var failure = (java.sql.SQLException) cause;
+                if (usesMysqlDialect() && failure.getErrorCode() == 1061) return true;
+                if ("42S11".equals(failure.getSQLState()) && failure.getErrorCode() == 42111)
+                    return true;
+            }
+        }
+        return false;
     }
 
     private boolean isAlreadyAppliedSqliteSchemaChange(String sql, Exception exception) {

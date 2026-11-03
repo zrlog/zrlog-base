@@ -123,7 +123,7 @@ public class V31EntityMetadataUpgradeTest {
             db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "30");
             new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
             assertEquals(
-                    "31",
+                    String.valueOf(com.zrlog.business.version.UpgradeVersionHandler.SQL_VERSION),
                     db.scalar(
                             "SELECT value FROM website WHERE name=?",
                             CacheService.ZRLOG_SQL_VERSION_KEY));
@@ -240,7 +240,8 @@ public class V31EntityMetadataUpgradeTest {
                 }
                 coldStart.get(5, TimeUnit.SECONDS);
                 assertEquals(
-                        "31",
+                        String.valueOf(
+                                com.zrlog.business.version.UpgradeVersionHandler.SQL_VERSION),
                         db.scalar(
                                 "SELECT value FROM website WHERE name=?",
                                 CacheService.ZRLOG_SQL_VERSION_KEY));
@@ -264,7 +265,7 @@ public class V31EntityMetadataUpgradeTest {
             db.putWebsite(DistributedLock.SCHEMA_UPGRADE_KEY, "previous-owner");
             new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
             assertEquals(
-                    "31",
+                    String.valueOf(com.zrlog.business.version.UpgradeVersionHandler.SQL_VERSION),
                     db.scalar(
                             "SELECT value FROM website WHERE name=?",
                             CacheService.ZRLOG_SQL_VERSION_KEY));
@@ -328,13 +329,14 @@ public class V31EntityMetadataUpgradeTest {
             db.afterWebApiQuery((sql, params) -> requests.incrementAndGet());
             new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
             assertEquals(
-                    "31",
+                    String.valueOf(com.zrlog.business.version.UpgradeVersionHandler.SQL_VERSION),
                     db.scalar(
                             "SELECT value FROM website WHERE name=?",
                             CacheService.ZRLOG_SQL_VERSION_KEY));
+            // Includes version 32: three assistant tables, eight indexes and its version marker.
             assertTrue(
                     "Empty migration made " + requests.get() + " remote calls",
-                    requests.get() <= 100);
+                    requests.get() <= 113);
             assertNull(
                     db.scalar(
                             "SELECT value FROM website WHERE name=?",
@@ -374,7 +376,8 @@ public class V31EntityMetadataUpgradeTest {
                 new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
                 assertTrue(failed.get());
                 assertEquals(
-                        "31",
+                        String.valueOf(
+                                com.zrlog.business.version.UpgradeVersionHandler.SQL_VERSION),
                         db.scalar(
                                 "SELECT value FROM website WHERE name=?",
                                 CacheService.ZRLOG_SQL_VERSION_KEY));

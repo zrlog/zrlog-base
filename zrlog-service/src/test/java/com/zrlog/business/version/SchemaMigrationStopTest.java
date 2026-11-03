@@ -146,7 +146,7 @@ public class SchemaMigrationStopTest {
                                     "SELECT value FROM website WHERE name='base_data_init_cache_v3'"));
                     new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
                     assertEquals(
-                            "31",
+                            "32",
                             db.scalar(
                                     "SELECT value FROM website WHERE name=?",
                                     CacheService.ZRLOG_SQL_VERSION_KEY));
@@ -250,7 +250,7 @@ public class SchemaMigrationStopTest {
                                     "SELECT value FROM website WHERE name=?",
                                     DistributedLock.SCHEMA_UPGRADE_KEY));
                     assertEquals(
-                            "31",
+                            "32",
                             db.scalar(
                                     "SELECT value FROM website WHERE name=?",
                                     CacheService.ZRLOG_SQL_VERSION_KEY));

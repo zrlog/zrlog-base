@@ -156,6 +156,8 @@ public class DbUpgradeServiceDatabaseTest {
                         "-- dialect: mysql\r\n"
                                 + "insert into website(name,value) values('mysql-migration','applied');",
                         30);
+        // This fixture advertises MySQL while executing on SQLite: isolate the dialect test's SQL.
+        writeUpgradeSql(folder, "-- schema already installed by the fixture", 32);
         try {
             System.setProperty("sws.conf.path", folder.getAbsolutePath());
             for (String jdbcUrl :

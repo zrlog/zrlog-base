@@ -31,13 +31,4 @@ public class UserRepository extends BaseRepository<User, Long> {
         return queryOne(
                 "select userName,userId,header from user where userId=?", UserBasicDTO.class, id);
     }
-
-    public com.zrlog.data.security.AccountAccess ownerAccess() throws SQLException {
-        return com.zrlog.data.security.AccountAccess.fromSnapshot(
-                queryOne(
-                        "SELECT userId,role,enabled,authVersion FROM user WHERE role=? AND enabled=? ORDER BY userId LIMIT 1",
-                        com.zrlog.data.security.AccountAccess.Snapshot.class,
-                        "owner",
-                        true));
-    }
 }

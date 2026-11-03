@@ -9,6 +9,7 @@ import com.zrlog.common.CacheService;
 import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.ZrLogConfig;
+import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import java.util.Collections;
@@ -38,14 +39,15 @@ public class DataWebSetupTest {
                             () -> container.get(CacheService.class));
             assertEquals("Application database is not ready", error.getCause().getMessage());
 
-            db.putWebsite("title", "Shared cache site");
+            WebSiteRepository websites = new WebSiteRepository(db.dataSource());
+            websites.updateByKV("title", "Shared cache site");
             config.attachDatabase(db.dataSource());
             setup.onDatabaseReady(db.dataSource());
             CacheService cache = container.get(CacheService.class);
             assertSame(cache.getPublicWebSiteInfo(), setup.getPublicWebSiteInfo());
             assertEquals("Shared cache site", cache.getPublicWebSiteInfo().getTitle());
             assertSame(cache, container.get(CacheService.class));
-            db.putWebsite("title", "Updated site");
+            websites.updateByKV("title", "Updated site");
             cache.refreshInitData();
             assertEquals(
                     "Updated site",

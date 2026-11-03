@@ -9,6 +9,7 @@ import com.zrlog.common.TokenService;
 import com.zrlog.common.vo.AdminFullTokenVO;
 import com.zrlog.data.repository.UserRepository;
 import com.zrlog.data.service.UserPreferenceStore;
+import com.zrlog.model.User;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
@@ -30,9 +31,14 @@ public class AdminTokenServiceTest {
 
     private static Cookie createAdminCookie(AdminTokenService service, String secretKey)
             throws Exception {
+        return createAdminCookie(service, 7, secretKey);
+    }
+
+    private static Cookie createAdminCookie(AdminTokenService service, int userId, String secretKey)
+            throws Exception {
         CapturedResponse capturedResponse = new CapturedResponse();
         service.setAdminToken(
-                7,
+                userId,
                 secretKey,
                 "session-id",
                 "http",
@@ -152,14 +158,14 @@ public class AdminTokenServiceTest {
                             ? ZrLogTestDatabase.openWebApi()
                             : ZrLogTestDatabase.open(
                                     ZrLogTestDatabase.DatabaseType.valueOf(backend))) {
-                db.update(
-                        "INSERT INTO user(userId,userName,role,enabled,authVersion,secretKey) VALUES(?,?,?,?,?,?)",
-                        7,
-                        "owner",
-                        "owner",
-                        true,
-                        0,
-                        "secret-key");
+                User owner = new User();
+                owner.setUserName("owner");
+                owner.setRole("owner");
+                owner.setEnabled(true);
+                owner.setAuthVersion(0);
+                owner.setSecretKey("secret-key");
+                new UserRepository(db.dataSource()).insert(owner);
+                int userId = Math.toIntExact(owner.getId());
                 AdminTokenService service =
                         new AdminTokenService(
                                 30,
@@ -174,21 +180,23 @@ public class AdminTokenServiceTest {
                                 return now;
                             }
                         };
-                Cookie cookie = createAdminCookie(service, "secret-key");
+                Cookie cookie = createAdminCookie(service, userId, "secret-key");
                 HttpRequest request =
                         request("/admin", header(cookie.getValue()), null, new HashMap<>());
 
                 AdminFullTokenVO parsed = service.getAdminTokenVO(request);
                 assertNotNull(parsed);
-                assertEquals(7, parsed.getUserId());
+                assertEquals(userId, parsed.getUserId());
                 assertEquals("secret-key", parsed.getSecretKey());
                 assertEquals("session-id", parsed.getSessionId());
 
-                db.update("UPDATE user SET enabled=? WHERE userId=?", false, 7);
+                // External writes must invalidate authentication even while the secret is cached.
+                db.update("UPDATE user SET enabled=? WHERE userId=?", false, userId);
                 assertNull(service.getAdminTokenVO(request));
-                db.update("UPDATE user SET enabled=?,authVersion=? WHERE userId=?", true, 1, 7);
+                db.update(
+                        "UPDATE user SET enabled=?,authVersion=? WHERE userId=?", true, 1, userId);
                 assertNull(service.getAdminTokenVO(request));
-                db.update("DELETE FROM user WHERE userId=?", 7);
+                db.update("DELETE FROM user WHERE userId=?", userId);
                 assertNull(service.getAdminTokenVO(request));
             }
         }

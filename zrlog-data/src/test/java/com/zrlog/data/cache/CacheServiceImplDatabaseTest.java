@@ -13,6 +13,13 @@ import com.zrlog.common.cache.dto.UserBasicDTO;
 import com.zrlog.common.cache.vo.BaseDataInitVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
 import com.zrlog.data.di.DaggerDataComponent;
+import com.zrlog.data.repository.TagRepository;
+import com.zrlog.data.repository.TypeRepository;
+import com.zrlog.data.repository.UserRepository;
+import com.zrlog.data.repository.WebSiteRepository;
+import com.zrlog.model.Tag;
+import com.zrlog.model.Type;
+import com.zrlog.model.User;
 import com.zrlog.plugin.IPlugin;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.test.support.ZrLogTestDatabase;
@@ -67,20 +74,21 @@ public class CacheServiceImplDatabaseTest {
     }
 
     private static void seedLookupTables(ZrLogTestDatabase db) throws Exception {
-        db.update(
-                "insert into user(userId, email, password, userName, header) values(?, ?, ?, ?, ?)",
-                1,
-                "db@example.com",
-                "password",
-                "db-user",
-                "/avatar.png");
-        db.update(
-                "insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
-                1,
-                "db",
-                "Db Type",
-                "Db posts");
-        db.update("insert into tag(tagId, text, count) values(?, ?, ?)", 1, "db-tag", 2);
+        User user = new User();
+        user.setEmail("db@example.com");
+        user.setPassword("password");
+        user.setUserName("db-user");
+        user.setHeader("/avatar.png");
+        new UserRepository(db.dataSource()).insert(user);
+        Type type = new Type();
+        type.setAlias("db");
+        type.setTypeName("Db Type");
+        type.setRemark("Db posts");
+        new TypeRepository(db.dataSource()).insert(type);
+        Tag tag = new Tag();
+        tag.setText("db-tag");
+        tag.setCount(2);
+        new TagRepository(db.dataSource()).insert(tag);
     }
 
     private static ZrLogConfig testConfig(boolean installed) throws Exception {
@@ -103,16 +111,11 @@ public class CacheServiceImplDatabaseTest {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             applicationConfig = testConfig(true);
             BaseDataInitVO cached = cachedInit();
-            db.update(
-                    "insert into website(name, value, remark) values(?, ?, ?)",
-                    "base_data_init_cache_v3",
-                    new Gson().toJson(cached),
-                    "");
-            db.update(
-                    "insert into website(name, value, remark) values(?, ?, ?)",
-                    "zrlogSqlVersion",
-                    "7",
-                    "");
+            WebSiteRepository websites = new WebSiteRepository(db.dataSource());
+            websites.insert(
+                    WebSiteRepository.entry(
+                            "base_data_init_cache_v3", new Gson().toJson(cached), ""));
+            websites.insert(WebSiteRepository.entry("zrlogSqlVersion", "7", ""));
 
             CacheServiceImpl service =
                     ((CacheServiceImpl)
@@ -136,16 +139,9 @@ public class CacheServiceImplDatabaseTest {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             applicationConfig = testConfig(false);
             seedLookupTables(db);
-            db.update(
-                    "insert into website(name, value, remark) values(?, ?, ?)",
-                    "base_data_init_cache_v3",
-                    "{bad-json",
-                    "");
-            db.update(
-                    "insert into website(name, value, remark) values(?, ?, ?)",
-                    "default_setting",
-                    "{\"color\":\"blue\"}",
-                    "");
+            WebSiteRepository websites = new WebSiteRepository(db.dataSource());
+            websites.insert(WebSiteRepository.entry("base_data_init_cache_v3", "{bad-json", ""));
+            websites.insert(WebSiteRepository.entry("default_setting", "{\"color\":\"blue\"}", ""));
 
             CacheServiceImpl service =
                     ((CacheServiceImpl)
@@ -169,21 +165,10 @@ public class CacheServiceImplDatabaseTest {
             throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             applicationConfig = testConfig(true);
-            db.update(
-                    "insert into website(name, value, remark) values(?, ?, ?)",
-                    "base_data_init_cache_v3",
-                    "{bad-json",
-                    "");
-            db.update(
-                    "insert into website(name, value, remark) values(?, ?, ?)",
-                    "title",
-                    "Installed Site",
-                    "");
-            db.update(
-                    "insert into website(name, value, remark) values(?, ?, ?)",
-                    "author",
-                    "Installed Author",
-                    "");
+            WebSiteRepository websites = new WebSiteRepository(db.dataSource());
+            websites.insert(WebSiteRepository.entry("base_data_init_cache_v3", "{bad-json", ""));
+            websites.insert(WebSiteRepository.entry("title", "Installed Site", ""));
+            websites.insert(WebSiteRepository.entry("author", "Installed Author", ""));
 
             PublicWebSiteInfo info =
                     ((CacheServiceImpl)

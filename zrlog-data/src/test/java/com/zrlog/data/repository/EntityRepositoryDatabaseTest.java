@@ -8,7 +8,10 @@ import com.zrlog.common.cache.dto.LinkDTO;
 import com.zrlog.common.cache.dto.LogNavDTO;
 import com.zrlog.common.cache.dto.TagDTO;
 import com.zrlog.model.Comment;
+import com.zrlog.model.Link;
 import com.zrlog.model.Log;
+import com.zrlog.model.LogNav;
+import com.zrlog.model.Tag;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -44,18 +47,21 @@ public class EntityRepositoryDatabaseTest {
     @Test
     public void publicListsPreserveOrderingNavigationFiltersAndNullableFields() throws Exception {
         try (ZrLogTestDatabase db = open()) {
-            db.update(
-                    "INSERT INTO link(linkId,linkName,sort,url,alt,icon) VALUES(?,?,?,?,?,?)",
-                    1,
-                    "Later",
-                    20,
-                    "/later",
-                    "Later link",
-                    "later-icon");
-            db.update("INSERT INTO link(linkId,linkName,sort) VALUES(?,?,?)", 2, "Earlier", 10);
-            List<LinkDTO> links = new LinkRepository(db.dataSource()).findAll();
+            LinkRepository linkRepository = new LinkRepository(db.dataSource());
+            Link laterLink = new Link();
+            laterLink.setLinkName("Later");
+            laterLink.setSort(20);
+            laterLink.setUrl("/later");
+            laterLink.setAlt("Later link");
+            laterLink.setIcon("later-icon");
+            linkRepository.insert(laterLink);
+            Link earlierLink = new Link();
+            earlierLink.setLinkName("Earlier");
+            earlierLink.setSort(10);
+            linkRepository.insert(earlierLink);
+            List<LinkDTO> links = linkRepository.findAll();
             assertEquals(2, links.size());
-            assertEquals(Long.valueOf(2), links.get(0).getId());
+            assertEquals(earlierLink.getId(), links.get(0).getId());
             assertEquals("Earlier", links.get(0).getLinkName());
             assertEquals(Long.valueOf(10), links.get(0).getSort());
             assertNull(links.get(0).getUrl());
@@ -65,44 +71,43 @@ public class EntityRepositoryDatabaseTest {
             assertEquals("Later link", links.get(1).getAlt());
             assertEquals("later-icon", links.get(1).getIcon());
 
-            db.update(
-                    "INSERT INTO lognav(navId,navName,url,sort,icon) VALUES(?,?,?,?,?)",
-                    1,
-                    "Later",
-                    "/later",
-                    20,
-                    "nav-icon");
-            db.update(
-                    "INSERT INTO lognav(navId,navName,url,sort) VALUES(?,?,?,?)",
-                    2,
-                    "Earlier",
-                    "/earlier",
-                    10);
-            db.update(
-                    "INSERT INTO lognav(navId,navName,url,sort) VALUES(?,?,?,?)",
-                    3,
-                    null,
-                    "/hidden",
-                    0);
-            db.update(
-                    "INSERT INTO lognav(navId,navName,url,sort) VALUES(?,?,?,?)",
-                    4,
-                    "Hidden",
-                    null,
-                    0);
-            List<LogNavDTO> navs = new LogNavRepository(db.dataSource()).findAll();
+            LogNavRepository navRepository = new LogNavRepository(db.dataSource());
+            LogNav laterNav = new LogNav();
+            laterNav.setNavName("Later");
+            laterNav.setUrl("/later");
+            laterNav.setSort(20);
+            laterNav.setIcon("nav-icon");
+            navRepository.insert(laterNav);
+            LogNav earlierNav = new LogNav();
+            earlierNav.setNavName("Earlier");
+            earlierNav.setUrl("/earlier");
+            earlierNav.setSort(10);
+            navRepository.insert(earlierNav);
+            LogNav missingName = new LogNav();
+            missingName.setUrl("/hidden");
+            missingName.setSort(0);
+            navRepository.insert(missingName);
+            LogNav missingUrl = new LogNav();
+            missingUrl.setNavName("Hidden");
+            missingUrl.setSort(0);
+            navRepository.insert(missingUrl);
+            List<LogNavDTO> navs = navRepository.findAll();
             assertEquals(2, navs.size());
-            assertEquals(Long.valueOf(2), navs.get(0).getId());
+            assertEquals(earlierNav.getId(), navs.get(0).getId());
             assertEquals("Earlier", navs.get(0).getNavName());
             assertEquals("/earlier", navs.get(0).getUrl());
             assertEquals(Long.valueOf(10), navs.get(0).getSort());
             assertNull(navs.get(0).getIcon());
             assertEquals("nav-icon", navs.get(1).getIcon());
 
-            db.update("INSERT INTO tag(tagId,text,count) VALUES(?,?,?)", 1, "java", 3);
-            List<TagDTO> tags = new TagRepository(db.dataSource()).findAll();
+            TagRepository tagRepository = new TagRepository(db.dataSource());
+            Tag tag = new Tag();
+            tag.setText("java");
+            tag.setCount(3);
+            tagRepository.insert(tag);
+            List<TagDTO> tags = tagRepository.findAll();
             assertEquals(1, tags.size());
-            assertEquals(Long.valueOf(1), tags.get(0).getId());
+            assertEquals(tag.getId(), tags.get(0).getId());
             assertEquals("java", tags.get(0).getText());
             assertEquals(Long.valueOf(3), tags.get(0).getCount());
         }
@@ -274,6 +279,7 @@ public class EntityRepositoryDatabaseTest {
     public void historicalUnknownCreationTimeAndAuthorizationVersionRemainIndependent()
             throws Exception {
         try (ZrLogTestDatabase db = open()) {
+            // Historical rows deliberately have no Entity creation/update timestamps.
             db.update(
                     "INSERT INTO user(userId,userName,authVersion) VALUES(?,?,?)",
                     1,

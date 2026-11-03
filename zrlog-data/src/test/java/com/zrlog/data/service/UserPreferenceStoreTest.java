@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 import com.zrlog.data.repository.UserRepository;
+import com.zrlog.model.User;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import org.junit.Test;
 
@@ -12,32 +13,40 @@ public class UserPreferenceStoreTest {
     public void sessionPreferencesUseAccountJsonAndValidateStoredValues() throws Exception {
         for (ZrLogTestDatabase.DatabaseType database : ZrLogTestDatabase.DatabaseType.values()) {
             try (ZrLogTestDatabase ignored = ZrLogTestDatabase.open(database)) {
-                UserRepository user = new UserRepository(ignored.dataSource());
-                user.execute("insert into user(userId,userName) values(1,'one')");
-                user.execute("insert into user(userId,userName) values(2,'two')");
+                UserRepository users = new UserRepository(ignored.dataSource());
+                User one = new User();
+                one.setUserName("one");
+                users.insert(one);
+                User two = new User();
+                two.setUserName("two");
+                users.insert(two);
+                int firstId = Math.toIntExact(one.getId());
+                int secondId = Math.toIntExact(two.getId());
                 UserPreferenceStore store =
                         new UserPreferenceStore(() -> new UserRepository(ignored.dataSource()));
                 assertNull(store.raw(999));
-                assertNull(store.raw(1));
-                assertEquals(1440, store.sessionTimeoutMinutes(1, 1440));
+                assertNull(store.raw(firstId));
+                assertEquals(1440, store.sessionTimeoutMinutes(firstId, 1440));
                 store.mutate(
-                        1,
+                        firstId,
                         root ->
                                 root.add(
                                         "session",
                                         com.google.gson.JsonParser.parseString(
                                                 "{\"timeoutMinutes\":60}")));
-                assertEquals(60, store.sessionTimeoutMinutes(1, 1440));
-                assertEquals(1440, store.sessionTimeoutMinutes(2, 1440));
+                assertEquals(60, store.sessionTimeoutMinutes(firstId, 1440));
+                assertEquals(1440, store.sessionTimeoutMinutes(secondId, 1440));
                 for (String invalid :
                         new String[] {"5", "100000", "1.5", "\"60\"", "true", "null", "1e100"}) {
-                    user.execute(
-                            "update user set preferences=? where userId=1",
-                            "{\"session\":{\"timeoutMinutes\":" + invalid + "}}");
-                    assertEquals(30, store.sessionTimeoutMinutes(1, 30));
+                    User current = users.loadById(one.getId());
+                    current.setPreferences("{\"session\":{\"timeoutMinutes\":" + invalid + "}}");
+                    users.update(current);
+                    assertEquals(30, store.sessionTimeoutMinutes(firstId, 30));
                 }
-                user.execute("update user set preferences=? where userId=1", "{broken");
-                assertEquals(30, store.sessionTimeoutMinutes(1, 30));
+                User current = users.loadById(one.getId());
+                current.setPreferences("{broken");
+                users.update(current);
+                assertEquals(30, store.sessionTimeoutMinutes(firstId, 30));
             }
         }
     }

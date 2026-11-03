@@ -11,6 +11,7 @@ import com.zrlog.data.dto.VisitorCommentDTO;
 import com.zrlog.data.repository.*;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
+import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -37,45 +38,39 @@ public class CoreModelDatabaseTest {
     }
 
     private static void seedContent(ZrLogTestDatabase db) throws Exception {
-        db.update(
-                "insert into user(userId, email, password, userName, header) values(?, ?, ?, ?, ?)",
-                1,
-                "admin@example.com",
-                "password",
-                "admin",
-                "/avatar.png");
-        db.update(
-                "insert into type(typeId, alias, typeName, remark) values(?, ?, ?, ?)",
-                1,
-                "tech",
-                "Tech",
-                "Tech posts");
-        db.update(
-                "insert into link(linkId, linkName, url, sort, alt, icon, status) values(?, ?, ?, ?, ?, ?, ?)",
-                1,
-                "ZrLog",
-                "https://www.zrlog.com",
-                1,
-                "ZrLog",
-                "link",
-                true);
-        db.update(
-                "insert into lognav(navId, navName, url, sort, icon) values(?, ?, ?, ?, ?)",
-                1,
-                "Home",
-                "/",
-                1,
-                "home");
-        db.update(
-                "insert into plugin(pluginId, content, isSystem, pTitle, sort, pluginName, level)"
-                        + " values(?, ?, ?, ?, ?, ?, ?)",
-                1,
-                "{}",
-                false,
-                "Plugin",
-                1,
-                "Plugin",
-                1);
+        User user = new User();
+        user.setEmail("admin@example.com");
+        user.setPassword("password");
+        user.setUserName("admin");
+        user.setHeader("/avatar.png");
+        new UserRepository(db.dataSource()).insert(user);
+        Type type = new Type();
+        type.setAlias("tech");
+        type.setTypeName("Tech");
+        type.setRemark("Tech posts");
+        new TypeRepository(db.dataSource()).insert(type);
+        Link link = new Link();
+        link.setLinkName("ZrLog");
+        link.setUrl("https://www.zrlog.com");
+        link.setSort(1);
+        link.setAlt("ZrLog");
+        link.setIcon("link");
+        link.setStatus(true);
+        new LinkRepository(db.dataSource()).insert(link);
+        LogNav nav = new LogNav();
+        nav.setNavName("Home");
+        nav.setUrl("/");
+        nav.setSort(1);
+        nav.setIcon("home");
+        new LogNavRepository(db.dataSource()).insert(nav);
+        Plugin plugin = new Plugin();
+        plugin.setContent("{}");
+        plugin.setIsSystem(false);
+        plugin.setPTitle("Plugin");
+        plugin.setSort(1);
+        plugin.setPluginName("Plugin");
+        plugin.setLevel(1);
+        new PluginRepository(db.dataSource()).insert(plugin);
         insertArticle(
                 db,
                 1,
@@ -109,34 +104,30 @@ public class CoreModelDatabaseTest {
                 0,
                 true,
                 false);
-        db.update(
-                "insert into comment(commentId, commTime, have_read, userComment, userMail, userHome, userIp,"
-                        + " userName, hide, logId, header) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                1,
-                todayAt("09:00:00"),
-                false,
-                "Nice post",
-                "reader@example.com",
-                "https://reader.example.com",
-                "127.0.0.1",
-                "Reader",
-                false,
-                1,
-                "/reader.png");
-        db.update(
-                "insert into comment(commentId, commTime, have_read, userComment, userMail, userHome, userIp,"
-                        + " userName, hide, logId, header) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                2,
-                "2026-01-15 12:00:00",
-                true,
-                "Old post",
-                null,
-                "",
-                "127.0.0.2",
-                "Old",
-                false,
-                2,
-                "");
+        Comment comment = new Comment();
+        comment.setCommTime(Timestamp.valueOf(todayAt("09:00:00")));
+        comment.setHaveRead(false);
+        comment.setUserComment("Nice post");
+        comment.setUserMail("reader@example.com");
+        comment.setUserHome("https://reader.example.com");
+        comment.setUserIp("127.0.0.1");
+        comment.setUserName("Reader");
+        comment.setHide(false);
+        comment.setLogId(1);
+        comment.setHeader("/reader.png");
+        CommentRepository comments = new CommentRepository(db.dataSource());
+        comments.insert(comment);
+        Comment old = new Comment();
+        old.setCommTime(Timestamp.valueOf("2026-01-15 12:00:00"));
+        old.setHaveRead(true);
+        old.setUserComment("Old post");
+        old.setUserHome("");
+        old.setUserIp("127.0.0.2");
+        old.setUserName("Old");
+        old.setHide(false);
+        old.setLogId(2);
+        old.setHeader("");
+        comments.insert(old);
     }
 
     private static String todayAt(String time) {
@@ -155,42 +146,36 @@ public class CoreModelDatabaseTest {
             boolean rubbish,
             boolean privacy)
             throws Exception {
-        db.update(
-                "insert into log(logId, alias, canComment, click, version, content, plain_content, markdown,"
-                        + " digest, keywords, recommended, releaseTime, last_update_date, title, typeId, userId,"
-                        + " hot, rubbish, privacy, editor_type) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
-                        + " ?, ?, ?, ?, ?, ?)",
-                id,
-                alias,
-                true,
-                click,
-                1,
-                content,
-                content,
-                content,
-                "Digest",
-                keywords,
-                false,
-                releaseTime,
-                releaseTime,
-                title,
-                1,
-                1,
-                false,
-                rubbish,
-                privacy,
-                "markdown");
+        Log article = new Log();
+        article.setId((long) id);
+        article.setAlias(alias);
+        article.setCanComment(true);
+        article.setClick(click);
+        article.setContent(content);
+        article.setPlainContent(content);
+        article.setMarkdown(content);
+        article.setDigest("Digest");
+        article.setKeywords(keywords);
+        article.setRecommended(false);
+        article.setReleaseTime(Timestamp.valueOf(releaseTime));
+        article.setTitle(title);
+        article.setTypeId(1);
+        article.setUserId(1);
+        article.setHot(false);
+        article.setRubbish(rubbish);
+        article.setPrivacy(privacy);
+        article.setEditorType("markdown");
+        new LogRepository(db.dataSource()).insert(article);
     }
 
     @Test
     public void shouldQueryArticleModelViewsThroughRealTables() throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);
-            db.update(
-                    "update log set extensions=? where logId=?",
-                    "{\"metadata\":{\"topicIds\":[\"tech\"],\"priority\":3}}",
-                    1);
             LogRepository log = new LogRepository(db.dataSource());
+            Log article = log.loadById(1L);
+            article.setExtensions("{\"metadata\":{\"topicIds\":[\"tech\"],\"priority\":3}}");
+            log.update(article);
 
             PageData<ArticleBasicDTO> visitorPage = log.visitorFind(page(), "content");
             assertEquals(2L, visitorPage.getTotalElements());
@@ -236,11 +221,12 @@ public class CoreModelDatabaseTest {
                     1,
                     false,
                     true);
-            db.update("update log set sticky=? where logId=?", 5, 1);
-            db.update("update log set sticky=? where logId=?", 5, 2);
-            db.update("update log set sticky=? where logId=?", 100, 3);
-            db.update("update log set sticky=? where logId=?", 100, 5);
             LogRepository log = new LogRepository(db.dataSource());
+            for (long id : new long[] {1, 2, 3, 5}) {
+                Log article = log.loadById(id);
+                article.setSticky(id <= 2 ? 5 : 100);
+                log.update(article);
+            }
 
             PageData<ArticleBasicDTO> firstPage = log.visitorFindHome(new PageRequestImpl(1L, 2L));
             PageData<ArticleBasicDTO> secondPage = log.visitorFindHome(new PageRequestImpl(2L, 2L));

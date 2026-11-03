@@ -115,10 +115,10 @@ public class UpdateVersionInfoPluginTest {
     public void hostSchedulingDisablesLegacyTimerAndKeepsOnDemandChecks(DatabaseType databaseType)
             throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-            db.update(
-                    "insert into website(name, value) values(?, ?)",
-                    WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
-                    "60");
+            new WebSiteRepository(db.dataSource())
+                    .insert(
+                            WebSiteRepository.entry(
+                                    WebsiteKvService.AUTO_UPGRADE_VERSION_KEY, "60", null));
             var plugin =
                     new TestUpdateVersionInfoPlugin(
                             new FakeVersionTimerTask(version("3.7.0")), db.dataSource());
@@ -135,11 +135,12 @@ public class UpdateVersionInfoPluginTest {
     public void shouldStartWithoutSchedulingWhenAutoUpgradeIsDisabled(DatabaseType databaseType)
             throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-            db.update(
-                    "insert into website(name, value, remark) values(?, ?, ?)",
-                    WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
-                    String.valueOf(AutoUpgradeVersionType.NEVER.getCycle()),
-                    "");
+            new WebSiteRepository(db.dataSource())
+                    .insert(
+                            WebSiteRepository.entry(
+                                    WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
+                                    String.valueOf(AutoUpgradeVersionType.NEVER.getCycle()),
+                                    ""));
             UpdateVersionInfoPlugin plugin =
                     new UpdateVersionInfoPlugin(
                             new UpgradeNoticeService(
@@ -161,16 +162,14 @@ public class UpdateVersionInfoPluginTest {
     public void shouldStartScheduledVersionTaskFromDatabaseConfigWithoutNetwork(
             DatabaseType databaseType) throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-            db.update(
-                    "insert into website(name, value, remark) values(?, ?, ?)",
-                    WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
-                    String.valueOf(AutoUpgradeVersionType.ONE_MINUTE.getCycle()),
-                    "");
-            db.update(
-                    "insert into website(name, value, remark) values(?, ?, ?)",
-                    WebsiteKvService.UPGRADE_PREVIEW_KEY,
-                    "true",
-                    "");
+            WebSiteRepository websites = new WebSiteRepository(db.dataSource());
+            websites.insert(
+                    WebSiteRepository.entry(
+                            WebsiteKvService.AUTO_UPGRADE_VERSION_KEY,
+                            String.valueOf(AutoUpgradeVersionType.ONE_MINUTE.getCycle()),
+                            ""));
+            websites.insert(
+                    WebSiteRepository.entry(WebsiteKvService.UPGRADE_PREVIEW_KEY, "true", ""));
             TestUpdateVersionInfoPlugin plugin =
                     new TestUpdateVersionInfoPlugin(
                             new FakeVersionTimerTask(version("3.7.0")), db.dataSource());

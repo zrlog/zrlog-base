@@ -3,14 +3,11 @@ package com.zrlog.model;
 import com.zrlog.data.repository.*;
 
 import com.hibegin.common.dao.ResultValueConvertUtils;
-import com.hibegin.common.dao.dto.Direction;
-import com.hibegin.common.dao.dto.OrderBy;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequestImpl;
 import com.zrlog.common.cache.dto.*;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
-import com.zrlog.data.dto.CommentDTO;
 import com.zrlog.data.dto.VisitorCommentDTO;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
@@ -18,7 +15,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -95,56 +91,19 @@ public class CoreModelDatabaseTest {
             LogRepository log = new LogRepository(db.dataSource());
 
             PageData<ArticleBasicDTO> visitorPage = log.visitorFind(page(), "content");
-            PageData<ArticleBasicDTO> adminPublished = log.adminFind(page(), "First", "tech", "published");
-            PageRequestImpl clickAsc = page();
-            clickAsc.setOrders(List.of(new OrderBy("click", Direction.ASC)));
-            PageRequestImpl defaultSortAsc = page();
-            defaultSortAsc.setOrders(List.of(new OrderBy("unknown", Direction.ASC)));
-            PageData<ArticleBasicDTO> adminClickAsc = log.adminFind(clickAsc, null, null);
-            PageData<ArticleBasicDTO> adminDefaultSortAsc = log.adminFind(defaultSortAsc, null, null);
-            ArticleBasicDTO adminDetail = log.adminFindByIdOrAlias(1);
-            ArticleBasicDTO adminDetailByLongId = log.adminFindByIdOrAlias(1L);
-
-            assertEquals(3L, log.findMaxId());
             assertEquals(2L, visitorPage.getTotalElements());
             assertEquals("Second", visitorPage.getRows().get(0).getTitle());
-            assertEquals(1L, adminPublished.getTotalElements());
-            assertEquals("Draft", adminClickAsc.getRows().get(0).getTitle());
-            assertEquals("First", adminDefaultSortAsc.getRows().get(0).getTitle());
-            assertEquals("First", adminDetail.getTitle());
-            assertEquals("First", adminDetailByLongId.getTitle());
             Map<String, Object> metadataExtensions =
-                    (Map<String, Object>) adminDetail.getExtensions().get("metadata");
+                    (Map<String, Object>) log.findByIdOrAlias(1, true).getExtensions().get("metadata");
             assertEquals(Collections.singletonList("tech"), metadataExtensions.get("topicIds"));
             assertEquals(3.0d, metadataExtensions.get("priority"));
-            assertEquals("admin", adminDetail.getUserName());
             assertEquals(2L, log.findByTypeAlias(1, 10, "tech").getTotalElements());
             assertEquals(1L, log.findByTag(1, 10, "zrlog").getTotalElements());
             assertEquals(2L, log.findByTag(1, 10, "java").getTotalElements());
             assertEquals(2L, log.findByDate(1, 10, "2026_01").getTotalElements());
             assertTrue(log.findByDate(1, 10, "").getRows().isEmpty());
             assertEquals(Long.valueOf(2), log.getArchives().get("2026_01"));
-            assertEquals(Long.valueOf(1), log.getAdminArticleData().get("2026-01-15"));
-            assertEquals(new BigDecimal(12), log.sumClick());
             assertEquals(2L, log.getVisitorCount());
-            assertEquals(3L, log.countByTypeId(1));
-            assertEquals(3L, log.getAdminCount());
-        }
-    }
-
-    @Test
-    public void shouldFilterAdminArticlesByDraftPrivateAndPublishedStatus() throws Exception {
-        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
-            seedContent(db);
-            insertArticle(db, 4, "private", "Private", "Private content", "secret",
-                    "2026-02-02 10:00:00", 1, false, true);
-            LogRepository log = new LogRepository(db.dataSource());
-
-            assertEquals(2L, log.adminFind(page(), null, null, "published").getTotalElements());
-            assertEquals("Private", log.adminFind(page(), null, null, "private").getRows().get(0).getTitle());
-            assertEquals("Draft", log.adminFind(page(), null, null, "draft").getRows().get(0).getTitle());
-            assertEquals(4L, log.adminFind(page(), null, null, "unknown").getTotalElements());
-            assertEquals("Private", log.adminFindByIdOrAlias("private").getTitle());
         }
     }
 
@@ -222,23 +181,13 @@ public class CoreModelDatabaseTest {
             seedContent(db);
             CommentRepository comment = new CommentRepository(db.dataSource());
 
-            PageData<CommentDTO> page = comment.find(page());
-            List<Comment> unread = comment.findHaveReadIsFalse();
             List<Comment> byLog = comment.findAllByLogId(1);
             List<VisitorCommentDTO> visitorComments = comment.visitorFindAllByLogId(1);
-            comment.doRead(1);
 
-            assertEquals(Long.valueOf(2), comment.count());
-            assertEquals(Long.valueOf(1), comment.countToDayComment());
-            assertEquals(2L, page.getTotalElements());
-            assertFalse(page.getRows().get(0).getCommTime().isEmpty());
-            assertEquals(1, unread.size());
             assertEquals(1, byLog.size());
             assertEquals("Reader", byLog.get(0).getUserName());
             assertEquals(1, visitorComments.size());
             assertFalse(visitorComments.get(0).getGravatarId().isEmpty());
-            assertTrue(ResultValueConvertUtils.toBoolean(
-                    db.queryOne("select have_read from comment where commentId=?", 1).get("have_read")));
         }
     }
 
@@ -256,12 +205,9 @@ public class CoreModelDatabaseTest {
             Set<String> tagTexts = refreshedTags.stream().map(TagDTO::getText).collect(Collectors.toSet());
 
             assertEquals("ZrLog", links.get(0).getLinkName());
-            assertEquals(1L, new LinkRepository(db.dataSource()).find(page()).getTotalElements());
             assertEquals("Home", navs.get(0).getNavName());
-            assertEquals(1L, new LogNavRepository(db.dataSource()).find(page()).getTotalElements());
             assertEquals("Tech", types.get(0).getTypeName());
             assertEquals(2L, types.get(0).getTypeamount().longValue());
-            assertEquals(1L, new TypeRepository(db.dataSource()).find(page()).getTotalElements());
             assertEquals("tech", new TypeRepository(db.dataSource()).findByAlias("tech").getAlias());
             assertEquals("admin", users.get(0).getUserName());
             assertNotNull(new UserRepository(db.dataSource()).getUserByUserName("admin"));

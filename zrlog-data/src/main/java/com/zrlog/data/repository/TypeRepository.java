@@ -4,8 +4,6 @@ import com.zrlog.model.Type;
 
 
 import com.hibegin.common.dao.DataSourceWrapper;
-import com.hibegin.common.dao.dto.PageData;
-import com.hibegin.common.dao.dto.PageRequest;
 import com.zrlog.common.cache.dto.TypeDTO;
 import jakarta.inject.Inject;
 
@@ -28,10 +26,6 @@ public class TypeRepository extends BaseRepository<Type, Long> {
                 " where rubbish=? and privacy=? and typeid=t.typeid) as typeamount from " + tableName + " t", TypeDTO.class, false, false);
     }
 
-    public PageData<TypeDTO> find(PageRequest page) {
-        return queryPageData("select t.typeId as id,t.alias,t.typeName,t.remark,t.arrange_plugin,(select count(logId) from " + LogRepository.TABLE_NAME +
-                " where typeid=t.typeid) as typeamount from " + tableName + " t", page, new Object[0], TypeDTO.class);
-    }
 
     public Type findByAlias(String alias) throws SQLException {
         return findMatching(Map.of("alias", alias), 1).stream().findFirst().orElse(null);

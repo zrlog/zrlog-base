@@ -4,8 +4,6 @@ import com.zrlog.model.LogNav;
 
 
 import com.hibegin.common.dao.DataSourceWrapper;
-import com.hibegin.common.dao.dto.PageData;
-import com.hibegin.common.dao.dto.PageRequest;
 import com.zrlog.common.cache.dto.LogNavDTO;
 import jakarta.inject.Inject;
 
@@ -26,7 +24,4 @@ public class LogNavRepository extends BaseRepository<LogNav, Long> {
         return queryList("select l.navId as id,l.navName,l.url,l.sort,l.icon from " + tableName + " l where l.url is not null and l.navName is not null order by sort", LogNavDTO.class);
     }
 
-    public PageData<LogNavDTO> find(PageRequest page) {
-        return queryPageData("select l.navId as id,l.navName,l.url,l.sort,l.icon from " + tableName + " l where l.url is not null and l.navName is not null order by sort", page, new Object[0], LogNavDTO.class);
-    }
 }

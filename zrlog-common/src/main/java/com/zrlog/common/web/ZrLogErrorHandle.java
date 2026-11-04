@@ -97,7 +97,7 @@ public class ZrLogErrorHandle implements HttpErrorHandle {
 
     private String getResponseMessage(Throwable error) {
         if (error instanceof AbstractBusinessException) {
-            String message = error.getMessage();
+            String message = ((AbstractBusinessException) error).getUserMessage();
             if (message != null && !message.isBlank()) {
                 return message;
             }

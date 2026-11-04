@@ -133,6 +133,23 @@ public class ZrLogErrorHandleTest {
     }
 
     @Test
+    public void shouldUseBusinessDisplayMessageWithoutLogDiagnostics() {
+        ResponseRecorder recorder = new ResponseRecorder();
+        AbstractBusinessException error =
+                new TestBusinessException() {
+                    @Override
+                    public String getUserMessage() {
+                        return "Check the settings and try again";
+                    }
+                };
+        new ZrLogErrorHandle(500).doHandle(request("/api/article", ""), recorder.response(), error);
+        ApiStandardResponse<?> response = (ApiStandardResponse<?>) recorder.json;
+        assertEquals(9001, response.getError());
+        assertEquals("Check the settings and try again", response.getMessage());
+        assertEquals("business-error", error.getMessage());
+    }
+
+    @Test
     public void shouldRenderApiNotFoundAndUnexpectedErrorsAsJson() {
         for (String locale : new String[] {"zh_CN", "en_US"}) {
             useLocale(locale);

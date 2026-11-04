@@ -11,4 +11,9 @@ public abstract class AbstractBusinessException extends RuntimeException {
     }
 
     public abstract int getError();
+
+    /** Localized text intended for API responses, which may differ from log diagnostics. */
+    public String getUserMessage() {
+        return getMessage();
+    }
 }

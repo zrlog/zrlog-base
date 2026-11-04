@@ -95,7 +95,7 @@ public class V31MySqlMetadataUpgradeTest {
 
                 new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
                 assertEquals(
-                        "31",
+                        String.valueOf(UpgradeVersionHandler.SQL_VERSION),
                         db.scalar(
                                 "SELECT value FROM website WHERE name=?",
                                 CacheService.ZRLOG_SQL_VERSION_KEY));

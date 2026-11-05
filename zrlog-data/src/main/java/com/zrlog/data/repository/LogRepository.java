@@ -5,7 +5,9 @@ import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequest;
 import com.hibegin.common.dao.dto.PageRequestImpl;
+import com.hibegin.common.dao.dto.UnPageRequestImpl;
 import com.hibegin.common.util.StringUtils;
+import com.zrlog.common.cache.vo.HotLogBasicInfoEntry;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
 import com.zrlog.data.exception.DAOException;
@@ -25,6 +27,10 @@ import java.util.concurrent.ExecutorService;
 public class LogRepository extends BaseRepository<Log, Long> implements Serializable {
 
     public static final String TABLE_NAME = "log";
+    private static final String VISITOR_FROM =
+            " from log l inner join user u on u.userId=l.userId"
+                    + " inner join type t on t.typeId=l.typeId"
+                    + " where l.rubbish=? and l.privacy=?";
     private final DataSourceWrapper dataSource;
 
     @Inject
@@ -153,58 +159,26 @@ public class LogRepository extends BaseRepository<Log, Long> implements Serializ
     }
 
     public PageData<ArticleBasicDTO> visitorFindHome(PageRequest pageRequest) {
-        String sql =
-                "select l.*,t.typeName,t.alias as typeAlias,u.userName,u.header as header,(select count(commentId) from "
-                        + CommentRepository.TABLE_NAME
-                        + " where logId=l.logId) commentSize from "
-                        + tableName
-                        + " l inner join user u inner join type t where l.rubbish=? and l.privacy=? and u.userId=l.userId and t.typeid=l.typeid order by l.sticky desc,l.logId desc";
-        return queryPageData(sql, pageRequest, new Object[] {false, false}, ArticleBasicDTO.class);
+        return queryVisitorPage(pageRequest, "", new Object[] {false, false}, true);
     }
 
     public PageData<ArticleBasicDTO> visitorFind(PageRequest pageRequest, String keywords) {
         if (StringUtils.isEmpty(keywords)) {
-            String sql =
-                    "select l.*,t.typeName,t.alias as typeAlias,u.userName,u.header as header,(select count(commentId) from "
-                            + CommentRepository.TABLE_NAME
-                            + " where logId=l.logId) commentSize from "
-                            + tableName
-                            + " l inner join user u inner join type t where rubbish=? and privacy=? and u.userId=l.userId and t.typeid=l.typeid  order by l.logId desc";
-            return queryPageData(
-                    sql, pageRequest, new Object[] {false, false}, ArticleBasicDTO.class);
+            return queryVisitorPage(pageRequest, "", new Object[] {false, false}, false);
         }
-        String sql =
-                "select l.*,t.typeName,t.alias as typeAlias,(select count(commentId) from "
-                        + CommentRepository.TABLE_NAME
-                        + " "
-                        + "where logId=l.logId) commentSize,u.userName,u.header as header from "
-                        + tableName
-                        + " l inner join user u,"
-                        + "type"
-                        + " t where rubbish=? and privacy=? and u.userId=l.userId and t.typeId=l.typeId and (l"
-                        + ".title "
-                        + "like ? or l.plain_content like ?) order by l.logId desc";
-        return queryPageData(
-                sql,
+        return queryVisitorPage(
                 pageRequest,
+                " and (l.title like ? or l.plain_content like ?)",
                 new Object[] {false, false, "%" + keywords + "%", "%" + keywords + "%"},
-                ArticleBasicDTO.class);
+                false);
     }
 
     public PageData<ArticleBasicDTO> findByTypeAlias(long page, long pageSize, String typeAlias) {
-        String sql =
-                "select l.*,t.typeName,t.alias  as typeAlias,(select count(commentId) from "
-                        + CommentRepository.TABLE_NAME
-                        + " where logId=l.logId ) commentSize,u.userName,u.header as header from "
-                        + tableName
-                        + " l inner join user u,"
-                        + "type t where rubbish=? and privacy=? and u.userId=l.userId and t.typeId=l.typeId and t"
-                        + ".alias=? order by l.logId desc";
-        return queryPageData(
-                sql,
+        return queryVisitorPage(
                 new PageRequestImpl(page, pageSize),
+                " and t.alias=?",
                 new Object[] {false, false, typeAlias},
-                ArticleBasicDTO.class);
+                false);
     }
 
     public Map<String, Long> getArchives() throws SQLException {
@@ -234,47 +208,133 @@ public class LogRepository extends BaseRepository<Log, Long> implements Serializ
     }
 
     public PageData<ArticleBasicDTO> findByTag(long page, long pageSize, String tag) {
-        String sql =
-                "select l.*,t.typeName,t.alias  as typeAlias,(select count(commentId) from "
-                        + CommentRepository.TABLE_NAME
-                        + " where logId=l.logId) commentSize,u.userName,u.header as header from "
-                        + tableName
-                        + " l inner join user u,"
-                        + "type t where rubbish=? and privacy=? and u.userId=l.userId and t.typeId=l.typeId and (l"
-                        + ".keywords like ? or l.keywords like ? or l.keywords like ? or l.keywords= ?) order by l"
-                        + ".logId desc";
-        return queryPageData(
-                sql,
+        return queryVisitorPage(
                 new PageRequestImpl(page, pageSize),
+                " and (l.keywords like ? or l.keywords like ? or l.keywords like ? or l.keywords=?)",
                 new Object[] {false, false, tag + ",%", "%," + tag + ",%", "%," + tag, tag},
-                ArticleBasicDTO.class);
+                false);
     }
 
     public PageData<ArticleBasicDTO> findByDate(long page, long pageSize, String yyyyMM) {
         if (StringUtils.isEmpty(yyyyMM)) {
             return new PageData<>();
         }
-        String sql =
-                "select l.*,t.typeName,t.alias as typeAlias,(select count(commentId) from "
-                        + CommentRepository.TABLE_NAME
-                        + " "
-                        + "where logId=l.logId ) commentSize,u.userName,u.header as header from "
-                        + tableName
-                        + " l inner join user u,"
-                        + "type t where rubbish=? and privacy=? and u.userId=l.userId and t.typeId=l.typeId and releaseTime between ? and ? order by l.logId desc";
         String start = yyyyMM.replace("_", "-") + "-01 00:00:00";
         YearMonth parse = YearMonth.parse(yyyyMM, DateTimeFormatter.ofPattern("yyyy_MM"));
         String end =
                 parse.atEndOfMonth().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
                         + " 23:59:59";
-        return queryPageData(
-                sql,
+        return queryVisitorPage(
                 new PageRequestImpl(page, pageSize),
+                " and l.releaseTime between ? and ?",
                 new Object[] {false, false, start, end},
-                ArticleBasicDTO.class);
+                false);
     }
 
     public long getVisitorCount() {
-        return visitorFind(new PageRequestImpl(1L, 0L), null).getTotalElements();
+        return countVisitorArticles(VISITOR_FROM, new Object[] {false, false});
+    }
+
+    public List<HotLogBasicInfoEntry> findRecentBasic(long limit) {
+        return queryRecentBasic("", new Object[] {false, false}, limit);
+    }
+
+    public List<HotLogBasicInfoEntry> findRecentBasicByTypeAlias(String typeAlias, long limit) {
+        return queryRecentBasic(" and t.alias=?", new Object[] {false, false, typeAlias}, limit);
+    }
+
+    private List<HotLogBasicInfoEntry> queryRecentBasic(
+            String filter, Object[] params, long limit) {
+        if (limit <= 0) {
+            return Collections.emptyList();
+        }
+        List<Object> arguments = new ArrayList<>(Arrays.asList(params));
+        arguments.add(limit);
+        try {
+            // Sidebar/cache consumers need links, not full article pages or their total count.
+            return queryList(
+                    "select l.logId,l.title,l.alias"
+                            + VISITOR_FROM
+                            + filter
+                            + " order by l.logId desc limit ?",
+                    HotLogBasicInfoEntry.class,
+                    arguments.toArray());
+        } catch (SQLException e) {
+            throw new DAOException(e);
+        }
+    }
+
+    private long countVisitorArticles(String from, Object[] params) {
+        try {
+            // Retain the joins: articles with a missing author/category were never public rows.
+            return ((Number) queryFirstObj("select count(*)" + from, params)).longValue();
+        } catch (SQLException e) {
+            throw new DAOException(e);
+        }
+    }
+
+    private PageData<ArticleBasicDTO> queryVisitorPage(
+            PageRequest page, String filter, Object[] params, boolean sticky) {
+        String from = VISITOR_FROM + filter;
+        PageData<ArticleBasicDTO> data = new PageData<>();
+        if (page.getSize() <= 0) {
+            data.setTotalElements(countVisitorArticles(from, params));
+        } else {
+            ExecutorService executor = ThreadUtils.newFixedThreadPool(2);
+            try {
+                CompletableFuture<Long> total =
+                        CompletableFuture.supplyAsync(
+                                () -> countVisitorArticles(from, params), executor);
+                CompletableFuture<List<ArticleBasicDTO>> rows =
+                        CompletableFuture.supplyAsync(
+                                () -> queryVisitorRows(page, from, params, sticky), executor);
+                CompletableFuture.allOf(total, rows).join();
+                data.setTotalElements(total.join());
+                data.setRows(rows.join());
+            } finally {
+                executor.shutdown();
+            }
+        }
+        data.setPage(page.getPage());
+        data.setSize(
+                page instanceof UnPageRequestImpl
+                        ? Math.max(data.getRows().size(), 1000000L)
+                        : page.getSize());
+        List<String> sorts = new ArrayList<>();
+        if (page.getSorts() != null) {
+            page.getSorts().forEach(sort -> sorts.add(sort.toParamString()));
+        }
+        data.setSort(sorts);
+        return data;
+    }
+
+    private List<ArticleBasicDTO> queryVisitorRows(
+            PageRequest page, String from, Object[] params, boolean sticky) {
+        String order = sticky ? "l.sticky desc,l.logId desc" : "l.logId desc";
+        // Select page IDs and joined metadata before reading bodies or counting comments. LIMIT
+        // keeps this derived table from being merged into the outer query by MySQL/SQLite.
+        String ids =
+                "select l.logId,t.typeName,t.alias as typeAlias,u.userName,u.header"
+                        + from
+                        + " order by "
+                        + order;
+        List<Object> arguments = new ArrayList<>(Arrays.asList(params));
+        if (page instanceof PageRequestImpl) {
+            ids += " limit ?,?";
+            arguments.add(page.getOffset());
+            arguments.add(page.getSize());
+        }
+        String sql =
+                "select l.*,p.typeName,p.typeAlias,p.userName,p.header,"
+                        + "(select count(commentId) from comment where logId=l.logId) commentSize"
+                        + " from ("
+                        + ids
+                        + ") p inner join log l on l.logId=p.logId order by "
+                        + order;
+        try {
+            return queryList(sql, ArticleBasicDTO.class, arguments.toArray());
+        } catch (SQLException e) {
+            throw new DAOException(e);
+        }
     }
 }

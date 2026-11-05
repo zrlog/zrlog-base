@@ -47,7 +47,7 @@ public class V32AssistantStorageUpgradeTest {
                     legacy,
                     db.scalar("SELECT value FROM website WHERE name=?", "assistant.v1.run:old"));
             assertEquals(
-                    "32",
+                    String.valueOf(UpgradeVersionHandler.SQL_VERSION),
                     db.scalar(
                             "SELECT value FROM website WHERE name=?",
                             CacheService.ZRLOG_SQL_VERSION_KEY));
@@ -55,7 +55,7 @@ public class V32AssistantStorageUpgradeTest {
             db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "31");
             new DbUpgradeService(db.dataSource(), 31).tryDoUpgrade();
             assertEquals(
-                    "32",
+                    String.valueOf(UpgradeVersionHandler.SQL_VERSION),
                     db.scalar(
                             "SELECT value FROM website WHERE name=?",
                             CacheService.ZRLOG_SQL_VERSION_KEY));

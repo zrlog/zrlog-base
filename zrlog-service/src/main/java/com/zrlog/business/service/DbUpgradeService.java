@@ -194,10 +194,13 @@ public class DbUpgradeService implements AutoCloseable {
                         } catch (Exception e) {
                             if (!isAlreadyAppliedSqliteSchemaChange(sql, e)
                                     && !(entry.getKey() == 32
-                                            && isExistingAssistantIndex(sql, e))) {
+                                            && isExistingIndex(sql, e, "assistant_"))
+                                    && !(entry.getKey() == 33
+                                            && (isExistingIndex(sql, e, "log_public_")
+                                                    || isExistingIndex(sql, e, "logid")))) {
                                 throw e;
                             }
-                            LOGGER.info("Skip already applied SQLite schema migration: " + sql);
+                            LOGGER.info("Skip already applied schema migration: " + sql);
                         }
                     }
                     if (entry.getKey() == 31) {
@@ -302,11 +305,9 @@ public class DbUpgradeService implements AutoCloseable {
                 && jdbcUrl.regionMatches(true, 0, "jdbc:sqlite:", 0, "jdbc:sqlite:".length());
     }
 
-    /**
-     * Version 32 can resume after a partial DDL commit without touching existing assistant data.
-     */
-    private boolean isExistingAssistantIndex(String sql, Exception error) {
-        if (!sql.stripLeading().toLowerCase(Locale.ROOT).startsWith("create index `assistant_"))
+    /** Resume the known index-only steps after a partial DDL commit. */
+    private boolean isExistingIndex(String sql, Exception error, String prefix) {
+        if (!sql.stripLeading().toLowerCase(Locale.ROOT).startsWith("create index `" + prefix))
             return false;
         for (Throwable cause = error; cause != null; cause = cause.getCause()) {
             if (cause instanceof java.sql.SQLException) {

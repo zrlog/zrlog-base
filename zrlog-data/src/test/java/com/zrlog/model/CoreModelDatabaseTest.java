@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequestImpl;
+import com.hibegin.common.dao.dto.UnPageRequestImpl;
 import com.zrlog.common.cache.dto.*;
 import com.zrlog.data.dto.ArticleBasicDTO;
 import com.zrlog.data.dto.ArticleDetailDTO;
@@ -245,6 +246,117 @@ public class CoreModelDatabaseTest {
             assertEquals("Newest", visitorPage.getRows().get(0).getTitle());
             assertEquals("Second", visitorPage.getRows().get(1).getTitle());
         }
+    }
+
+    @Test
+    public void publicPagesKeepFiltersTotalsAndCommentsWhenRelatedRowsAreMissing()
+            throws Exception {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
+            seedContent(db);
+            for (int id = 4; id <= 8; id++) {
+                insertArticle(
+                        db,
+                        id,
+                        "article-" + id,
+                        "Article " + id,
+                        "Body " + id,
+                        id == 7 ? "javascript,notjava" : "java",
+                        "2026-02-03 10:00:00",
+                        0,
+                        false,
+                        id == 4);
+            }
+            db.update("update log set userId=null where logId=5");
+            db.update("update log set typeId=999 where logId=6");
+            db.update("insert into type(typeId,alias,typeName) values(2,'other','Other')");
+            db.update("update log set typeId=2 where logId=8");
+            db.update("update log set sticky=100 where logId in (3,4,5,6)");
+            db.update("update log set sticky=5,extensions=? where logId=1", "{\"topic\":\"java\"}");
+            // commentSize has always included hidden comments; keep that existing contract.
+            db.update(
+                    "insert into comment(logId,userComment,hide) values(1,'Hidden comment',?)",
+                    true);
+            LogRepository logs = new LogRepository(db.dataSource());
+
+            PageData<ArticleBasicDTO> first = logs.visitorFind(new PageRequestImpl(1L, 2L), null);
+            PageData<ArticleBasicDTO> second = logs.visitorFind(new PageRequestImpl(2L, 2L), null);
+            assertEquals(4L, first.getTotalElements());
+            assertEquals(Arrays.asList(8L, 7L), articleIds(first));
+            assertEquals(Arrays.asList(2L, 1L), articleIds(second));
+            assertEquals("Body 8", first.getRows().get(0).getContent());
+            assertEquals("admin", first.getRows().get(0).getUserName());
+            assertEquals("/avatar.png", first.getRows().get(0).getHeader());
+            assertEquals("other", first.getRows().get(0).getTypeAlias());
+            assertEquals("Other", first.getRows().get(0).getTypeName());
+            assertEquals(Long.valueOf(0), first.getRows().get(0).getCommentSize());
+            assertEquals(Long.valueOf(2), second.getRows().get(1).getCommentSize());
+            assertEquals("java", second.getRows().get(1).getExtensions().get("topic"));
+            assertEquals(
+                    Arrays.asList(1L, 8L),
+                    articleIds(logs.visitorFindHome(new PageRequestImpl(1L, 2L))));
+            assertEquals(3L, logs.findByTypeAlias(1, 1, "tech").getTotalElements());
+            assertEquals(
+                    Collections.singletonList(7L), articleIds(logs.findByTypeAlias(1, 1, "tech")));
+            assertEquals(Arrays.asList(8L, 2L, 1L), articleIds(logs.findByTag(1, 10, "java")));
+            assertEquals(Arrays.asList(2L, 1L), articleIds(logs.findByDate(1, 10, "2026_01")));
+            assertEquals(
+                    Collections.singletonList(1L), articleIds(logs.visitorFind(page(), "First")));
+            assertEquals(4L, logs.getVisitorCount());
+            assertEquals(
+                    Arrays.asList(8L, 7L),
+                    logs.findRecentBasic(2).stream()
+                            .map(com.zrlog.common.cache.vo.HotLogBasicInfoEntry::getLogId)
+                            .collect(Collectors.toList()));
+            assertEquals(
+                    Arrays.asList(7L, 2L),
+                    logs.findRecentBasicByTypeAlias("tech", 2).stream()
+                            .map(com.zrlog.common.cache.vo.HotLogBasicInfoEntry::getLogId)
+                            .collect(Collectors.toList()));
+            assertTrue(logs.findRecentBasic(0).isEmpty());
+            assertTrue(logs.findRecentBasicByTypeAlias("missing", 6).isEmpty());
+            PageData<ArticleBasicDTO> empty = logs.visitorFind(new PageRequestImpl(99L, 2L), null);
+            assertTrue(empty.getRows().isEmpty());
+            assertEquals(4L, empty.getTotalElements());
+            assertEquals(0L, logs.findByTypeAlias(1, 10, "missing").getTotalElements());
+        }
+    }
+
+    @Test
+    public void publicListsPreserveCountOnlyAndUnpagedRequests() throws Exception {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
+            seedContent(db);
+            LogRepository logs = new LogRepository(db.dataSource());
+            PageRequestImpl request = new PageRequestImpl(2L, 0L);
+            request.setOrders(null);
+            PageData<ArticleBasicDTO> countOnly = logs.visitorFind(request, null);
+            assertEquals(2L, countOnly.getTotalElements());
+            assertTrue(countOnly.getRows().isEmpty());
+            assertEquals(Long.valueOf(2), countOnly.getPage());
+            assertEquals(Long.valueOf(0), countOnly.getSize());
+            assertTrue(countOnly.getSort().isEmpty());
+            PageData<ArticleBasicDTO> all = logs.visitorFind(new UnPageRequestImpl(1L), null);
+            assertEquals(Arrays.asList(2L, 1L), articleIds(all));
+            assertEquals(2L, all.getTotalElements());
+            assertEquals(Long.valueOf(1000000), all.getSize());
+        }
+    }
+
+    @Test
+    public void publicPagesWorkThroughSingleStatementWebApiWithoutJdbc() throws Exception {
+        org.junit.Assume.assumeTrue(databaseType == DatabaseType.SQLITE);
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.openWebApi()) {
+            seedContent(db);
+            LogRepository logs = new LogRepository(db.dataSource());
+            PageData<ArticleBasicDTO> data = logs.findByTypeAlias(2, 1, "tech");
+            assertEquals(2L, data.getTotalElements());
+            assertEquals(Collections.singletonList(1L), articleIds(data));
+            assertEquals(Long.valueOf(1), data.getRows().get(0).getCommentSize());
+            assertEquals(2L, logs.getVisitorCount());
+        }
+    }
+
+    private static List<Long> articleIds(PageData<ArticleBasicDTO> page) {
+        return page.getRows().stream().map(ArticleBasicDTO::getLogId).collect(Collectors.toList());
     }
 
     @Test

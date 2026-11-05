@@ -333,10 +333,10 @@ public class V31EntityMetadataUpgradeTest {
                     db.scalar(
                             "SELECT value FROM website WHERE name=?",
                             CacheService.ZRLOG_SQL_VERSION_KEY));
-            // Includes version 32: three assistant tables, eight indexes and its version marker.
+            // Includes v32 assistant storage and v33's list/comment indexes and version marker.
             assertTrue(
                     "Empty migration made " + requests.get() + " remote calls",
-                    requests.get() <= 113);
+                    requests.get() <= 118);
             assertNull(
                     db.scalar(
                             "SELECT value FROM website WHERE name=?",

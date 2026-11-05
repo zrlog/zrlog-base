@@ -64,13 +64,15 @@ public class DatabaseMigrationLifecycleTest {
                                         .getBindings()
                                         .build()
                                         .get(CacheService.class);
-                        assertEquals(32, cache.getCurrentSqlVersion());
+                        assertEquals(
+                                UpgradeVersionHandler.SQL_VERSION.longValue(),
+                                cache.getCurrentSqlVersion());
                         assertEquals("Historical site", cache.getPublicWebSiteInfo().getTitle());
                         assertNotNull(
                                 db.scalar(
                                         "SELECT updatedAt FROM website WHERE name='base_data_init_cache_v3'"));
                         assertEquals(
-                                "32",
+                                String.valueOf(UpgradeVersionHandler.SQL_VERSION),
                                 db.scalar(
                                         "SELECT value FROM website WHERE name=?",
                                         CacheService.ZRLOG_SQL_VERSION_KEY));

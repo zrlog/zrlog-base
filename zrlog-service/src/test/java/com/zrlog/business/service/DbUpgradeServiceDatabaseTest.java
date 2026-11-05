@@ -83,6 +83,54 @@ public class DbUpgradeServiceDatabaseTest {
     }
 
     @Test
+    public void publicArticleIndexesResumeAfterPartialMigrationWithoutChangingArticles()
+            throws Exception {
+        try (ZrLogTestDatabase db =
+                databaseType == DatabaseType.SQLITE
+                        ? ZrLogTestDatabase.openWebApi()
+                        : ZrLogTestDatabase.open(databaseType)) {
+            for (String index :
+                    List.of("log_public_order", "log_public_sticky", "log_public_type", "logId")) {
+                db.update("drop index if exists " + index);
+            }
+            db.update(
+                    "insert into log(logId,title,content,sticky) values(1,'Existing','Keep this body',7)");
+            db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "32");
+            String sql = bundledUpgradeSql(33);
+            List<String> statements =
+                    databaseType == DatabaseType.SQLITE
+                            ? SqlConvertUtils.doMySQLToSqliteBySqlText(sql)
+                            : SqlConvertUtils.extractExecutableSql(sql);
+            // Simulate interruption after the first index committed but before the version
+            // advanced.
+            db.update(statements.get(0));
+            upgradeService(db.dataSource(), 32).tryDoUpgrade();
+            String indexCount =
+                    databaseType == DatabaseType.SQLITE
+                            ? "select count(*) from sqlite_master where type='index' and name in ('log_public_order','log_public_sticky','log_public_type','logId')"
+                            : "select count(*) from INFORMATION_SCHEMA.INDEXES where lower(INDEX_NAME) in ('log_public_order','log_public_sticky','log_public_type','logid')";
+            assertEquals(4L, ((Number) db.scalar(indexCount)).longValue());
+            assertEquals("Keep this body", db.scalar("select content from log where logId=1"));
+            assertEquals(
+                    7L, ((Number) db.scalar("select sticky from log where logId=1")).longValue());
+            assertEquals(
+                    "33",
+                    db.scalar(
+                            "select value from website where name=?",
+                            CacheService.ZRLOG_SQL_VERSION_KEY));
+            // Also tolerate an old version marker when all indexes are already present.
+            db.putWebsite(CacheService.ZRLOG_SQL_VERSION_KEY, "32");
+            upgradeService(db.dataSource(), 32).tryDoUpgrade();
+            assertEquals(4L, ((Number) db.scalar(indexCount)).longValue());
+            assertEquals(
+                    "33",
+                    db.scalar(
+                            "select value from website where name=?",
+                            CacheService.ZRLOG_SQL_VERSION_KEY));
+        }
+    }
+
+    @Test
     public void shouldSkipUpgradeWhenCurrentSqlVersionIsUnknown() throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             upgradeService(db.dataSource(), -1).tryDoUpgrade();
@@ -158,6 +206,7 @@ public class DbUpgradeServiceDatabaseTest {
                         30);
         // This fixture advertises MySQL while executing on SQLite: isolate the dialect test's SQL.
         writeUpgradeSql(folder, "-- schema already installed by the fixture", 32);
+        writeUpgradeSql(folder, "-- schema already installed by the fixture", 33);
         try {
             System.setProperty("sws.conf.path", folder.getAbsolutePath());
             for (String jdbcUrl :
@@ -285,6 +334,7 @@ public class DbUpgradeServiceDatabaseTest {
             try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 db.update("drop table log_extension_index");
                 db.update("alter table log drop column extensions");
+                db.update("drop index if exists log_public_sticky");
                 db.update("alter table log drop column sticky");
                 dropPasskeySchema(db);
 
@@ -317,6 +367,7 @@ public class DbUpgradeServiceDatabaseTest {
             try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 db.update("drop table log_extension_index");
                 db.update("alter table log drop column extensions");
+                db.update("drop index if exists log_public_sticky");
                 db.update("alter table log drop column sticky");
                 dropPasskeySchema(db);
                 db.update("insert into log(logId, alias) values(?, ?)", 1, "legacy-article");
@@ -459,6 +510,7 @@ public class DbUpgradeServiceDatabaseTest {
         try {
             System.setProperty("sws.conf.path", confFolder.getAbsolutePath());
             try (ZrLogTestDatabase db = ZrLogTestDatabase.openWebApi()) {
+                db.update("drop index if exists log_public_sticky");
                 db.update("alter table log drop column sticky");
                 dropPasskeySchema(db);
                 preparePartiallyAppliedPasskeySchemaForWebApi(db);
@@ -563,6 +615,7 @@ public class DbUpgradeServiceDatabaseTest {
             try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
                 db.update("drop table log_extension_index");
                 db.update("alter table log drop column extensions");
+                db.update("drop index if exists log_public_sticky");
                 db.update("alter table log drop column sticky");
                 dropPasskeySchema(db);
 

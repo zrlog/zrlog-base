@@ -150,6 +150,20 @@ public class ZrLogErrorHandleTest {
     }
 
     @Test
+    public void preservesTheProvidersPublicUpgradeFailureMessage() {
+        ResponseRecorder recorder = new ResponseRecorder();
+        new ZrLogErrorHandle(500)
+                .doHandle(
+                        request("/api/admin/upgrade/status", ""),
+                        recorder.response(),
+                        new com.zrlog.updater.spi.UpdateOperationException(
+                                503, "updater_unavailable", "Please check the updater connection"));
+        ApiStandardResponse<?> response = (ApiStandardResponse<?>) recorder.json;
+        assertNotEquals(0, response.getError());
+        assertEquals("Please check the updater connection", response.getMessage());
+    }
+
+    @Test
     public void shouldRenderApiNotFoundAndUnexpectedErrorsAsJson() {
         for (String locale : new String[] {"zh_CN", "en_US"}) {
             useLocale(locale);

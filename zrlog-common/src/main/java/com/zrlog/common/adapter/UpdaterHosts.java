@@ -43,6 +43,7 @@ public final class UpdaterHosts {
         b.manifestFilename = BlogBuildInfoUtil.getUpdateVersionJsonFilename();
         b.lambda = EnvKit.isLambda();
         b.http = HTTP;
+        b.currentBuildId = BlogBuildInfoUtil::getBuildId;
         b.bundledTheme = path -> BundledThemes.getInstance().containsResource(path);
         b.releaseJdbcDrivers = UpdaterHosts::releaseJdbcDrivers;
         b.docker =
@@ -106,23 +107,17 @@ public final class UpdaterHosts {
                 : updater;
     }
 
-    public static boolean dockerConfigured() {
-        return System.getenv("ZRLOG_UPDATER_URL") != null
-                && System.getenv("ZRLOG_UPDATER_TOKEN") != null;
-    }
-
-    public static DockerControl dockerControl(Updater updater) {
-        ApplicationUpdater implementation = unwrap(updater);
-        if (!(implementation instanceof DockerControl)) {
-            throw new IllegalStateException("Docker updater is not assembled");
-        }
-        return (DockerControl) implementation;
-    }
-
     public static boolean onlineUpgradeSupported(UpdaterTypeEnum type, Updater updater) {
         return UpdateProviders.find(type)
                 .map(provider -> provider.onlineUpgradeSupported(context(updater)))
                 .orElse(false);
+    }
+
+    public static UpdateOperations operations(
+            UpdaterTypeEnum type, Updater updater, String packageSource) {
+        UpdateContext.Builder builder = new UpdateContext.Builder(context(updater));
+        builder.packageSource = packageSource;
+        return UpdateProviders.get(type).operations(builder.build(), unwrap(updater));
     }
 
     public static Function<String, String> text(Map<String, Object> backend) {

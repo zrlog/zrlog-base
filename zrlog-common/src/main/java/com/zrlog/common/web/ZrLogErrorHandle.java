@@ -96,6 +96,11 @@ public class ZrLogErrorHandle implements HttpErrorHandle {
     }
 
     private String getResponseMessage(Throwable error) {
+        if (error instanceof com.zrlog.updater.spi.UpdateOperationException) {
+            return error
+                    .getMessage(); // Provider already removed transport diagnostics and localized
+            // this message.
+        }
         if (error instanceof AbstractBusinessException) {
             String message = ((AbstractBusinessException) error).getUserMessage();
             if (message != null && !message.isBlank()) {

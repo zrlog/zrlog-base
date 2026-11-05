@@ -2,7 +2,7 @@ package com.zrlog.business.rest.response;
 
 public class PreCheckVersionResponse extends CheckVersionResponse {
     private com.zrlog.updater.spi.DebUpgradeStatus systemPackageUpgrade;
-    private Boolean dockerUpdaterAvailable = false;
+    private com.zrlog.updater.spi.UpdateTaskMessages taskMessages;
     private Boolean onlineUpgradable;
     private String disableUpgradeReason;
     private Boolean dockerMode;
@@ -20,12 +20,12 @@ public class PreCheckVersionResponse extends CheckVersionResponse {
         systemPackageUpgrade = status;
     }
 
-    public Boolean getDockerUpdaterAvailable() {
-        return dockerUpdaterAvailable;
+    public com.zrlog.updater.spi.UpdateTaskMessages getTaskMessages() {
+        return taskMessages;
     }
 
-    public void setDockerUpdaterAvailable(Boolean value) {
-        dockerUpdaterAvailable = value;
+    public void setTaskMessages(com.zrlog.updater.spi.UpdateTaskMessages value) {
+        taskMessages = value;
     }
 
     public Boolean getOnlineUpgradable() {

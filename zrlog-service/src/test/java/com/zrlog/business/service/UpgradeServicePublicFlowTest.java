@@ -3,24 +3,16 @@ package com.zrlog.business.service;
 import static org.junit.Assert.*;
 
 import com.hibegin.common.dao.DataSourceWrapper;
-import com.sun.net.httpserver.HttpServer;
-import com.zrlog.business.exception.DownloadUpgradeFileException;
 import com.zrlog.business.rest.response.BackupProtectionStatus;
 import com.zrlog.business.rest.response.CheckVersionResponse;
 import com.zrlog.business.rest.response.PreCheckVersionResponse;
 import com.zrlog.business.rest.response.UpgradeProcessResponse;
 import com.zrlog.business.updater.UpdateVersionInfoPlugin;
-import com.zrlog.common.Updater;
-import com.zrlog.common.UpdaterTypeEnum;
-import com.zrlog.common.updater.UpdateVersionHandler;
 import com.zrlog.common.updater.UpgradeProgressEvent;
 import com.zrlog.common.updater.UpgradeProgressListener;
 import com.zrlog.common.vo.Version;
 import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.util.BlogBuildInfoUtil;
-import java.io.File;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import org.junit.Rule;
 import org.junit.Test;
@@ -81,7 +73,7 @@ public class UpgradeServicePublicFlowTest {
     }
 
     @Test
-    public void shouldBuildPreUpgradeResponseWhenOnlineUpgradeIsAllowed() {
+    public void shouldReportUnavailableWhenNoUpdaterWasAssembled() {
         FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(null, null);
 
         PreCheckVersionResponse response =
@@ -89,14 +81,14 @@ public class UpgradeServicePublicFlowTest {
                         .preUpgradeVersion(false, plugin);
 
         assertFalse(response.getUpgrade());
-        assertTrue(response.getOnlineUpgradable());
+        assertFalse(response.getOnlineUpgradable());
         assertFalse(response.getDockerMode());
         assertFalse(response.getSystemServiceMode());
         assertFalse(response.getFaasMode());
         assertFalse(response.getWarMode());
         assertNotNull(response.getNativeImageMode());
         assertNotNull(response.getBackupProtection());
-        assertNull(response.getDisableUpgradeReason());
+        assertNotNull(response.getDisableUpgradeReason());
     }
 
     @Test
@@ -215,154 +207,73 @@ public class UpgradeServicePublicFlowTest {
     }
 
     @Test
-    public void shouldFailUpgradeWhenDownloadedPackageChecksumMismatches() throws Exception {
-        byte[] packageBytes = "zip-bytes".getBytes(StandardCharsets.UTF_8);
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext(
-                "/zrlog.zip",
-                exchange -> {
-                    exchange.sendResponseHeaders(200, packageBytes.length);
-                    exchange.getResponseBody().write(packageBytes);
-                    exchange.close();
-                });
-        server.start();
-        try {
-            Version version = futureVersion("99.0.1");
-            version.setZipDownloadUrl(
-                    "http://127.0.0.1:" + server.getAddress().getPort() + "/zrlog.zip");
-            version.setZipFileSize(packageBytes.length);
-            version.setZipMd5sum("bad-md5");
-            FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(version, null);
-            List<UpgradeProgressEvent.Data> progressEvents = new ArrayList<>();
+    public void submitsPinnedTasksThroughTheSameProviderDespiteMissingBackupEvidence()
+            throws Exception {
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        var command = new com.zrlog.updater.spi.UpdateCommand();
+        command.requestId = "manual-request-123456";
+        command.version = "99.0.4";
+        command.buildId = "pinned-build";
+        command.channel = "release";
+        var service =
+                new TestableUpgradeService(false, false, false, true, false, false, null) {
+                    public com.zrlog.updater.spi.UpdateOperations operations() {
+                        return new com.zrlog.updater.common.AbstractUpdateOperations() {
+                            public com.zrlog.updater.spi.UpdateAvailability availability(
+                                    java.util.function.Function<String, String> text) {
+                                return new com.zrlog.updater.spi.UpdateAvailability(true, null);
+                            }
 
-            assertThrows(
-                    DownloadUpgradeFileException.class,
-                    () ->
-                            new TestableUpgradeService(false, false, false, true)
-                                    .doUpgrade(
-                                            plugin,
-                                            (event, data) -> progressEvents.add(data),
-                                            backend()));
+                            public com.zrlog.updater.spi.UpdateTask submit(
+                                    com.zrlog.updater.spi.UpdateCommand received,
+                                    UpgradeProgressListener listener,
+                                    java.util.function.Function<String, String> text)
+                                    throws Exception {
+                                calls.incrementAndGet();
+                                assertSame(command, received);
+                                listener.onProgress(
+                                        UpgradeProgressEvent.EVENT,
+                                        UpgradeProgressEvent.data("download", "Downloading"));
+                                var task = new com.zrlog.updater.spi.UpdateTask();
+                                task.id = received.requestId;
+                                task.buildId = received.buildId;
+                                task.state = "queued";
+                                return task;
+                            }
 
-            assertFalse(progressEvents.isEmpty());
-            assertEquals(UpgradeProgressEvent.STAGE_DOWNLOAD, progressEvents.get(0).getStage());
-            assertEquals(UpgradeProgressEvent.STATUS_RUNNING, progressEvents.get(0).getStatus());
-            assertEquals(1, plugin.fetchTrueCount);
-            assertEquals(1, plugin.fetchFalseCount);
-        } finally {
-            server.stop(0);
-        }
-    }
+                            public com.zrlog.updater.spi.UpdateTask status(
+                                    String id, java.util.function.Function<String, String> text) {
+                                return null;
+                            }
 
-    @Test(timeout = 10000)
-    public void shouldUseWarPackageMetadataWhenRunningInWarMode() throws Exception {
-        byte[] packageBytes = "war-bytes".getBytes(StandardCharsets.UTF_8);
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        java.util.concurrent.atomic.AtomicBoolean warRequested =
-                new java.util.concurrent.atomic.AtomicBoolean();
-        server.createContext(
-                "/zrlog.war",
-                exchange -> {
-                    warRequested.set(true);
-                    exchange.sendResponseHeaders(200, packageBytes.length);
-                    exchange.getResponseBody().write(packageBytes);
-                    exchange.close();
-                });
-        server.start();
-        try {
-            Version version = futureVersion("99.0.2");
-            version.setZipDownloadUrl("https://example.invalid/unused.zip");
-            version.setWarDownloadUrl(
-                    "http://127.0.0.1:" + server.getAddress().getPort() + "/zrlog.war");
-            version.setWarFileSize(packageBytes.length);
-            version.setWarMd5sum("bad-md5");
-            File updateTemp = temporaryFolder.newFolder("war-download");
-            Updater updater =
-                    new Updater() {
-                        @Override
-                        public void restartProcessAsync(Version ignored) {}
+                            public com.zrlog.updater.spi.UpdateSourceSettings settings(
+                                    String channel,
+                                    java.util.function.Function<String, String> text) {
+                                throw new UnsupportedOperationException();
+                            }
 
-                        @Override
-                        public File getUpdateTempPath() {
-                            return updateTemp;
-                        }
-
-                        @Override
-                        public String getUnzipPath() {
-                            return updateTemp.getAbsolutePath();
-                        }
-
-                        @Override
-                        public File execFile() {
-                            return null;
-                        }
-
-                        @Override
-                        public UpdaterTypeEnum getType() {
-                            return UpdaterTypeEnum.WAR;
-                        }
-                    };
-
-            assertThrows(
-                    DownloadUpgradeFileException.class,
-                    () ->
-                            new TestableUpgradeService(false, false, false, true, true)
-                                    .doUpgrade(
-                                            version,
-                                            updater,
-                                            UpgradeProgressListener.NONE,
-                                            backend()));
-
-            assertTrue(warRequested.get());
-        } finally {
-            server.stop(0);
-        }
-    }
-
-    @Test
-    public void shouldDownloadPackageWhenBackupEvidenceIsMissing() throws Exception {
-        byte[] packageBytes = "zip-bytes".getBytes(StandardCharsets.UTF_8);
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext(
-                "/zrlog.zip",
-                exchange -> {
-                    exchange.sendResponseHeaders(200, packageBytes.length);
-                    exchange.getResponseBody().write(packageBytes);
-                    exchange.close();
-                });
-        server.start();
-        try {
-            Version version = futureVersion("99.0.4");
-            version.setZipDownloadUrl(
-                    "http://127.0.0.1:" + server.getAddress().getPort() + "/zrlog.zip");
-            FakeUpdateVersionInfoPlugin plugin = new FakeUpdateVersionInfoPlugin(version, null);
-            FakeUpdateVersionHandler handler = new FakeUpdateVersionHandler(true, "Updated");
-            TestableUpgradeService service =
-                    new TestableUpgradeService(false, false, false, true, false, false, null);
-            service.onlineHandler = handler;
-            List<UpgradeProgressEvent.Data> progressEvents = new ArrayList<>();
-
-            UpgradeProcessResponse response =
-                    service.doUpgrade(
-                            plugin, (event, data) -> progressEvents.add(data), backend(), false);
-
-            assertTrue(response.getFinish());
-            assertEquals("Updated", response.getMessage());
-            assertTrue(handler.handled);
-            assertNotNull(service.onlinePackage);
-            assertTrue(service.onlinePackage.exists());
-            assertEquals(packageBytes.length, service.onlinePackage.length());
-            assertEquals(1, plugin.fetchTrueCount);
-            assertEquals(1, plugin.fetchFalseCount);
-            assertTrue(
-                    progressEvents.stream()
-                            .anyMatch(
-                                    data ->
-                                            UpgradeProgressEvent.STATUS_COMPLETE.equals(
-                                                    data.getStatus())));
-        } finally {
-            server.stop(0);
-        }
+                            public void saveSettings(
+                                    String source,
+                                    String channel,
+                                    java.util.function.Function<String, String> text) {
+                                throw new UnsupportedOperationException();
+                            }
+                        };
+                    }
+                };
+        var check =
+                service.preUpgradeVersion(
+                        false, new FakeUpdateVersionInfoPlugin(futureVersion("99.0.4"), null));
+        assertFalse(check.getBackupProtection().getReady());
+        assertTrue(check.getOnlineUpgradable());
+        List<UpgradeProgressEvent.Data> events = new ArrayList<>();
+        var submitted =
+                service.submitUpgrade(command, (event, data) -> events.add(data), backend());
+        assertEquals(command.requestId, submitted.id);
+        assertEquals(command.buildId, submitted.buildId);
+        assertEquals("queued", submitted.state);
+        assertEquals("download", events.get(0).getStage());
+        assertEquals(1, calls.get());
     }
 
     private static class FakeUpdateVersionInfoPlugin extends UpdateVersionInfoPlugin {
@@ -400,8 +311,6 @@ public class UpgradeServicePublicFlowTest {
         private final boolean faasMode;
         private final boolean faasOnlineUpgradeSupported;
         private final boolean warMode;
-        private UpdateVersionHandler onlineHandler;
-        private File onlinePackage;
 
         TestableUpgradeService(
                 boolean dockerMode,
@@ -490,48 +399,6 @@ public class UpgradeServicePublicFlowTest {
         @Override
         boolean isFaaSOnlineUpgradeSupported() {
             return faasOnlineUpgradeSupported;
-        }
-
-        @Override
-        UpdateVersionHandler newOnlineUpdateVersionHandler(
-                Version version,
-                File upgradePackage,
-                UpgradeProgressListener progressListener,
-                Map<String, Object> backend,
-                Updater updater) {
-            onlinePackage = upgradePackage;
-            if (onlineHandler != null) {
-                return onlineHandler;
-            }
-            return super.newOnlineUpdateVersionHandler(
-                    version, upgradePackage, progressListener, backend, updater);
-        }
-    }
-
-    private static class FakeUpdateVersionHandler implements UpdateVersionHandler {
-
-        private final boolean finish;
-        private final String message;
-        private boolean handled;
-
-        FakeUpdateVersionHandler(boolean finish, String message) {
-            this.finish = finish;
-            this.message = message;
-        }
-
-        @Override
-        public String getMessage() {
-            return message;
-        }
-
-        @Override
-        public boolean isFinish() {
-            return finish;
-        }
-
-        @Override
-        public void doHandle() {
-            handled = true;
         }
     }
 }

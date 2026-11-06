@@ -197,6 +197,24 @@ public class CoreModelDatabaseTest {
     }
 
     @Test
+    public void shouldAggregateArchivesWithMinuteAndSecondPrecisionDates() throws Exception {
+        try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
+            seedContent(db);
+            // SQLite preserves legacy date text; typed databases may normalize it on write.
+            db.dataSource()
+                    .getQueryRunner()
+                    .update("UPDATE log SET releaseTime=? WHERE logId=?", "2026-10-30 01:33", 1);
+            db.dataSource()
+                    .getQueryRunner()
+                    .update("UPDATE log SET releaseTime=? WHERE logId=?", "2026-10-31 02:34:56", 2);
+
+            assertEquals(
+                    Collections.singletonMap("2026_10", 2L),
+                    new LogRepository(db.dataSource()).getArchives());
+        }
+    }
+
+    @Test
     public void shouldOrderAndPaginatePublicHomeArticlesByStickyPriority() throws Exception {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             seedContent(db);

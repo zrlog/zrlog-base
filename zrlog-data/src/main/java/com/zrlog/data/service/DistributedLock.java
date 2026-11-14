@@ -3,6 +3,7 @@ package com.zrlog.data.service;
 import com.hibegin.common.dao.ResultValueConvertUtils;
 import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.repository.WebSiteRepository;
+import com.zrlog.data.util.LockManager;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
@@ -20,8 +21,8 @@ import java.util.function.BooleanSupplier;
  * timeout bounds waiting, not ownership: locks do not expire while protected work may still run.
  */
 public class DistributedLock implements Lock, AutoCloseable {
-    public static final String LOCK_PREFIX = "distributed_lock_";
-    public static final String SCHEMA_UPGRADE_KEY = "schema_upgrade_lock";
+    public static final String LOCK_PREFIX = LockManager.LOCK_PREFIX;
+    public static final String SCHEMA_UPGRADE_KEY = "lock_schema_upgrade";
     private static final long POLL_NANOS = TimeUnit.MILLISECONDS.toNanos(200);
 
     private final String lockKey;
@@ -36,10 +37,8 @@ public class DistributedLock implements Lock, AutoCloseable {
         this.lockKey = storageKey(lockKey);
     }
 
-    /** Preserve the migration key so older and newer application versions exclude each other. */
     public static String storageKey(String lockKey) {
-        Objects.requireNonNull(lockKey);
-        return SCHEMA_UPGRADE_KEY.equals(lockKey) ? lockKey : LOCK_PREFIX + lockKey;
+        return LockManager.storageKey(lockKey);
     }
 
     private static boolean isDuplicateKey(SQLException failure) {
@@ -198,6 +197,39 @@ public class DistributedLock implements Lock, AutoCloseable {
 
     @AssistedFactory
     public interface Factory {
+        /** Acquire a closeable handle for lifecycle work such as startup migration. */
+        default DistributedLock acquire(
+                String lockKey, long time, TimeUnit unit, BooleanSupplier cancelled)
+                throws SQLException {
+            DistributedLock lock = create(lockKey);
+            try {
+                if (lock.tryLock(time, unit, cancelled)) {
+                    return lock;
+                }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new SQLException(
+                        "Interrupted while waiting for database lock '" + lockKey + "'",
+                        interrupted);
+            } catch (DAOException failure) {
+                throw new SQLException(
+                        "Cannot acquire database lock '" + lockKey + "'", failure.getCause());
+            }
+            if (cancelled.getAsBoolean()) {
+                throw new SQLException(
+                        "Database lock wait cancelled because the application is stopping");
+            }
+            throw new SQLException(
+                    "Timed out waiting for database lock '"
+                            + lockKey
+                            + "' after "
+                            + unit.toMillis(time)
+                            + "ms. Another instance may still be running. After an abrupt termination, confirm all previous "
+                            + "instances have stopped before removing website row '"
+                            + DistributedLock.storageKey(lockKey)
+                            + "'.");
+        }
+
         DistributedLock create(String lockKey);
     }
 }

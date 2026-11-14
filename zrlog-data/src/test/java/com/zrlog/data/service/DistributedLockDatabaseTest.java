@@ -5,7 +5,7 @@ import static org.junit.Assert.*;
 import com.zrlog.common.vo.LockVO;
 import com.zrlog.data.di.DaggerDataComponent;
 import com.zrlog.data.repository.WebSiteRepository;
-import com.zrlog.data.util.DistributedLockManager;
+import com.zrlog.data.util.LockManager;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import com.zrlog.test.support.ZrLogTestDatabase.DatabaseType;
 import java.util.List;
@@ -160,36 +160,30 @@ public class DistributedLockDatabaseTest {
     public void managerListsAndReleasesMigrationAndRequestLocksWithoutTouchingSettings()
             throws Exception {
         try (ZrLogTestDatabase db = open()) {
-            DistributedLockManager manager =
-                    DaggerDataComponent.factory()
-                            .create(() -> db.dataSource(), () -> true)
-                            .lockManager();
+            var component = DaggerDataComponent.factory().create(() -> db.dataSource(), () -> true);
+            LockManager manager = component.lockManager();
             db.putWebsite("distributedXlockYsetting", "keep");
             try (DistributedLock schema =
-                            manager.acquire(
-                                    DistributedLock.SCHEMA_UPGRADE_KEY,
-                                    1,
-                                    TimeUnit.SECONDS,
-                                    () -> false);
+                            component
+                                    .locks()
+                                    .acquire(
+                                            DistributedLock.SCHEMA_UPGRADE_KEY,
+                                            1,
+                                            TimeUnit.SECONDS,
+                                            () -> false);
                     DistributedLock request =
-                            manager.acquire("request", 1, TimeUnit.SECONDS, () -> false)) {
+                            component
+                                    .locks()
+                                    .acquire("request", 1, TimeUnit.SECONDS, () -> false)) {
                 List<LockVO> locks = manager.getLocks();
                 assertEquals(2, locks.size());
                 assertTrue(
-                        locks.stream()
-                                .anyMatch(
-                                        lock ->
-                                                lock.getName()
-                                                        .equals(
-                                                                DistributedLock
-                                                                        .SCHEMA_UPGRADE_KEY)));
+                        locks.stream().anyMatch(lock -> lock.getName().equals("schema_upgrade")));
                 assertTrue(locks.stream().anyMatch(lock -> lock.getName().equals("request")));
                 assertNotNull(
-                        db.scalar("SELECT value FROM website WHERE name=?", "schema_upgrade_lock"));
+                        db.scalar("SELECT value FROM website WHERE name=?", "lock_schema_upgrade"));
                 assertNull(
-                        db.scalar(
-                                "SELECT value FROM website WHERE name=?",
-                                "distributed_lock_schema_upgrade_lock"));
+                        db.scalar("SELECT value FROM website WHERE name=?", "schema_upgrade_lock"));
                 manager.releaseLock(DistributedLock.SCHEMA_UPGRADE_KEY);
                 manager.releaseLock("request");
                 assertTrue(manager.getLocks().isEmpty());
@@ -217,6 +211,37 @@ public class DistributedLockDatabaseTest {
                     .lockManager()
                     .releaseLock("replace");
             assertEquals("new-owner", db.scalar("SELECT value FROM website WHERE name=?", key));
+        }
+    }
+
+    @Test
+    public void managerListsOnlyTheUnifiedPrefixAndAlsoClearsCustomLocks() throws Exception {
+        try (ZrLogTestDatabase db = open()) {
+            var manager =
+                    DaggerDataComponent.factory()
+                            .create(() -> db.dataSource(), () -> true)
+                            .lockManager();
+            db.putWebsite("distributed_lock_cache", "leave-unchanged");
+            db.putWebsite("schema_upgrade_lock", "leave-unchanged");
+            db.putWebsite("assistant.v2.upgrade", "leave-unchanged");
+            db.putWebsite("lock_upgrade", "custom-upgrade-receipt");
+            db.putWebsite("lockXsetting", "keep");
+            var locks = manager.getLocks();
+            assertEquals(1, locks.size());
+            assertEquals("upgrade", locks.get(0).getName());
+            manager.releaseLock("upgrade");
+            assertTrue(manager.getLocks().isEmpty());
+            for (String key :
+                    List.of(
+                            "distributed_lock_cache",
+                            "schema_upgrade_lock",
+                            "assistant.v2.upgrade")) {
+                assertEquals(
+                        "leave-unchanged",
+                        db.scalar("SELECT value FROM website WHERE name=?", key));
+            }
+            assertEquals(
+                    "keep", db.scalar("SELECT value FROM website WHERE name=?", "lockXsetting"));
         }
     }
 }

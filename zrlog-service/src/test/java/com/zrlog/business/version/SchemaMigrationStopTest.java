@@ -171,7 +171,7 @@ public class SchemaMigrationStopTest {
                     DistributedLock owner =
                             DaggerDataComponent.factory()
                                     .create(() -> db.dataSource(), () -> true)
-                                    .lockManager()
+                                    .locks()
                                     .acquire(
                                             DistributedLock.SCHEMA_UPGRADE_KEY,
                                             30,

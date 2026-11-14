@@ -209,7 +209,7 @@ public class V31EntityMetadataUpgradeTest {
                 try (DistributedLock lock =
                         DaggerDataComponent.factory()
                                 .create(() -> db.dataSource(), () -> true)
-                                .lockManager()
+                                .locks()
                                 .acquire(
                                         DistributedLock.SCHEMA_UPGRADE_KEY,
                                         30,

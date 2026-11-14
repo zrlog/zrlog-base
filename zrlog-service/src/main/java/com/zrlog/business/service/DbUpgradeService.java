@@ -13,7 +13,6 @@ import com.zrlog.business.version.V31EntityMetadataUpgrade;
 import com.zrlog.common.CacheService;
 import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.data.service.DistributedLock;
-import com.zrlog.data.util.DistributedLockManager;
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
@@ -34,7 +33,7 @@ public class DbUpgradeService implements AutoCloseable {
     private final String dbName;
     private final long currentSqlVersion;
     private final Object migrationMonitor = new Object();
-    private final DistributedLockManager locks;
+    private final DistributedLock.Factory locks;
     private volatile boolean cancelled;
     private Thread migrationThread;
     private DistributedLock acquiredLock;
@@ -47,9 +46,7 @@ public class DbUpgradeService implements AutoCloseable {
         this(
                 dataSource,
                 dao,
-                new DistributedLockManager(
-                        () -> new WebSiteRepository(dataSource),
-                        key -> new DistributedLock(() -> new WebSiteRepository(dataSource), key)),
+                key -> new DistributedLock(() -> new WebSiteRepository(dataSource), key),
                 currentSqlVersion);
     }
 
@@ -57,7 +54,7 @@ public class DbUpgradeService implements AutoCloseable {
     public DbUpgradeService(
             DataSourceWrapper dataSource,
             DAO dao,
-            DistributedLockManager locks,
+            DistributedLock.Factory locks,
             @Assisted long currentSqlVersion) {
         this.dataSource = dataSource;
         this.dao = dao;

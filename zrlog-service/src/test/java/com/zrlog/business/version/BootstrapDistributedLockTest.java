@@ -32,7 +32,7 @@ public class BootstrapDistributedLockTest {
             throws SQLException {
         return DaggerDataComponent.factory()
                 .create(() -> db.dataSource(), () -> true)
-                .lockManager()
+                .locks()
                 .acquire(
                         DistributedLock.SCHEMA_UPGRADE_KEY,
                         waitMillis,
@@ -47,7 +47,7 @@ public class BootstrapDistributedLockTest {
     }
 
     @Test
-    public void existingManagerCanInspectAndRecoverHistoricalLockRows() throws Exception {
+    public void managerCanInspectAndRecoverLocksBeforeSchemaMigration() throws Exception {
         try (ZrLogTestDatabase db = open()) {
             db.putWebsite(DistributedLock.SCHEMA_UPGRADE_KEY, "previous-migration");
             db.putWebsite(DistributedLock.LOCK_PREFIX + "request", "locked");

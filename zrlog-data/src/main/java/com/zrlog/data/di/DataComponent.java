@@ -7,7 +7,7 @@ import com.zrlog.data.repository.*;
 import com.zrlog.data.service.BaseDataDbService;
 import com.zrlog.data.service.DistributedLock;
 import com.zrlog.data.service.UserPreferenceStore;
-import com.zrlog.data.util.DistributedLockManager;
+import com.zrlog.data.util.LockManager;
 import dagger.BindsInstance;
 import dagger.Component;
 import jakarta.inject.Named;
@@ -49,7 +49,7 @@ public interface DataComponent {
 
     DistributedLock.Factory locks();
 
-    DistributedLockManager lockManager();
+    LockManager lockManager();
 
     @Component.Factory
     interface Factory {

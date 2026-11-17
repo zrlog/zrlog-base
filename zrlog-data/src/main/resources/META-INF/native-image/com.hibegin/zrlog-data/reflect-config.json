@@ -1,5 +1,15 @@
 [
   {
+    "name": "com.zrlog.data.cache.StartupData$Property",
+    "fields": [
+      { "name": "name" },
+      { "name": "value" }
+    ],
+    "methods": [
+      { "name": "<init>", "parameterTypes": [] }
+    ]
+  },
+  {
     "name": "com.zrlog.model.Comment",
     "fields": [
       {

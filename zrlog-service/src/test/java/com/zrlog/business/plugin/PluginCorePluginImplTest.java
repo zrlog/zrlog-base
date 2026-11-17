@@ -187,8 +187,7 @@ public class PluginCorePluginImplTest {
                             if ("getPublicWebSiteInfo".equals(method.getName())) {
                                 return info;
                             }
-                            if ("getCurrentSqlVersion".equals(method.getName())
-                                    || "getWebSiteVersion".equals(method.getName())) {
+                            if ("getWebSiteVersion".equals(method.getName())) {
                                 return 0L;
                             }
                             if ("toString".equals(method.getName())) {

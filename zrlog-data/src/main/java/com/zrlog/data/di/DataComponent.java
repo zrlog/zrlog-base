@@ -3,6 +3,7 @@ package com.zrlog.data.di;
 import com.hibegin.common.dao.DAO;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.common.CacheService;
+import com.zrlog.data.cache.StartupData;
 import com.zrlog.data.repository.*;
 import com.zrlog.data.service.BaseDataDbService;
 import com.zrlog.data.service.DistributedLock;
@@ -22,6 +23,8 @@ public interface DataComponent {
     DataSourceWrapper dataSource();
 
     CacheService cache();
+
+    StartupData startupData();
 
     DAO dao();
 

@@ -237,7 +237,6 @@ public class BaseDataDbServiceDatabaseTest {
                     db.queryOne(
                             "select value from website where name=?", "base_data_init_cache_v3");
 
-            assertEquals(42L, cacheService.getCurrentSqlVersion());
             assertTrue(cacheService.getWebSiteVersion() != 0);
             assertEquals("Tech", cacheService.getArticleTypes().get(0).getTypeName());
             assertTrue(

@@ -12,8 +12,6 @@ public interface CacheService {
 
     String ZRLOG_SQL_VERSION_KEY = "zrlogSqlVersion";
 
-    long getCurrentSqlVersion();
-
     long getWebSiteVersion();
 
     BaseDataInitVO getInitData();

@@ -368,6 +368,17 @@ public final class V31EntityMetadataUpgrade {
 
     private void execute(String sql, Object... params) throws SQLException {
         checkRunning();
+        if (sqlite && !source.isWebApi() && sql.startsWith("ALTER TABLE ")) {
+            try (Connection connection = source.getConnection()) {
+                // SQLite may reject DDL against a pooled connection's stale schema before
+                // checking its schema version. Refresh on the same connection before parsing DDL.
+                var runner = source.getQueryRunner();
+                runner.query(connection, "SELECT 1 FROM sqlite_master LIMIT 1", ResultSet::next);
+                checkRunning();
+                runner.update(connection, sql, params);
+            }
+            return;
+        }
         dao.execute(sql, params);
     }
 }

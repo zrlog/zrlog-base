@@ -73,8 +73,7 @@ public class PluginLifecycleContractTest {
                                 refreshCount.incrementAndGet();
                                 return new BaseDataInitVO();
                             }
-                            if ("getCurrentSqlVersion".equals(method.getName())
-                                    || "getWebSiteVersion".equals(method.getName())) {
+                            if ("getWebSiteVersion".equals(method.getName())) {
                                 return 0L;
                             }
                             if ("toString".equals(method.getName())) {
@@ -395,8 +394,7 @@ public class PluginLifecycleContractTest {
                             PluginLifecycleContractTest.class.getClassLoader(),
                             new Class[] {CacheService.class},
                             (proxy, method, args) -> {
-                                if ("getCurrentSqlVersion".equals(method.getName())
-                                        || "getWebSiteVersion".equals(method.getName())) {
+                                if ("getWebSiteVersion".equals(method.getName())) {
                                     return 0L;
                                 }
                                 if ("toString".equals(method.getName())) {

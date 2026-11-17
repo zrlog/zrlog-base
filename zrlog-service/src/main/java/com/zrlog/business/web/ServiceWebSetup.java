@@ -7,10 +7,10 @@ import com.zrlog.business.plugin.PluginCorePlugin;
 import com.zrlog.business.plugin.PluginCorePluginImpl;
 import com.zrlog.business.plugin.StaticSitePlugin;
 import com.zrlog.business.service.*;
+import com.zrlog.business.version.UpgradeVersionHandler;
 import com.zrlog.common.CacheService;
 import com.zrlog.common.ZrLogConfig;
 import com.zrlog.data.di.DataComponent;
-import com.zrlog.data.repository.WebSiteRepository;
 import com.zrlog.plugin.Plugins;
 import com.zrlog.web.WebSetup;
 import com.zrlog.web.WebSetupContext;
@@ -80,11 +80,14 @@ public final class ServiceWebSetup implements WebSetup {
 
     @Override
     public void beforeDatabaseReady(DataSourceWrapper dataSource) throws java.sql.SQLException {
-        // Read only the historical schema marker before cache construction or Entity-backed writes.
-        String stored =
-                new WebSiteRepository(dataSource)
-                        .findValueByName(CacheService.ZRLOG_SQL_VERSION_KEY);
-        long sqlVersion = stored == null ? -1 : Long.parseLong(stored);
+        var startupData =
+                config.getServerConfig()
+                        .getBindings()
+                        .build()
+                        .get(DataComponent.class)
+                        .startupData();
+        long sqlVersion = startupData.readSqlVersion();
+        if (sqlVersion != UpgradeVersionHandler.SQL_VERSION) startupData.invalidate();
         if (sqlVersion >= 0) {
             DbUpgradeService upgrade;
             synchronized (migrationMonitor) {

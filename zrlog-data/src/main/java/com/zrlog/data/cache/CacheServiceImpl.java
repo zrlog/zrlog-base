@@ -1,5 +1,7 @@
 package com.zrlog.data.cache;
 
+import static com.zrlog.data.cache.StartupData.CACHE_KEY;
+
 import com.google.gson.Gson;
 import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.ObjectUtil;
@@ -37,8 +39,6 @@ public class CacheServiceImpl implements CacheService {
     private static final Logger LOGGER = LoggerUtil.getLogger(CacheServiceImpl.class);
 
     private final AtomicLong version;
-    private final String CACHE_KEY = "base_data_init_cache_v3";
-    private final long sqlVersion;
     private final BooleanSupplier installed;
     private final Lock lock;
     private final jakarta.inject.Provider<WebSiteRepository> websites;
@@ -56,7 +56,8 @@ public class CacheServiceImpl implements CacheService {
             jakarta.inject.Provider<TagRepository> tags,
             jakarta.inject.Provider<UserRepository> users,
             BaseDataDbService baseData,
-            DistributedLock.Factory locks) {
+            DistributedLock.Factory locks,
+            StartupData startupData) {
         this.websites = Objects.requireNonNull(websites);
         this.types = Objects.requireNonNull(types);
         this.tags = Objects.requireNonNull(tags);
@@ -67,9 +68,12 @@ public class CacheServiceImpl implements CacheService {
         long versionStart =
                 Long.parseLong(new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()) + "00000");
         this.version = new AtomicLong(versionStart);
-        Map<String, Object> baseInfo =
-                websites.get().getWebSiteByNameIn(Arrays.asList(CACHE_KEY, ZRLOG_SQL_VERSION_KEY));
-        String dbCache = (String) baseInfo.get(CACHE_KEY);
+        String dbCache;
+        try {
+            dbCache = startupData.takeCache();
+        } catch (SQLException e) {
+            throw new DAOException(e);
+        }
         if (StringUtils.isNotEmpty(dbCache)) {
             try {
                 this.cacheInit = new Gson().fromJson(dbCache, BaseDataInitVO.class);
@@ -79,17 +83,6 @@ public class CacheServiceImpl implements CacheService {
         } else {
             this.cacheInit = getInitData();
         }
-        String sqlVersion = (String) baseInfo.get(ZRLOG_SQL_VERSION_KEY);
-        if (StringUtils.isNotEmpty(sqlVersion)) {
-            this.sqlVersion = Long.parseLong(sqlVersion);
-        } else {
-            this.sqlVersion = -1L;
-        }
-    }
-
-    @Override
-    public long getCurrentSqlVersion() {
-        return sqlVersion;
     }
 
     @Override

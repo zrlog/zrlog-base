@@ -1716,11 +1716,6 @@ public class ServiceUtilityFallbackTest {
         }
 
         @Override
-        public long getCurrentSqlVersion() {
-            return 0;
-        }
-
-        @Override
         public long getWebSiteVersion() {
             return version;
         }

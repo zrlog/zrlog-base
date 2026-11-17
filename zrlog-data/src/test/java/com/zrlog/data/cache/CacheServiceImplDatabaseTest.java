@@ -123,7 +123,6 @@ public class CacheServiceImplDatabaseTest {
                                     .create(() -> db.dataSource(), applicationConfig::isInstalled)
                                     .cache());
 
-            assertEquals(7L, service.getCurrentSqlVersion());
             assertEquals(99L, service.getWebSiteVersion());
             assertEquals("Cached Type", service.getArticleTypes().get(0).getTypeName());
             assertEquals("cached", service.getTags().get(0).getText());
@@ -149,7 +148,6 @@ public class CacheServiceImplDatabaseTest {
                                     .create(() -> db.dataSource(), applicationConfig::isInstalled)
                                     .cache());
 
-            assertEquals(-1L, service.getCurrentSqlVersion());
             assertEquals(0L, service.getWebSiteVersion());
             assertEquals("Db Type", service.getArticleTypes().get(0).getTypeName());
             assertEquals("db-tag", service.getTags().get(0).getText());

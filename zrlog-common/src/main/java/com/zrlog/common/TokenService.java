@@ -24,6 +24,11 @@ public interface TokenService {
      */
     AdminFullTokenVO getAdminTokenVO(HttpRequest request);
 
+    /** Authenticate an admin request, allowing storage failures to reach its error handler. */
+    default AdminFullTokenVO getAdminTokenVOForAdmin(HttpRequest request) {
+        return getAdminTokenVO(request);
+    }
+
     /** Renew an authenticated browser session without changing its chosen lifetime. */
     default void refreshAdminToken(
             AdminFullTokenVO token, HttpRequest request, HttpResponse response) throws Exception {

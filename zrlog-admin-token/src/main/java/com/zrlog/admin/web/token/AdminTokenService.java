@@ -1,6 +1,7 @@
 package com.zrlog.admin.web.token;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
 import com.hibegin.common.util.EnvKit;
 import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.SecurityUtils;
@@ -14,6 +15,7 @@ import com.zrlog.common.Constants;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.vo.AdminFullTokenVO;
 import com.zrlog.common.vo.AdminTokenVO;
+import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.repository.UserRepository;
 import com.zrlog.data.security.AccountAccess;
 import com.zrlog.data.service.UserPreferenceStore;
@@ -109,6 +111,16 @@ public class AdminTokenService implements TokenService {
 
     @Override
     public AdminFullTokenVO getAdminTokenVO(HttpRequest request) {
+        try {
+            return getAdminTokenVOForAdmin(request);
+        } catch (DAOException e) {
+            LOGGER.warning("Unable to load account for optional admin session");
+            return null;
+        }
+    }
+
+    @Override
+    public AdminFullTokenVO getAdminTokenVOForAdmin(HttpRequest request) {
         if (!installed.getAsBoolean()) {
             return null;
         }
@@ -179,10 +191,21 @@ public class AdminTokenService implements TokenService {
                 return adminTokenVO;
             }
         } catch (BadPaddingException e) {
-            // ignore 发生数据库 secretKey 无法解析 token 的情况下
             userSecretKeyCacheMap.remove(userId);
+            LOGGER.warning("Admin token decryption failed; cached account key cleared");
+        } catch (SQLException e) {
+            throw new DAOException(e);
+        } catch (DAOException e) {
+            throw e;
+        } catch (JsonParseException e) {
+            LOGGER.warning(
+                    () -> "Invalid admin token payload (" + e.getClass().getSimpleName() + ")");
+        } catch (IllegalArgumentException e) {
+            LOGGER.warning(
+                    () -> "Invalid admin token encoding (" + e.getClass().getSimpleName() + ")");
         } catch (Exception e) {
-            LOGGER.warning("Invalid admin token");
+            LOGGER.warning(
+                    () -> "Admin token verification failed (" + e.getClass().getSimpleName() + ")");
         }
         return null;
     }
@@ -262,7 +285,12 @@ public class AdminTokenService implements TokenService {
             HttpResponse response,
             long duration)
             throws Exception {
-        AccountAccess account = loadAccount(userId);
+        AccountAccess account;
+        try {
+            account = loadAccount(userId);
+        } catch (SQLException e) {
+            throw new DAOException(e);
+        }
         if (!account.isEnabled()) throw new IllegalStateException("Account disabled");
         if (duration <= 0) throw new IllegalArgumentException("Invalid session lifetime");
         AdminTokenVO adminTokenVO = new AdminTokenVO();

@@ -7,12 +7,14 @@ import com.hibegin.http.server.api.HttpResponse;
 import com.hibegin.http.server.web.cookie.Cookie;
 import com.zrlog.common.TokenService;
 import com.zrlog.common.vo.AdminFullTokenVO;
+import com.zrlog.data.exception.DAOException;
 import com.zrlog.data.repository.UserRepository;
 import com.zrlog.data.service.UserPreferenceStore;
 import com.zrlog.model.User;
 import com.zrlog.test.support.ZrLogTestDatabase;
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +28,7 @@ public class AdminTokenServiceTest {
     // Keep encrypted fixtures deterministic, including the wrong-key padding failure.
     private boolean installed = true;
     private boolean staticHtml;
+    private SQLException accountReadFailure;
 
     private long now = 1_700_000_000_000L;
 
@@ -129,7 +132,9 @@ public class AdminTokenServiceTest {
             }
 
             @Override
-            protected com.zrlog.data.security.AccountAccess loadAccount(int userId) {
+            protected com.zrlog.data.security.AccountAccess loadAccount(int userId)
+                    throws SQLException {
+                if (accountReadFailure != null) throw accountReadFailure;
                 return com.zrlog.data.security.AccountAccess.fromRow(
                         Map.of(
                                 "userId",
@@ -245,6 +250,35 @@ public class AdminTokenServiceTest {
         assertNotNull(token);
         assertEquals(7, token.getUserId());
         assertEquals("session-id", token.getSessionId());
+    }
+
+    @Test
+    public void shouldReportTemporaryAccountReadFailureOnAdminRequests() throws Exception {
+        AdminTokenService service = testService(30);
+        Cookie cookie = createAdminCookie(service, "secret-key");
+        cacheSecretKey(service, 7, "secret-key");
+        HttpRequest request =
+                request("/admin", new HashMap<>(), new Cookie[] {cookie}, new HashMap<>());
+        AdminFullTokenVO token = service.getAdminTokenVOForAdmin(request);
+
+        accountReadFailure = new SQLException("Account database unavailable");
+        DAOException failure =
+                assertThrows(DAOException.class, () -> service.getAdminTokenVOForAdmin(request));
+        assertSame(accountReadFailure, failure.getCause());
+        assertEquals(9101, failure.getError());
+        assertNull(service.getAdminTokenVO(request));
+        var refreshFailure =
+                assertThrows(
+                        DAOException.class,
+                        () ->
+                                service.refreshAdminToken(
+                                        token, request, new CapturedResponse().response()));
+        assertSame(accountReadFailure, refreshFailure.getCause());
+
+        accountReadFailure = null;
+        assertNotNull(service.getAdminTokenVOForAdmin(request));
+        now += 31 * 60000;
+        assertNull(service.getAdminTokenVOForAdmin(request));
     }
 
     @Test

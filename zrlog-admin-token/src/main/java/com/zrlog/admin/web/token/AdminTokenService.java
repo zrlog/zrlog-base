@@ -1,6 +1,7 @@
 package com.zrlog.admin.web.token;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
 import com.hibegin.common.util.EnvKit;
 import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.SecurityUtils;
@@ -190,14 +191,21 @@ public class AdminTokenService implements TokenService {
                 return adminTokenVO;
             }
         } catch (BadPaddingException e) {
-            // ignore 发生数据库 secretKey 无法解析 token 的情况下
             userSecretKeyCacheMap.remove(userId);
+            LOGGER.warning("Admin token decryption failed; cached account key cleared");
         } catch (SQLException e) {
             throw new DAOException(e);
         } catch (DAOException e) {
             throw e;
+        } catch (JsonParseException e) {
+            LOGGER.warning(
+                    () -> "Invalid admin token payload (" + e.getClass().getSimpleName() + ")");
+        } catch (IllegalArgumentException e) {
+            LOGGER.warning(
+                    () -> "Invalid admin token encoding (" + e.getClass().getSimpleName() + ")");
         } catch (Exception e) {
-            LOGGER.warning("Invalid admin token");
+            LOGGER.warning(
+                    () -> "Admin token verification failed (" + e.getClass().getSimpleName() + ")");
         }
         return null;
     }

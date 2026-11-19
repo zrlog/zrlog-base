@@ -53,11 +53,7 @@ public class WebsiteKvService {
 
     public List<Entry> listByPrefix(String prefix) {
         try {
-            return websites.get()
-                    .queryList(
-                            "SELECT `name`, `value`, length(`value`) AS `size` FROM `website` WHERE `name` LIKE ? ORDER BY `name`",
-                            Entry.class,
-                            prefix + "%");
+            return websites.get().listByPrefix(prefix, Entry.class);
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "List website KV by prefix failed, prefix=" + prefix, e);
             return Collections.emptyList();

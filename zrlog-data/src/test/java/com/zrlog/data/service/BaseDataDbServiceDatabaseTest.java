@@ -235,7 +235,7 @@ public class BaseDataDbServiceDatabaseTest {
             BaseDataInitVO refreshed = cacheService.refreshInitData();
             Map<String, Object> savedCache =
                     db.queryOne(
-                            "select value from website where name=?", "base_data_init_cache_v3");
+                            "select value from website where name=?", "cache_v1:base_data_init_v3");
 
             assertTrue(cacheService.getWebSiteVersion() != 0);
             assertEquals("Tech", cacheService.getArticleTypes().get(0).getTypeName());

@@ -143,7 +143,7 @@ public class SchemaMigrationStopTest {
                                     CacheService.ZRLOG_SQL_VERSION_KEY));
                     assertNull(
                             db.scalar(
-                                    "SELECT value FROM website WHERE name='base_data_init_cache_v3'"));
+                                    "SELECT value FROM website WHERE name='cache_v1:base_data_init_v3'"));
                     new DbUpgradeService(db.dataSource(), 30).tryDoUpgrade();
                     assertEquals(
                             String.valueOf(UpgradeVersionHandler.SQL_VERSION),

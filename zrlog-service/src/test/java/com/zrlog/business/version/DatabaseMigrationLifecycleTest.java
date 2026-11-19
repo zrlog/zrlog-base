@@ -144,7 +144,7 @@ public class DatabaseMigrationLifecycleTest {
                                         CacheService.ZRLOG_SQL_VERSION_KEY));
                         assertNull(
                                 db.scalar(
-                                        "SELECT value FROM website WHERE name='base_data_init_cache_v3'"));
+                                        "SELECT value FROM website WHERE name='cache_v1:base_data_init_v3'"));
                     } else {
                         config.start(db.dataSource());
                         CacheService cache =
@@ -155,7 +155,7 @@ public class DatabaseMigrationLifecycleTest {
                         assertEquals("Historical site", cache.getPublicWebSiteInfo().getTitle());
                         assertNotNull(
                                 db.scalar(
-                                        "SELECT updatedAt FROM website WHERE name='base_data_init_cache_v3'"));
+                                        "SELECT updatedAt FROM website WHERE name='cache_v1:base_data_init_v3'"));
                         assertEquals(
                                 String.valueOf(UpgradeVersionHandler.SQL_VERSION),
                                 db.scalar(

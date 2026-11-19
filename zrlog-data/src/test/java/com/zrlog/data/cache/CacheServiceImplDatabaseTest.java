@@ -114,7 +114,7 @@ public class CacheServiceImplDatabaseTest {
             WebSiteRepository websites = new WebSiteRepository(db.dataSource());
             websites.insert(
                     WebSiteRepository.entry(
-                            "base_data_init_cache_v3", new Gson().toJson(cached), ""));
+                            "cache_v1:base_data_init_v3", new Gson().toJson(cached), ""));
             websites.insert(WebSiteRepository.entry("zrlogSqlVersion", "7", ""));
 
             CacheServiceImpl service =
@@ -139,7 +139,7 @@ public class CacheServiceImplDatabaseTest {
             applicationConfig = testConfig(false);
             seedLookupTables(db);
             WebSiteRepository websites = new WebSiteRepository(db.dataSource());
-            websites.insert(WebSiteRepository.entry("base_data_init_cache_v3", "{bad-json", ""));
+            websites.insert(WebSiteRepository.entry("cache_v1:base_data_init_v3", "{bad-json", ""));
             websites.insert(WebSiteRepository.entry("default_setting", "{\"color\":\"blue\"}", ""));
 
             CacheServiceImpl service =
@@ -164,7 +164,7 @@ public class CacheServiceImplDatabaseTest {
         try (ZrLogTestDatabase db = ZrLogTestDatabase.open(databaseType)) {
             applicationConfig = testConfig(true);
             WebSiteRepository websites = new WebSiteRepository(db.dataSource());
-            websites.insert(WebSiteRepository.entry("base_data_init_cache_v3", "{bad-json", ""));
+            websites.insert(WebSiteRepository.entry("cache_v1:base_data_init_v3", "{bad-json", ""));
             websites.insert(WebSiteRepository.entry("title", "Installed Site", ""));
             websites.insert(WebSiteRepository.entry("author", "Installed Author", ""));
 

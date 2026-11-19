@@ -197,6 +197,14 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
         return value == null ? null : value.toString();
     }
 
+    public <T> List<T> listByPrefix(String prefix, Class<T> entryType) throws SQLException {
+        String pattern = prefix.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+        return queryList(
+                "SELECT `name`, `value`, length(`value`) AS `size` FROM `website` WHERE `name` LIKE ? ESCAPE '!' ORDER BY `name`",
+                entryType,
+                pattern);
+    }
+
     /** Lock coordination must also work before the entity metadata columns exist. */
     public void insertLock(String name, String owner, String remark) throws SQLException {
         execute("INSERT INTO website(name,value,remark) VALUES(?,?,?)", name, owner, remark);

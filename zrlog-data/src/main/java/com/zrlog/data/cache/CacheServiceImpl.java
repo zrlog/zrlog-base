@@ -2,7 +2,6 @@ package com.zrlog.data.cache;
 
 import static com.zrlog.data.cache.StartupData.CACHE_KEY;
 
-import com.google.gson.Gson;
 import com.hibegin.common.util.LoggerUtil;
 import com.hibegin.common.util.ObjectUtil;
 import com.hibegin.common.util.StringUtils;
@@ -31,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /** 对缓存数据的操作 */
@@ -46,6 +44,7 @@ public class CacheServiceImpl implements CacheService {
     private final jakarta.inject.Provider<TagRepository> tags;
     private final jakarta.inject.Provider<UserRepository> users;
     private final BaseDataDbService baseData;
+    private final WebsiteCacheService websiteCache;
     private volatile BaseDataInitVO cacheInit;
 
     @Inject
@@ -56,6 +55,7 @@ public class CacheServiceImpl implements CacheService {
             jakarta.inject.Provider<TagRepository> tags,
             jakarta.inject.Provider<UserRepository> users,
             BaseDataDbService baseData,
+            WebsiteCacheService websiteCache,
             DistributedLock.Factory locks,
             StartupData startupData) {
         this.websites = Objects.requireNonNull(websites);
@@ -63,6 +63,7 @@ public class CacheServiceImpl implements CacheService {
         this.tags = Objects.requireNonNull(tags);
         this.users = Objects.requireNonNull(users);
         this.baseData = Objects.requireNonNull(baseData);
+        this.websiteCache = Objects.requireNonNull(websiteCache);
         this.lock = locks.create("base-data-init-cache");
         this.installed = Objects.requireNonNull(installed, "installed");
         long versionStart =
@@ -75,11 +76,7 @@ public class CacheServiceImpl implements CacheService {
             throw new DAOException(e);
         }
         if (StringUtils.isNotEmpty(dbCache)) {
-            try {
-                this.cacheInit = new Gson().fromJson(dbCache, BaseDataInitVO.class);
-            } catch (Exception e) {
-                LOGGER.info("Load cache error " + e.getMessage());
-            }
+            this.cacheInit = websiteCache.decodeJson(CACHE_KEY, dbCache, BaseDataInitVO.class);
         } else {
             this.cacheInit = getInitData();
         }
@@ -135,10 +132,8 @@ public class CacheServiceImpl implements CacheService {
             try {
                 cacheInit = baseData.queryCacheInit(executor);
                 cacheInit.setVersion(expectVersion);
-                try {
-                    websites.get().updateByKV(CACHE_KEY, new Gson().toJson(cacheInit));
-                } catch (SQLException e) {
-                    LOGGER.log(Level.SEVERE, "save cache error " + e.getMessage(), e);
+                if (!websiteCache.putJson(CACHE_KEY, cacheInit)) {
+                    LOGGER.severe("Save base data cache failed");
                 }
             } finally {
                 executor.shutdown();

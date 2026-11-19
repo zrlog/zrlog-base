@@ -3,6 +3,7 @@ package com.zrlog.data.di;
 import com.hibegin.common.dao.DAO;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.zrlog.common.CacheService;
+import com.zrlog.data.cache.WebsiteCacheService;
 import dagger.Module;
 import dagger.Provides;
 
@@ -19,6 +20,11 @@ public final class DataBindingsModule {
     @Provides
     static CacheService cache(DataComponent data) {
         return data.cache();
+    }
+
+    @Provides
+    static WebsiteCacheService websiteCache(DataComponent data) {
+        return data.websiteCache();
     }
 
     @Provides

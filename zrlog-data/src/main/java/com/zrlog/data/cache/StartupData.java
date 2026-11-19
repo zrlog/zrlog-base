@@ -10,7 +10,7 @@ import java.sql.SQLException;
 /** Shares one database read between schema validation and this application's cache construction. */
 @Singleton
 public final class StartupData {
-    public static final String CACHE_KEY = "base_data_init_cache_v3";
+    public static final String CACHE_KEY = WebsiteCacheService.storageKey("base_data_init_v3");
     private final Provider<WebSiteRepository> websites;
     private Snapshot snapshot;
 

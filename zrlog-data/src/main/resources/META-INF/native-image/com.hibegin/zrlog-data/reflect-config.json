@@ -10,6 +10,11 @@
     ]
   },
   {
+    "name": "com.zrlog.data.cache.WebsiteCacheService$Entry",
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true
+  },
+  {
     "name": "com.zrlog.model.Comment",
     "fields": [
       {

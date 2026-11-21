@@ -570,6 +570,27 @@ public class PluginCorePluginImplTest {
     }
 
     @Test
+    public void shouldForwardDefaultsForMissingAppearanceStrings() throws Exception {
+        HttpRequest request = request(Map.of());
+        AdminTokenVO token = new AdminTokenVO();
+        token.setUserId(5);
+        token.setProtocol("https");
+
+        for (String missing : new String[] {null, "", " "}) {
+            request.getAttr()
+                    .put(
+                            PluginAdminAppearance.REQUEST_ATTRIBUTE,
+                            new PluginAdminAppearance(missing, false, missing, false));
+
+            Map<String, String> headers = headerMap(request, token);
+            assertEquals("default", headers.get("Admin-Theme"));
+            assertEquals("#1677ff", headers.get("Admin-Color-Primary"));
+            assertEquals("false", headers.get("Dark-Mode"));
+            assertEquals("false", headers.get("Admin-Compact-Mode"));
+        }
+    }
+
+    @Test
     public void shouldForwardGetContextToStartedPluginCoreServer() throws Exception {
         AtomicReference<String> queryRef = new AtomicReference<>();
         AtomicReference<String> loginHeaderRef = new AtomicReference<>();

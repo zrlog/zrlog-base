@@ -18,6 +18,7 @@ import com.zrlog.business.rest.response.PluginStatusResponse;
 import com.zrlog.common.Constants;
 import com.zrlog.common.vo.AdminTokenVO;
 import com.zrlog.common.vo.PublicWebSiteInfo;
+import com.zrlog.data.util.WebSiteUtils;
 import com.zrlog.plugin.PluginAdminAppearance;
 import com.zrlog.util.BlogBuildInfoUtil;
 import com.zrlog.util.ExecutionDeadline;
@@ -206,14 +207,16 @@ public class PluginCorePluginImpl extends BaseLockObject implements PluginCorePl
             }
         }
         map.put("Dark-Mode", Boolean.toString(appearance.isDarkMode()));
-        map.put(
-                "Admin-Theme",
-                StringUtils.isEmpty(appearance.getTheme()) ? "default" : appearance.getTheme());
+        String theme = Objects.toString(appearance.getTheme(), "").trim();
+        map.put("Admin-Theme", theme.isEmpty() ? "default" : theme);
         map.put("Admin-Compact-Mode", Boolean.toString(appearance.isCompactMode()));
+        String colorPrimary = Objects.toString(appearance.getColorPrimary(), "").trim();
+        map.put(
+                "Admin-Color-Primary",
+                colorPrimary.isEmpty() ? WebSiteUtils.DEFAULT_COLOR_PRIMARY_COLOR : colorPrimary);
         if (EnvKit.isDevMode()) {
             map.put("DEV_MODE", "true");
         }
-        map.put("Admin-Color-Primary", appearance.getColorPrimary());
         if (Objects.isNull(request)) {
             return map;
         }

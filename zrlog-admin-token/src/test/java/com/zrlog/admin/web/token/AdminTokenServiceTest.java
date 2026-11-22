@@ -16,6 +16,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +26,6 @@ import org.junit.Test;
 public class AdminTokenServiceTest {
 
     private final Map<Integer, Long> personalTimeouts = new HashMap<>();
-    // Keep encrypted fixtures deterministic, including the wrong-key padding failure.
     private boolean installed = true;
     private boolean staticHtml;
     private SQLException accountReadFailure;
@@ -373,58 +373,36 @@ public class AdminTokenServiceTest {
     }
 
     @Test
-    public void legacyTokensUseSiteTimeoutUntilRenewed() throws Exception {
-        installed = true;
+    public void usesFreshNoncesAndRejectsAlteredSessions() throws Exception {
         AdminTokenService service = testService(30);
+        String first = createAdminCookie(service, "secret-key").getValue();
+        String second = createAdminCookie(service, "secret-key").getValue();
         cacheSecretKey(service, 7, "secret-key");
-        com.zrlog.common.vo.AdminTokenVO legacy = new com.zrlog.common.vo.AdminTokenVO();
-        legacy.setUserId(7);
-        legacy.setCreatedDate(now);
-        legacy.setSessionId("legacy");
-        legacy.setProtocol("http");
-        java.lang.reflect.Method encrypt =
-                AdminTokenService.class.getDeclaredMethod("encrypt", String.class, byte[].class);
-        encrypt.setAccessible(true);
-        byte[] encrypted =
-                (byte[])
-                        encrypt.invoke(
-                                service,
-                                "secret-key",
-                                new com.google.gson.Gson()
-                                        .toJson(legacy)
-                                        .getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        String token =
-                "7#"
-                        + com.zrlog.admin.web.util.ByteUtils.bytesToHexString(
-                                java.util.Base64.getEncoder().encode(encrypted));
-        AdminFullTokenVO parsed =
-                service.getAdminTokenVO(request("/admin", header(token), null, new HashMap<>()));
-        assertNotNull(parsed);
-        assertNull(parsed.getExpiresAt());
-        personalTimeouts.put(7, 60L);
-        CapturedResponse renewed = new CapturedResponse();
-        service.refreshAdminToken(
-                parsed,
-                request("/admin", new HashMap<>(), null, new HashMap<>()),
-                renewed.response());
-        AdminFullTokenVO refreshed =
-                service.getAdminTokenVO(
-                        request(
-                                "/admin",
-                                header(renewed.cookies.get(0).getValue()),
-                                null,
-                                new HashMap<>()));
-        assertEquals(Long.valueOf(now + 30 * 60000), refreshed.getExpiresAt());
-        service.updateSessionTimeout(-1);
-        assertNull(
-                service.getAdminTokenVO(request("/admin", header(token), null, new HashMap<>())));
+
+        String versionPrefix = "7#v2.";
+        assertTrue(first.startsWith(versionPrefix));
+        assertNotEquals(first, second);
         assertNotNull(
-                service.getAdminTokenVO(
-                        request(
-                                "/admin",
-                                header(renewed.cookies.get(0).getValue()),
-                                null,
-                                new HashMap<>())));
+                service.getAdminTokenVO(request("/admin", header(first), null, new HashMap<>())));
+        assertNotNull(
+                service.getAdminTokenVO(request("/admin", header(second), null, new HashMap<>())));
+
+        byte[] envelope = Base64.getUrlDecoder().decode(first.substring(versionPrefix.length()));
+        envelope[envelope.length - 1] ^= 1;
+        String altered =
+                versionPrefix + Base64.getUrlEncoder().withoutPadding().encodeToString(envelope);
+        assertNull(
+                service.getAdminTokenVO(request("/admin", header(altered), null, new HashMap<>())));
+    }
+
+    @Test
+    public void rejectsLegacySessionsWithoutLookingUpTheAccount() throws Exception {
+        AdminTokenService service = testService(30);
+        accountReadFailure =
+                new SQLException("Legacy sessions must be declined before a storage read");
+        assertNull(
+                service.getAdminTokenVOForAdmin(
+                        request("/admin", header("7#6c6567616379"), null, new HashMap<>())));
     }
 
     @Test

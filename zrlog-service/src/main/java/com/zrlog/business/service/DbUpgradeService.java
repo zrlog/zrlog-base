@@ -211,12 +211,13 @@ public class DbUpgradeService implements AutoCloseable {
                     }
                     // Bootstrap SQL must work before the Entity metadata columns exist.
                     checkRunning();
-                    Object versionRow =
+                    boolean versionRowExists =
                             dao.queryFirstObj(
-                                    "SELECT siteId FROM website WHERE name=?",
-                                    CacheService.ZRLOG_SQL_VERSION_KEY);
+                                            "SELECT 1 FROM website WHERE name=? LIMIT 1",
+                                            CacheService.ZRLOG_SQL_VERSION_KEY)
+                                    != null;
                     checkRunning();
-                    if (versionRow == null) {
+                    if (!versionRowExists) {
                         dao.execute(
                                 "INSERT INTO website(name,value) VALUES(?,?)",
                                 CacheService.ZRLOG_SQL_VERSION_KEY,

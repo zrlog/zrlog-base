@@ -191,6 +191,10 @@ public class WebSiteRepository extends BaseRepository<WebSite, Long> {
                 .orElse(null);
     }
 
+    public boolean existsByName(String name) throws SQLException {
+        return queryFirstObj("SELECT 1 FROM " + tableName + " WHERE name=? LIMIT 1", name) != null;
+    }
+
     /** Nullable scalar read, including before the entity metadata columns have been migrated. */
     public String findValueByName(String name) throws SQLException {
         Object value = queryFirstObj("SELECT value FROM " + tableName + " WHERE name=?", name);

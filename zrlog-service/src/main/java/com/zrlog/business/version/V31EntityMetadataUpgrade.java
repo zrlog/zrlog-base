@@ -102,13 +102,8 @@ public final class V31EntityMetadataUpgrade {
                 // Existing log.version may be NULL; preserve every known revision.
                 execute("UPDATE " + q(name) + " SET version=0 WHERE version IS NULL");
                 checkRunning();
-                if (((Number)
-                                        dao.queryFirstObj(
-                                                "SELECT count(*) FROM "
-                                                        + q(name)
-                                                        + " WHERE version<0"))
-                                .longValue()
-                        != 0) {
+                if (dao.queryFirstObj("SELECT 1 FROM " + q(name) + " WHERE version<0 LIMIT 1")
+                        != null) {
                     throw new SQLException(
                             "Negative row version in " + name + "; migration stopped");
                 }

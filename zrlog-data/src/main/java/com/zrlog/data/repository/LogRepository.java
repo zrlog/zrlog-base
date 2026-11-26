@@ -53,6 +53,30 @@ public class LogRepository extends BaseRepository<Log, Long> implements Serializ
         return execute("UPDATE log SET click=click+1 WHERE logId=?", logId);
     }
 
+    /** Checks for any article in the category, including drafts and private articles. */
+    public boolean existsByTypeId(Integer typeId) {
+        try {
+            return queryFirstObj("select 1 from " + tableName + " where typeId=? limit 1", typeId)
+                    != null;
+        } catch (SQLException e) {
+            throw new DAOException(e);
+        }
+    }
+
+    /** Counts all articles in the category. */
+    public long countByTypeId(Integer typeId) {
+        try {
+            Number count =
+                    (Number)
+                            queryFirstObj(
+                                    "select count(1) from " + tableName + " where typeId=?",
+                                    typeId);
+            return count.longValue();
+        } catch (SQLException e) {
+            throw new DAOException(e);
+        }
+    }
+
     private ArticleDetailDTO getDetail(Object idOrAlias) throws SQLException {
         if (idOrAlias == null) {
             return null;

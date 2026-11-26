@@ -1,6 +1,7 @@
 package com.zrlog.data.repository;
 
 import com.hibegin.common.dao.DataSourceWrapper;
+import com.hibegin.common.dao.entity.BaseRepository;
 import com.hibegin.common.util.SecurityUtils;
 import com.zrlog.data.dto.VisitorCommentDTO;
 import com.zrlog.data.util.DateValueFormatUtils;

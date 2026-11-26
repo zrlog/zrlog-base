@@ -1,6 +1,7 @@
 package com.zrlog.data.repository;
 
 import com.hibegin.common.dao.DataSourceWrapper;
+import com.hibegin.common.dao.entity.BaseRepository;
 import com.zrlog.common.cache.dto.UserBasicDTO;
 import com.zrlog.model.User;
 import jakarta.inject.Inject;

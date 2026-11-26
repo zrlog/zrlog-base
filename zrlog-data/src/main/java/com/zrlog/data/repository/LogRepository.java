@@ -6,6 +6,7 @@ import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequest;
 import com.hibegin.common.dao.dto.PageRequestImpl;
 import com.hibegin.common.dao.dto.UnPageRequestImpl;
+import com.hibegin.common.dao.entity.BaseRepository;
 import com.hibegin.common.util.StringUtils;
 import com.zrlog.common.cache.vo.HotLogBasicInfoEntry;
 import com.zrlog.data.dto.ArticleBasicDTO;

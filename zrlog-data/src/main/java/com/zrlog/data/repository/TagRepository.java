@@ -3,6 +3,7 @@ package com.zrlog.data.repository;
 import com.hibegin.common.dao.DataSourceWrapper;
 import com.hibegin.common.dao.dto.PageData;
 import com.hibegin.common.dao.dto.PageRequest;
+import com.hibegin.common.dao.entity.BaseRepository;
 import com.hibegin.common.util.StringUtils;
 import com.zrlog.common.cache.dto.TagDTO;
 import com.zrlog.model.Tag;
